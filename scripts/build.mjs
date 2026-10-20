@@ -3,6 +3,8 @@ import {mkdir,copyFile,readFile,writeFile} from 'node:fs/promises';
 await mkdir('dist',{recursive:true});
 await build({entryPoints:['src/app.js'],outfile:'dist/app.js',bundle:true,format:'esm',platform:'browser',target:['es2022'],minify:false,sourcemap:false,legalComments:'eof',external:['node:fs','node:module','node:path','node:url'],logLevel:'info'});
 for(const path of ['index.html','styles.css'])await copyFile(path,`dist/${path}`);
+await mkdir('dist/assets',{recursive:true});
+await copyFile('assets/mach-selected-A.svg','dist/assets/mach-selected-A.svg');
 await copyFile('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs','dist/pdf.worker.min.mjs');
 await copyFile('THIRD_PARTY_LICENSES.txt','dist/THIRD_PARTY_LICENSES.txt');
 await writeFile('dist/.nojekyll','');
