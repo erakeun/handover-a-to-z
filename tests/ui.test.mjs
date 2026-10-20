@@ -873,7 +873,7 @@ test('first task needs only name and method, saves once without replacing compos
   const editor = ui.document.querySelector('.first-task-editor');
   const name = control('업무명');
   const method = control('하는 방법');
-  assert.deepEqual([...editor.querySelectorAll('input,textarea,select')], [name, method]);
+  assert.deepEqual([...editor.querySelectorAll('input:not([hidden]),textarea,select')], [name, method]);
   assert.equal(savedDocument().tasks.length, 0, 'opening the editor creates no empty task');
   await fill('업무명', ' ');
   assert.equal(savedDocument().tasks.length, 0, 'whitespace is not a new task');
@@ -920,7 +920,7 @@ test('selected task keeps the overview alongside two initial inputs and retains 
   assert.ok(workspace.querySelector(':scope > .map-workspace'));
   assert.ok(workspace.querySelector(':scope > .selected-editor'));
   const editor = ui.document.querySelector('.selected-editor .editor');
-  const initiallyShown = [...editor.querySelectorAll('input,select,textarea')].filter(node => !node.closest('details:not([open])'));
+  const initiallyShown = [...editor.querySelectorAll('input,select,textarea')].filter(node => !node.hidden&&!node.closest('details:not([open])'));
   assert.deepEqual(initiallyShown.map(node => node.labels[0].textContent), ['업무명', '하는 방법']);
   assert.equal(ui.document.querySelector('.map-calendar').closest('details').open, false);
   await fill('주담당 역할', '검증 담당');

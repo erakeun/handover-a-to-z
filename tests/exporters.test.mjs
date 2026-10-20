@@ -117,8 +117,8 @@ test('DOCX reopens as OOXML with Korean headings, onboarding, summary, details a
   assert.ok(output.text.indexOf('업무 상세') < output.text.indexOf('별도 인계할 진행 건'));
   assert.ok(output.text.includes('암호화되지 않은 평문'));
   assert.ok(output.text.includes('직접 확인'));
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 1);
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tblHeader').length, 1);
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 2, 'summary plus final work overview');
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tblHeader').length, 2);
   assert.equal(output.dom.getElementsByTagNameNS(NS, 'trHeight').length, 0);
   assert.equal(output.dom.getElementsByTagNameNS(NS, 'cantSplit').length, 0);
   const styles = strFromU8(output.zip['word/styles.xml']);
@@ -185,7 +185,7 @@ test('35-task DOCX consolidates 245 missing fields without changing entered cont
   }
   const populatedOutput = await reopen(populated);
   assert.equal(populatedOutput.paragraphs.length - output.paragraphs.length, 245 * 2 - 35);
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 8);
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 9, 'eight group summaries plus final work overview');
 });
 
 test('summary omits start rules while detailed DOCX and AI exports preserve them', async () => {
@@ -214,7 +214,7 @@ test('DOCX selection applies to summary/detail and excludes source excerpts in p
   ]) assert.ok(!output.text.includes(excluded), `excluded: ${excluded}`);
   assert.ok(output.text.includes('검증용 원문.docx'));
   assert.ok(output.text.includes('선택하지 않은 내용이 섞일 수 있어 생략'));
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tr').length, 2);
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tr').length, 4, 'selected task appears in summary and final overview');
 
   const empty = await reopen(document, { taskIds: [], caseIds: [] });
   assert.equal(empty.dom.getElementsByTagNameNS(NS, 'tbl').length, 0);
@@ -310,7 +310,7 @@ test('DOCX and AI exports retain big-work groups while selection omits other gro
   document.tasks[1].groupId = 'group-2';
   const full = await reopen(document);
   for (const group of document.groups) assert.ok(full.text.includes(`큰 업무: ${group.title}`));
-  assert.equal(full.dom.getElementsByTagNameNS(NS, 'tbl').length, 2);
+  assert.equal(full.dom.getElementsByTagNameNS(NS, 'tbl').length, 3, 'two nonempty group summaries plus final work overview');
   assert.ok(full.text.indexOf('학생 지원 큰 업무') < full.text.indexOf(document.tasks[0].title));
   assert.ok(full.text.includes('등록된 세부 업무가 없습니다.'));
   const selected = await reopen(document, { taskIds: ['task-1'], caseIds: [] });

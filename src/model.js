@@ -1,9 +1,12 @@
+import { IMAGE_LIMITS, validateImage } from "./image-data.js";
+
 /**
- * Portable v1 data model. All dates are Gregorian civil dates, not UTC instants.
+ * Portable v1/v2 data model. All dates are Gregorian civil dates, not UTC instants.
  * Limits apply to editable drafts as well as imported and exported documents.
  */
 export const LIMITS = Object.freeze({
   jsonBytes: 5 * 1024 * 1024,
+  imageJsonBytes: 24 * 1024 * 1024,
   tasks: 500,
   cases: 500,
   sources: 200,
@@ -30,6 +33,7 @@ const ACCESS_STATUSES = new Set(["unconfirmed", "confirmed", "notApplicable"]);
 const TASK_TEXT = ["method", "purpose", "materials", "steps", "contacts", "approval", "exceptions", "doneWhen", "evidence"];
 const OPTIONAL_TASK_KEYS = ["groupId", "ownerRole", "supportRole", "accessStatus"];
 const TASK_KEYS = ["id", "title", "groupId", "ownerRole", "supportRole", "timing", ...TASK_TEXT, "verifiedAt", "accessChecked", "accessStatus", "sourceRefs", "firstDay", "firstWeek"];
+const IMAGE_KEYS = ["id", "section", "caption", "mime", "width", "height", "data"];
 const CASE_KEYS = ["id", "title", "status", "nextAction", "dueDate", "waitingFor", "notes", "sourceRefs"];
 const SOURCE_KEYS = ["id", "name", "format", "importedAt", "excerpt", "warnings"];
 const TIMING_KEYS = ["kind", "cadence", "dayRule", "weekday", "day", "month", "date", "trigger", "anchorDate", "offsetDays", "startRule"];
@@ -158,6 +162,18 @@ function inspectJSON(value, addError) {
   const ancestors = new Set();
   let count = 0;
   let stopped = false;
+  let maximumString = LIMITS.excerpt;
+  let graphCharacters = 0;
+  let graphBudget = LIMITS.jsonBytes;
+  const charge = (length) => {
+    graphCharacters += length;
+    // Every code unit needs at least one UTF-8 JSON byte. This cheap lower bound
+    // prevents huge repeated values from reaching JSON.stringify at all.
+    if (graphCharacters > graphBudget) {
+      addError(`v${graphBudget === LIMITS.imageJsonBytes ? 2 : 1} JSON 문서는 UTF-8 기준 ${graphBudget === LIMITS.imageJsonBytes ? 24 : 5} MiB 이하여야 합니다.`);
+      stopped = true;
+    }
+  };
   function walk(node, path, depth) {
     if (stopped) return;
     if (++count > LIMITS.nodes) {
@@ -171,9 +187,11 @@ function inspectJSON(value, addError) {
       return;
     }
     if (typeof node === "string") {
+      charge(node.length);
+      if (stopped) return;
+      if (node.length > maximumString) { addError(`${path}: 문자열 길이 제한을 초과했습니다.`); return; }
       if (BAD_CONTROLS.test(node)) addError(`${path}: 허용하지 않는 제어문자가 있습니다.`);
       if (invalidUnicode(node)) addError(`${path}: 짝이 맞지 않는 유니코드 서로게이트가 있습니다.`);
-      if (node.length > LIMITS.excerpt) addError(`${path}: 문자열 길이 제한을 초과했습니다.`);
       return;
     }
     if (node === null || typeof node === "boolean") return;
@@ -198,6 +216,12 @@ function inspectJSON(value, addError) {
       addError(`${path}: 일반 JSON 객체 또는 배열이 필요합니다.`);
       return;
     }
+    // Read the root version through a descriptor so accessors are never invoked.
+    // v1 retains its original graph-wide string cap, including provenance.
+    if (depth === 0 && !array && Object.getOwnPropertyDescriptor(node, "schemaVersion")?.value === 2) {
+      maximumString = 4 * Math.ceil(IMAGE_LIMITS.imageBytes / 3);
+      graphBudget = LIMITS.imageJsonBytes;
+    }
     const keys = Reflect.ownKeys(node);
     if (keys.length > LIMITS.nodes) {
       addError(`${path}: 객체 항목 수 제한을 초과했습니다.`);
@@ -217,6 +241,8 @@ function inspectJSON(value, addError) {
         addError(`${path}: Symbol 속성은 JSON으로 보존할 수 없습니다.`);
         continue;
       }
+      if (!array) charge(key.length);
+      if (stopped) break;
       const childPath = array ? `${path}[${key}]` : `${path}.${key}`;
       if (BAD_KEYS.has(key)) addError(`${childPath}: 금지된 prototype 관련 속성입니다.`);
       if (BAD_CONTROLS.test(key) || invalidUnicode(key)) addError(`${path}: 안전하지 않은 속성 이름입니다.`);
@@ -249,13 +275,14 @@ export function validateDocument(value) {
   if (errors.length) return { ok: false, errors, warnings };
   // This is exactly the format stringifyDocument writes, so valid documents can
   // always be exported and imported again under the same byte budget.
-  if (encoder.encode(JSON.stringify(value, null, 2)).byteLength > LIMITS.jsonBytes) {
-    error("JSON 문서는 UTF-8 기준 5 MiB 이하여야 합니다.");
+  const jsonBudget = value?.schemaVersion === 2 ? LIMITS.imageJsonBytes : LIMITS.jsonBytes;
+  if (encoder.encode(JSON.stringify(value, null, 2)).byteLength > jsonBudget) {
+    error(`v${value?.schemaVersion === 2 ? 2 : 1} JSON 문서는 UTF-8 기준 ${value?.schemaVersion === 2 ? 24 : 5} MiB 이하여야 합니다.`);
     return { ok: false, errors, warnings };
   }
   const object = (node, path, allowed, required = allowed) => {
     if (!isRecord(node)) { error(`${path}: 객체가 필요합니다.`); return false; }
-    for (const key of Object.keys(node)) if (!allowed.includes(key)) error(`${path}.${key}: v1에서 알 수 없는 속성입니다.`);
+    for (const key of Object.keys(node)) if (!allowed.includes(key)) error(`${path}.${key}: v${value?.schemaVersion === 2 ? 2 : 1}에서 알 수 없는 속성입니다.`);
     for (const key of required) if (!owns(node, key)) error(`${path}.${key}: 필수 속성이 없습니다.`);
     return true;
   };
@@ -313,7 +340,35 @@ export function validateDocument(value) {
   };
 
   if (!object(value, "$", DOCUMENT_KEYS, DOCUMENT_KEYS.filter((key) => !["provenance", "groups"].includes(key)))) return { ok: false, errors, warnings };
-  if (value.schemaVersion !== 1) error("$.schemaVersion: 지원하는 스키마 버전은 숫자 1입니다.");
+  if (value.schemaVersion !== 1 && value.schemaVersion !== 2) error("$.schemaVersion: 지원하는 스키마 버전은 숫자 1 또는 2입니다.");
+  // Reject count/size excess before base64 allocation, CRC, or decompression.
+  let imageCount = 0, imageBytes = 0, imageBudgetExceeded = false;
+  if (value.schemaVersion === 2 && Array.isArray(value.tasks)) value.tasks.forEach((task, index) => {
+    if (!Array.isArray(task?.images)) return;
+    imageCount += task.images.length;
+    if (task.images.length > IMAGE_LIMITS.perTask) {
+      error(`$.tasks[${index}].images: 업무당 이미지는 최대 ${IMAGE_LIMITS.perTask}개까지 지원합니다.`);
+      imageBudgetExceeded = true;
+    }
+    for (const image of task.images) {
+      if (typeof image?.data !== "string") continue;
+      const size = image.data.length / 4 * 3 - (image.data.endsWith("==") ? 2 : image.data.endsWith("=") ? 1 : 0);
+      imageBytes += Math.max(0, size);
+      if (size > IMAGE_LIMITS.imageBytes) {
+        error(`$.tasks[${index}].images: v2 문서 이미지 한 장은 2 MiB 이하여야 합니다.`);
+        imageBudgetExceeded = true;
+      }
+    }
+  });
+  if (imageCount > IMAGE_LIMITS.perDocument) {
+    error(`문서 전체 이미지는 최대 ${IMAGE_LIMITS.perDocument}개까지 지원합니다.`);
+    imageBudgetExceeded = true;
+  }
+  if (imageBytes > IMAGE_LIMITS.totalBytes) {
+    error("v2 문서 전체 이미지 용량은 16 MiB 이하여야 합니다.");
+    imageBudgetExceeded = true;
+  }
+  if (imageBudgetExceeded) return { ok: false, errors, warnings };
   id(value.id, "$.id");
   title(value.title, "$.title");
   timestamp(value.createdAt, "$.createdAt");
@@ -333,7 +388,7 @@ export function validateDocument(value) {
   });
   if (list(value.tasks, "$.tasks", LIMITS.tasks)) value.tasks.forEach((task, index) => {
     const path = `$.tasks[${index}]`;
-    if (!object(task, path, TASK_KEYS, TASK_KEYS.filter((key) => !OPTIONAL_TASK_KEYS.includes(key)))) return;
+    if (!object(task, path, value.schemaVersion === 2 ? [...TASK_KEYS, "images"] : TASK_KEYS, TASK_KEYS.filter((key) => !OPTIONAL_TASK_KEYS.includes(key)))) return;
     id(task.id, `${path}.id`);
     title(task.title, `${path}.title`);
     if (owns(task, "groupId") && string(task.groupId, `${path}.groupId`, LIMITS.id) && task.groupId !== "" && !groupIds.has(task.groupId)) {
@@ -348,6 +403,15 @@ export function validateDocument(value) {
     }
     ["accessChecked", "firstDay", "firstWeek"].forEach((key) => boolean(task[key], `${path}.${key}`));
     sourceRefs(task.sourceRefs, `${path}.sourceRefs`);
+    if (value.schemaVersion === 2 && owns(task, "images") && list(task.images, `${path}.images`, IMAGE_LIMITS.perTask)) {
+      task.images.forEach((image, imageIndex) => {
+        const imagePath = `${path}.images[${imageIndex}]`;
+        if (!object(image, imagePath, IMAGE_KEYS)) return;
+        id(image.id, `${imagePath}.id`);
+        string(image.caption, `${imagePath}.caption`, IMAGE_LIMITS.caption);
+        try { validateImage(image); } catch (failure) { error(`${imagePath}: ${failure.message}`); }
+      });
+    }
   });
   if (list(value.cases, "$.cases", LIMITS.cases)) value.cases.forEach((item, index) => {
     const path = `$.cases[${index}]`;
@@ -418,7 +482,9 @@ function rejectDuplicateJSONKeys(text) {
 
 export function parseImport(text) {
   if (typeof text !== "string") throw new TypeError("JSON 텍스트를 전달해 주세요.");
-  if (encoder.encode(text).byteLength > LIMITS.jsonBytes) throw new Error("JSON 파일은 UTF-8 기준 5 MiB 이하여야 합니다.");
+  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2 24 MiB 이하여야 합니다.");
+  const rawBytes = encoder.encode(text).byteLength;
+  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2 24 MiB 이하여야 합니다.");
   let document;
   try {
     // Scan nesting/count limits before JSON.parse can allocate an abusive graph.
@@ -428,6 +494,7 @@ export function parseImport(text) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new Error("올바른 JSON 문서가 아닙니다. 파일의 문법을 확인해 주세요.");
   }
+  if (document?.schemaVersion !== 2 && rawBytes > LIMITS.jsonBytes) throw new Error("v1 JSON 파일은 UTF-8 기준 5 MiB 이하여야 합니다.");
   const result = validateDocument(document);
   if (!result.ok) throw new Error(`가져올 수 없는 인수인계 문서입니다.\n${result.errors.join("\n")}`);
   return { document, warnings: result.warnings };
@@ -443,7 +510,7 @@ export function importAsCopy(document) {
   const source = parseImport(stringifyDocument(document)).document;
   const now = new Date().toISOString();
   const map = new Map();
-  const oldIds = new Set([source.id, ...(source.groups ?? []).map((item) => item.id), ...source.tasks.map((item) => item.id), ...source.cases.map((item) => item.id), ...source.sourceFiles.map((item) => item.id)]);
+  const oldIds = new Set([source.id, ...(source.groups ?? []).map((item) => item.id), ...source.tasks.map((item) => item.id), ...source.tasks.flatMap((item) => (item.images ?? []).map((image) => image.id)), ...source.cases.map((item) => item.id), ...source.sourceFiles.map((item) => item.id)]);
   const newIds = new Set();
   function fresh(oldId) {
     let replacement;
@@ -458,6 +525,7 @@ export function importAsCopy(document) {
   const remap = (item) => ({
     ...item, id: fresh(item.id), sourceRefs: item.sourceRefs.map((reference) => map.get(reference)),
     ...(owns(item, "groupId") ? { groupId: item.groupId === "" ? "" : map.get(item.groupId) } : {}),
+    ...(owns(item, "images") ? { images: item.images.map((image) => ({ ...image, id: fresh(image.id) })) } : {}),
   });
   const tasks = source.tasks.map(remap);
   const cases = source.cases.map(remap);

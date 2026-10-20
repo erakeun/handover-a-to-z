@@ -1,20 +1,38 @@
-import {makeId,createDocument,createTask,createCase,validateDocument,parseImport,importAsCopy,stringifyDocument,issuesFor,dueInRange,exampleDocument,dateISO} from './model.js';
+import {makeId,createDocument,createTask,createCase,validateDocument,parseImport,importAsCopy,stringifyDocument,issuesFor,dueInRange,exampleDocument,dateISO,LIMITS} from './model.js';
 import {loadDocuments,saveDocuments,loadProgress,markProgress,DATA_KEY,PROGRESS_KEY,CURRENT_KEY} from './storage.js';
 import {extractDocument} from './importers.js';
 import {exportDocx,exportAIText} from './exporters.js';
 import {renderCalendar} from './calendar.js';
 import {AUTHOR_PROMPT,parseAIDraft,applyAIDraft} from './ai-draft.js';
+import {createPhotoUI} from './photo-ui.js';
+import {verifyDocumentImages} from './image-browser.js';
+import {imageStats} from './image-data.js';
+import {openDocumentStore} from './document-store.js';
+import {renderWorkOverview} from './work-overview.js';
+import {proposeDraftTitles} from './draft-titles.js';
+import {renderUsageGuide} from './guide.js';
 
 const app=document.querySelector('#app');
 const modalRoot=document.querySelector('#modal-root');
 const state={documents:[],current:null,view:'home',authorSection:'tasks',selected:null,readerTab:'map',calendarMode:'month',calendarAnchor:dateISO(),calendarSelected:'',mobilePane:'map',roleQuery:'',query:'',authorQuery:'',limit:12,progress:{},exportSelections:new Map(),saveMessage:'입력하면 이 기기에 자동 저장됩니다',storageBlocked:false,storageConflict:false,progressBlocked:false,storageError:'',progressError:''};
-let storage;let lastDocumentsRaw=null;
-try{storage=window.localStorage;state.documents=loadDocuments(storage);lastDocumentsRaw=storage.getItem(DATA_KEY);state.current=storage.getItem(CURRENT_KEY);}
+let storage,documentStore;let lastDocumentsRaw=null;
+let savePending=false,saveRunning=false,editGeneration=0;
+app.textContent='이 기기에 저장한 문서를 불러오는 중입니다…';
+try{
+ storage=window.localStorage;documentStore=await openDocumentStore({storage,indexedDB:window.indexedDB});
+ state.documents=documentStore.documents;lastDocumentsRaw=documentStore.raw;state.current=storage.getItem(CURRENT_KEY);
+ state.storageWarning=documentStore.warning||'';
+ if(documentStore.readOnly){state.storageBlocked=documentStore.errorCode==='STORAGE_INVALID'&&!state.documents.length;state.storageError=documentStore.warning;state.saveMessage='임시저장을 사용할 수 없습니다 · 현재 내용은 파일로 보관해 주세요';}
+}
 catch(e){state.storageError=e.message;try{state.storageBlocked=!!storage?.getItem(DATA_KEY);}catch{}}
 try{if(storage)state.progress=loadProgress(storage);}catch(e){state.progressError=e.message;state.progressBlocked=true;}
 if(!state.documents.some(d=>d.id===state.current))state.current=state.documents[0]?.id||null;
 let fieldCount=0;
+let dialogCount=0;
 const openSections=new Set();
+const photos=createPhotoUI({el,button,field,note,modal,notice,confirmAction,isCurrent:id=>current()?.id===id,changed:(taskId,redraw=true)=>{
+ state.selected=taskId;saved();if(redraw){render();if(state.storageError)notice('사진은 현재 화면에 남아 있지만 기기 임시저장에 실패했습니다. 지금 ‘파일로 저장’을 눌러 JSON으로 보관해 주세요.');}
+}});
 function disclosure(key,label,...children){const node=el('details',{class:'optional-section',open:openSections.has(key)},el('summary',{},label),...children);node.addEventListener('toggle',()=>{if(!node.isConnected)return;if(node.open)openSections.add(key);else openSections.delete(key);});return node;}
 const today=()=>dateISO();
 const current=()=>state.documents.find(d=>d.id===state.current);
@@ -49,12 +67,31 @@ function select(label,value,options,onChange){
  return el('div',{class:'field'},el('label',{for:id},label),control);
 }
 function check(label,value,onChange,attrs={}){return el('label',{class:'checkbox'},el('input',{type:'checkbox',checked:value,onchange:e=>onChange(e.target.checked,e.target),...attrs}),el('span',{},label));}
-function saved(){
- const doc=current();if(doc)doc.updatedAt=new Date().toISOString();
- if(state.storageBlocked){state.saveMessage='이전 저장을 복구한 뒤 저장해 주세요';}
- else try{if(!storage)throw new Error('저장 공간을 사용할 수 없습니다');saveDocuments(storage,state.documents,lastDocumentsRaw);lastDocumentsRaw=storage.getItem(DATA_KEY);state.saveMessage='이 기기에 자동 저장됨 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});state.storageError='';}
- catch(e){state.saveMessage=e.code==='STORAGE_CONFLICT'?'다른 창의 변경 감지 · 먼저 파일로 저장해 주세요':'임시저장 실패 · 파일로 저장해 주세요';state.storageError=e.message;if(e.code==='STORAGE_CONFLICT'){state.storageConflict=true;const alert=document.querySelector('#conflict-notice');if(alert)alert.hidden=false;}}
+function updateSaveStatus(){
  document.querySelectorAll('[data-save-status]').forEach(n=>{n.textContent=state.saveMessage;n.classList.toggle('danger-text',!!state.storageError);});
+ const alert=document.querySelector('#save-failure-notice');if(alert){alert.hidden=!state.storageError;alert.querySelector('p').textContent=state.storageError?'현재 화면의 변경을 기기에 저장하지 못했습니다. 창을 닫기 전에 사진까지 포함된 JSON 파일을 받아 보관하세요.':'';}
+}
+async function flushSave(){
+ if(saveRunning)return;saveRunning=true;
+ try{
+  while(savePending){
+   savePending=false;
+   if(state.storageBlocked)throw new Error('이전 저장 원본을 복구한 뒤 저장해 주세요.');
+   if(!documentStore)throw new Error('기기 저장 공간을 사용할 수 없습니다.');
+   const snapshot=structuredClone(state.documents);
+   lastDocumentsRaw=await documentStore.save(snapshot,lastDocumentsRaw);
+  }
+  state.saveMessage='이 기기에 자동 저장됨 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});state.storageError='';
+ }catch(e){
+  savePending=false;state.storageError=e.message;
+  state.saveMessage=e.code==='STORAGE_CONFLICT'?'다른 창의 변경 감지 · 먼저 파일로 저장해 주세요':'임시저장 실패 · 파일로 저장해 주세요';
+  if(e.code==='STORAGE_CONFLICT'){state.storageConflict=true;const alert=document.querySelector('#conflict-notice');if(alert)alert.hidden=false;}
+ }finally{saveRunning=false;updateSaveStatus();}
+}
+function saved(){
+ const doc=current();if(doc)doc.updatedAt=new Date().toISOString();editGeneration++;
+ savePending=true;state.saveMessage='이 기기에 저장 중… 창을 닫기 전에 완료를 확인해 주세요';updateSaveStatus();
+ queueMicrotask(flushSave);
  if(doc){const heading=document.querySelector('.document-bar h1');if(heading)heading.textContent=doc.title||'이름 없는 인수인계';for(const node of document.querySelectorAll('.map-task[data-task-id]')){const task=doc.tasks.find(t=>t.id===node.dataset.taskId);if(task){node.querySelector('.map-task-title').textContent=task.title||'새 세부 업무';node.querySelector('.map-task-timing').textContent=timingLabel(task.timing);}}if(state.view==='author')document.querySelector('.work-map')?.dispatchEvent(new window.Event('author-map-refresh'));const calendar=document.querySelector('.map-calendar');if(calendar&&state.view==='author')calendar.replaceWith(calendarFor(doc,true));}
 }
 function chooseDocument(id){state.current=id;state.selected=null;state.query='';state.authorQuery='';state.roleQuery='';try{storage?.setItem(CURRENT_KEY,id);}catch{};render();}
@@ -69,11 +106,11 @@ function download(data,name,type='application/json'){
 }
 function safeName(s){return (s||'인수인계').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').slice(0,80);}
 function backup(){try{download(stringifyDocument(current()),`${safeName(current().title)}-${today()}.json`);notice('전달·백업 파일을 만들었습니다. 다운로드한 파일을 확인해 주세요.');}catch(e){notice(e.message);}}
-function modal(title,body,actions=[]){
- const prior=document.activeElement;modalRoot.replaceChildren();
- const dialog=el('dialog',{class:'modal','aria-labelledby':'modal-title'});
+function modal(title,body,actions=[],{stack=false}={}){
+ const prior=document.activeElement;if(!stack)modalRoot.replaceChildren();
+ const titleId=`modal-title-${++dialogCount}`;const dialog=el('dialog',{class:'modal','aria-labelledby':titleId});
  const close=()=>{if(dialog.open&&typeof dialog.close==='function')dialog.close();dialog.remove();prior?.isConnected&&prior.focus();};
- dialog.append(el('div',{class:'modal-heading'},el('h2',{id:'modal-title'},title),button('닫기',close,'quiet',{'aria-label':'대화상자 닫기'})),body,el('div',{class:'modal-actions'},actions.map(a=>a(close))));
+ dialog.append(el('div',{class:'modal-heading'},el('h2',{id:titleId},title),button('닫기',close,'quiet',{'aria-label':'대화상자 닫기'})),body,el('div',{class:'modal-actions'},actions.map(a=>a(close))));
  dialog.addEventListener('close',()=>{dialog.remove();prior?.isConnected&&prior.focus();});
  modalRoot.append(dialog);if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
  return {dialog,close};
@@ -81,10 +118,11 @@ function modal(title,body,actions=[]){
 function confirmAction(title,description,onYes){modal(title,el('p',{},description),[close=>button('취소',close),close=>button('확인',()=>{close();onYes();},'primary')]);}
 function render(focus=false){
  const active=document.activeElement;let focusKey=null;if(active&&app.contains(active)){if(active.matches('select,input,textarea'))focusKey={tag:active.tagName,label:document.querySelector(`label[for="${active.id}"]`)?.textContent};else if(active.tagName==='BUTTON')focusKey={tag:'BUTTON',label:active.getAttribute('aria-label')||active.textContent};}
- fieldCount=0;app.replaceChildren(header());
+ fieldCount=0;const masthead=header();masthead.querySelector('.header-inner').append(button('사용방법',()=>{if(state.view!=='guide')state.guideFrom=state.view;state.view='guide';render(true);},'quiet'));app.replaceChildren(masthead);
  const main=el('main',{id:'main',tabindex:'-1',class:state.view==='home'?'home':'workspace'});
- if(state.view==='home'||!current())main.append(home());
- else {main.append(documentBar());if(state.view==='author')main.append(authorView());if(state.view==='reader')main.append(readerView());if(state.view==='export')main.append(exportView());if(state.view==='print')main.append(printView());}
+ if(state.view==='guide')main.append(renderUsageGuide({el,button,onClose:()=>{state.view=state.guideFrom||'home';render(true);}}));
+ else if(state.view==='home'||!current())main.append(home());
+ else {main.append(documentBar());if(state.view==='author')main.append(authorView());if(state.view==='reader')main.append(readerView());if(state.view==='export')main.append(exportView());if(state.view==='print')main.append(printView());if(state.view==='overview')main.append(overviewView());}
  app.append(main,el('footer',{class:'footer'},el('span',{},'인수인계 A to Z'),el('span',{},'입력한 문서는 기기 안에서 처리 · JSON은 암호화되지 않은 파일')));
  if(focus)main.focus({preventScroll:true});else if(focusKey)queueMicrotask(()=>{const candidate=[...app.querySelectorAll(focusKey.tag.toLowerCase())].find(n=>focusKey.tag==='BUTTON'?(n.getAttribute('aria-label')||n.textContent)===focusKey.label:document.querySelector(`label[for="${n.id}"]`)?.textContent===focusKey.label);candidate?.focus({preventScroll:true});});
 }
@@ -96,16 +134,33 @@ function header(){
 }
 function home(){
  const section=el('section',{});
- if(state.storageError)section.append(el('div',{class:'callout warning',role:'alert'},el('strong',{},'임시저장을 확인해 주세요'),el('p',{},state.storageError),state.storageBlocked?el('div',{class:'actions'},button('저장 원본 내려받기',()=>download(storage.getItem(DATA_KEY),'임시저장-복구원본.txt','text/plain')),button('저장 공간 초기화',()=>confirmAction('기기 임시저장을 초기화할까요?','먼저 저장 원본을 내려받아 보관해 주세요. 이 기기의 문서 목록만 지워집니다.',()=>{storage.removeItem(DATA_KEY);lastDocumentsRaw=null;state.storageBlocked=false;state.storageError='';state.documents=[];state.current=null;render();}),'danger')):note('현재 내용을 파일로 백업하면서 사용해 주세요.')));
+ if(documentStore?.kind==='localStorage')section.append(note('이 브라우저는 용량이 작은 간이 임시저장을 사용합니다. 사진이 많으면 저장이 안 될 수 있으니 전달 파일도 꼭 받아 보관해 주세요.','warning-text'));
+ if(state.storageError)section.append(el('div',{class:'callout warning',role:'alert'},el('strong',{},'임시저장을 확인해 주세요'),el('p',{},state.storageError),note('저장 원본을 바꾸지 않았습니다. 복구 원본을 먼저 보관하고, 작성 중인 문서는 파일로 저장해 주세요.')));
  section.append(el('div',{class:'home-intro'},el('h1',{},'인수인계 A to Z'),el('p',{class:'lede'},'아는 일을 적고, 이어받을 일을 찾아보세요.')),
  el('section',{'aria-label':'시작하기'},el('div',{class:'start-grid'},startCard('01','인수인계서 만들기','업무명과 하는 방법부터 적어요.',()=>activate(createDocument()),true),startCard('02','받은 인수인계서 보기','이 앱에서 전달받은 파일을 열어요.',jsonImport)),
  el('div',{class:'home-secondary actions'},button('기존 문서로 시작',documentImport,'quiet',{disabled:state.storageBlocked}),button('가상 예시 체험',()=>activate(exampleDocument(today()),'reader'),'quiet',{disabled:state.storageBlocked}))));
+ if(documentStore?.recoveryRecords?.length&&documentStore.readOnly)section.append(el('div',{class:'callout warning'},note('저장 원본이 서로 다르거나 저장소를 사용할 수 없습니다. 아래 원본은 각각 따로 보관할 수 있습니다.'),...documentStore.recoveryRecords.map((record,i)=>button(`저장 원본 ${i+1} 내려받기`,()=>download(record.raw,`기기저장-복구원본-${i+1}.json`)))));
  if(state.documents.length)section.append(el('section',{class:'recent'},el('div',{class:'section-heading'},el('h2',{},'이 기기에서 이어하기'),el('span',{class:'helper'},`${state.documents.length}개 문서`)),el('div',{class:'document-grid'},state.documents.map(doc=>el('article',{class:'document-card'},el('div',{},tag(doc.title.includes('가상')?'가상 예시':'임시저장'),el('h3',{},doc.title||'이름 없는 인수인계'),el('p',{class:'helper'},`업무 ${doc.tasks.length}개 · 진행 건 ${doc.cases.length}개`)),el('div',{class:'actions'},button('이어서 작성',()=>{state.view='author';chooseDocument(doc.id);}),button('인수자 보기',()=>{state.view='reader';chooseDocument(doc.id);},'quiet'),button('삭제',()=>confirmAction('기기에서 문서를 지울까요?',`${doc.title||'이 문서'}의 백업 파일이 있는지 확인해 주세요. 내려받은 파일은 유지됩니다.`,()=>{state.documents=state.documents.filter(d=>d.id!==doc.id);if(state.current===doc.id)state.current=state.documents[0]?.id||null;saved();render();}),'quiet danger-text')))))));
  section.append(el('div',{class:'privacy-note'},el('strong',{},'비밀번호와 인증키는 적지 마세요.'),el('span',{},'임시저장은 이 브라우저에만 남고, 브라우저 데이터 삭제 시 사라질 수 있습니다. 중요한 내용은 전달·백업 파일로 저장해 주세요.')));
  return section;
 }
 function startCard(num,title,desc,action,primary=false){return el('button',{type:'button',class:`start-card${primary?' featured':''}`,onclick:action,disabled:state.storageBlocked},el('span',{class:'card-number'},num),el('strong',{},title),el('span',{},desc),el('span',{class:'card-arrow','aria-hidden':'true'},'↗'));}
-function documentBar(){const doc=current();return el('div',{},el('div',{class:'document-bar'},el('div',{},el('p',{class:'eyebrow'},'나의 인수인계'),el('h1',{},doc.title||'이름 없는 인수인계'),el('p',{'data-save-status':'',class:`save-status${state.storageError?' danger-text':''}`,role:'status'},state.saveMessage)),el('div',{class:'actions'},button('파일로 저장',backup,'secondary'),state.view==='author'?button('받는 사람 화면 확인',()=>switchView('reader'),'primary'):state.view==='reader'?button('전달·출력하기',()=>switchView('export'),'primary'):null)),el('div',{id:'conflict-notice',class:'callout warning',role:'alert',hidden:!state.storageConflict},el('p',{},'다른 창에서 저장한 변경을 발견해 덮어쓰기를 멈췄습니다. 현재 내용은 파일로 저장할 수 있습니다.'),button('현재 내용 파일로 저장',backup),button('변경된 저장 불러오기',()=>confirmAction('다른 창의 최신 저장을 불러올까요?','현재 화면의 변경은 먼저 파일로 저장해 주세요. 최신 저장으로 이 화면을 교체합니다.',()=>{try{state.documents=loadDocuments(storage);lastDocumentsRaw=storage.getItem(DATA_KEY);state.storageConflict=false;state.storageError='';state.saveMessage='변경된 기기 저장을 불러왔습니다';if(!current())state.current=state.documents[0]?.id||null;state.selected=null;render();}catch(e){notice(e.message);}}),'quiet')));}
+function documentBar(){
+ const doc=current();
+ return el('div',{},documentStore?.kind==='localStorage'?note('이 브라우저는 간이 임시저장을 사용합니다. 사진이 많은 문서는 파일로도 저장해 주세요.','warning-text'):null,el('div',{class:'document-bar'},el('div',{},el('p',{class:'eyebrow'},'나의 인수인계'),el('h1',{},doc.title||'이름 없는 인수인계'),el('p',{'data-save-status':'',class:`save-status${state.storageError?' danger-text':''}`,role:'status'},state.saveMessage),note('임시저장은 이 브라우저에서 이어 쓰는 용도입니다. 다른 사람에게 줄 때는 사진과 설명이 함께 담긴 파일을 직접 받아 주세요.')),
+ el('div',{class:'actions'},button('파일로 저장',backup,'secondary'),button('내 업무 한눈에 보기',openOverview,'quiet'),state.overviewReturn&&state.view==='author'?button('업무표로 돌아가기',returnToOverview,'quiet'):null,state.view==='author'?button('받는 사람 화면 확인',()=>switchView('reader'),'primary'):state.view==='reader'?button('전달·출력하기',()=>switchView('export'),'primary'):null)),
+ el('div',{id:'save-failure-notice',class:'callout warning',role:'alert',hidden:!state.storageError},el('p',{},'현재 화면의 변경을 기기에 저장하지 못했습니다. 창을 닫기 전에 사진까지 포함된 JSON 파일을 받아 보관하세요.'),button('현재 내용 파일로 저장',backup)),
+ el('div',{id:'conflict-notice',class:'callout warning',role:'alert',hidden:!state.storageConflict},el('p',{},'다른 창에서 저장한 변경을 발견해 덮어쓰기를 멈췄습니다. 현재 내용은 파일로 저장할 수 있습니다.'),button('변경된 저장 불러오기',()=>confirmAction('다른 창의 최신 저장을 불러올까요?','현재 화면의 변경은 먼저 파일로 저장해 주세요. 최신 저장으로 이 화면을 교체합니다.',async()=>{try{if(savePending||saveRunning){notice('저장 중인 작업이 끝난 뒤 다시 눌러 주세요.');return;}const generation=editGeneration;const selectedDocument=state.current;const latest=await documentStore.reload();if(generation!==editGeneration||state.current!==selectedDocument||savePending||saveRunning){notice('저장을 불러오는 동안 내용이 바뀌어 현재 화면을 유지했습니다. 먼저 파일로 보관한 뒤 다시 시도해 주세요.');return;}state.documents=latest.documents;lastDocumentsRaw=latest.raw;state.storageConflict=false;state.storageError='';state.saveMessage='변경된 기기 저장을 불러왔습니다';if(!current())state.current=state.documents[0]?.id||null;state.selected=null;render();}catch(e){notice(e.message);}}),'quiet')));
+}
+function openOverview(){if(state.view!=='overview')state.overviewFrom=state.view==='author'?'author':'reader';state.overviewReturn=null;state.view='overview';render(true);}
+function returnToOverview(){const back=state.overviewReturn;state.view='overview';render();queueMicrotask(()=>{window.scrollTo?.(0,back?.scrollY||0);[...document.querySelectorAll('.overview-task-link')].find(node=>node.dataset.taskId===back?.taskId)?.focus({preventScroll:true});});}
+function overviewView(){
+ return el('section',{class:'overview-screen'},el('div',{class:'actions'},button(state.overviewFrom==='author'?'작성 화면으로 돌아가기':'인수자 화면으로 돌아가기',()=>switchView(state.overviewFrom||'reader'))),note('적어 둔 담당·큰 업무·작은 업무 제목을 자동으로 모았습니다. 빠진 일이 보이면 제목을 눌러 내용을 확인하거나 고치세요.'),renderWorkOverview({doc:current(),el,button,onSelect:id=>{
+  if(state.overviewFrom==='author'){state.overviewReturn={taskId:id,scrollY:window.scrollY||0};state.authorSection='tasks';state.selected=id;state.view='author';render(true);focusEditor();}
+  else selectTask(id,false);
+ }}));
+}
+
 function updateItem(item,key,value){item[key]=value;saved();}
 function authorView(){
  const doc=current();const authorTab=(v,t)=>button(t,()=>{state.authorSection=v;state.selected=null;render();},state.authorSection===v?'pill selected':'pill',{'aria-pressed':state.authorSection===v,...(v==='tasks'?{'data-author-task-count':''}:{})});
@@ -130,7 +185,7 @@ function authorView(){
 function firstTaskEditor(doc){
  const task=createTask();
  const write=(key,value)=>{task[key]=value;if(!doc.tasks.includes(task)){if(!task.title.trim()&&!task.method.trim())return;doc.tasks.push(task);state.selected=task.id;}saved();const count=document.querySelector('[data-author-task-count]');if(count)count.textContent=`업무 매뉴얼 ${doc.tasks.length}`;document.querySelector('.author-workspace>.map-workspace')?.replaceWith(mapWorkspace(true));};
- return el('section',{class:'editor first-task-editor','aria-label':'첫 업무 작성'},el('h2',{},'첫 업무를 적어 보세요'),note('업무명과 하는 방법부터 적으면 됩니다. 입력한 내용은 자동 저장됩니다.'),field('업무명','',v=>write('title',v),{placeholder:'예: 매월 지출 자료 정리',maxLength:300}),field('하는 방법','',v=>write('method',v),{type:'textarea',rows:8,placeholder:'무엇을 하는지, 어떻게 하는지 아는 만큼 적어 주세요.'}),button('일정·담당·자료 더 적기',()=>{if(!doc.tasks.includes(task)){notice('업무명이나 하는 방법을 먼저 적어 주세요.');return;}render();},'quiet'),note('비밀번호와 인증키는 적지 마세요. 큰 업무 분류와 일정은 나중에 추가할 수 있어요.'));
+ return el('section',{class:'editor first-task-editor','aria-label':'첫 업무 작성'},el('h2',{},'첫 업무를 적어 보세요'),note('업무명과 하는 방법부터 적으면 됩니다. 입력한 내용은 자동 저장됩니다.'),field('업무명','',v=>write('title',v),{placeholder:'예: 매월 지출 자료 정리',maxLength:300}),photos.decorate(field('하는 방법','',v=>write('method',v),{type:'textarea',rows:8,placeholder:'무엇을 하는지, 어떻게 하는지 아는 만큼 적어 주세요.'}),{doc,task,section:'method',allowNew:true}),button('일정·담당·자료 더 적기',()=>{if(!doc.tasks.includes(task)){notice('업무명이나 하는 방법을 먼저 적어 주세요.');return;}render();},'quiet'),note('비밀번호와 인증키는 적지 마세요. 큰 업무 분류와 일정은 나중에 추가할 수 있어요.'));
 }
 function newTask(groupId=''){const task=createTask({groupId});current().tasks.push(task);state.authorQuery='';state.selected=task.id;saved();render();focusEditor();}
 function mapWorkspace(editable){
@@ -174,13 +229,13 @@ function addItem(cases){const item=cases?createCase():createTask();(cases?curren
 function itemTools(item,cases){
  const list=cases?current().cases:current().tasks;const index=list.findIndex(x=>x.id===item.id);
  const move=delta=>{[list[index],list[index+delta]]=[list[index+delta],list[index]];saved();render();};
- return el('div',{class:'item-tools'},el('div',{class:'actions'},button('복제',()=>{const copy=structuredClone(item);copy.id=makeId();copy.title=(copy.title||'업무')+' (사본)';list.splice(index+1,0,copy);state.selected=copy.id;saved();render();},'quiet'),button('위로',()=>move(-1),'quiet',{disabled:index===0,'aria-label':'이 항목을 위로 이동'}),button('아래로',()=>move(1),'quiet',{disabled:index===list.length-1,'aria-label':'이 항목을 아래로 이동'})),button('삭제',()=>confirmAction('이 항목을 삭제할까요?',item.title||'이름 없는 항목',()=>{list.splice(index,1);state.selected=null;saved();render();}),'quiet danger-text'));
+ return el('div',{class:'item-tools'},el('div',{class:'actions'},button('복제',()=>{const copy=structuredClone(item);copy.id=makeId();copy.title=(copy.title||'업무')+' (사본)';if(copy.images)copy.images.forEach(image=>image.id=makeId());const candidate=structuredClone(current());candidate[cases?'cases':'tasks'].splice(index+1,0,copy);const check=validateDocument(candidate);if(!check.ok){notice('복제할 수 없습니다. '+check.errors.join(' '));return;}list.splice(index+1,0,copy);state.selected=copy.id;saved();render();},'quiet'),button('위로',()=>move(-1),'quiet',{disabled:index===0,'aria-label':'이 항목을 위로 이동'}),button('아래로',()=>move(1),'quiet',{disabled:index===list.length-1,'aria-label':'이 항목을 아래로 이동'})),button('삭제',()=>confirmAction('이 항목을 삭제할까요?',item.title||'이름 없는 항목',()=>{list.splice(index,1);state.selected=null;saved();render();}),'quiet danger-text'));
 }
 function taskEditor(task){
- return el('section',{class:'editor','aria-label':'업무 작성'},el('div',{class:'section-heading'},el('h2',{},'업무명과 하는 방법부터'),tag('나머지는 선택','green')),field('업무명',task.title,v=>updateItem(task,'title',v),{placeholder:'예: 매월 지출 자료 정리',maxLength:300}),field('하는 방법',task.method,v=>updateItem(task,'method',v),{type:'textarea',rows:8,placeholder:'무엇을 하는지, 어떻게 하는지 아는 만큼 적거나 기존 메모를 붙여넣어 주세요.',hint:'입력한 내용은 자동 저장됩니다. 줄바꿈과 붙여넣은 표 텍스트가 유지됩니다.'}),
+ return el('section',{class:'editor','aria-label':'업무 작성'},el('div',{class:'section-heading'},el('h2',{},'업무명과 하는 방법부터'),tag('나머지는 선택','green')),field('업무명',task.title,v=>updateItem(task,'title',v),{placeholder:'예: 매월 지출 자료 정리',maxLength:300}),photos.decorate(field('하는 방법',task.method,v=>updateItem(task,'method',v),{type:'textarea',rows:8,placeholder:'무엇을 하는지, 어떻게 하는지 아는 만큼 적거나 기존 메모를 붙여넣어 주세요.',hint:'입력한 내용은 자동 저장됩니다. 줄바꿈과 붙여넣은 표 텍스트가 유지됩니다.'}),{doc:current(),task,section:'method'}),
  disclosure(`timing-${task.id}`,'언제 하는 업무인가요? (선택)',timingEditor(task)),
  disclosure(`group-${task.id}`,'큰 업무별로 묶기 (선택)',select('큰 업무 영역',task.groupId||'',[['','아직 분류하지 않음'],...(current().groups||[]).map(g=>[g.id,g.title])],v=>{task.groupId=v;saved();render();})),
- disclosure(`detail-${task.id}`,'담당·자료·자세한 설명 (선택)',el('div',{class:'detail-body'},field('이 업무의 목적',task.purpose,v=>updateItem(task,'purpose',v),{type:'textarea',rows:2}),field('준비자료와 위치',task.materials,v=>updateItem(task,'materials',v),{type:'textarea',rows:3,placeholder:'문서명 · 공용 폴더 경로 · 접근 권한을 확인할 역할'}),select('자료 접근 확인',task.accessStatus||(task.accessChecked?'confirmed':'unconfirmed'),[['unconfirmed','미확인'],['confirmed','확인함'],['notApplicable','해당 없음']],v=>{task.accessStatus=v;task.accessChecked=v==='confirmed';saved();}),note('자료 접근 확인은 업무 담당이나 실제 권한 이관의 완료를 뜻하지 않습니다.'),field('진행 단계',task.steps,v=>updateItem(task,'steps',v),{type:'textarea',placeholder:'1. 자료 확인\n2. 내용 정리\n3. 확인 요청'}),field('주담당 역할',task.ownerRole||'',v=>updateItem(task,'ownerRole',v),{placeholder:'예: 운영 담당',maxLength:1000}),field('지원 역할',task.supportRole||'',v=>updateItem(task,'supportRole',v),{placeholder:'예: 행정 지원',maxLength:1000}),field('문의할 역할',task.contacts,v=>updateItem(task,'contacts',v),{type:'textarea',rows:2,placeholder:'가능하면 개인 정보 대신 역할·공용 연락 창구'}),field('결재 또는 확인',task.approval,v=>updateItem(task,'approval',v),{type:'textarea',rows:2}),field('예외 상황과 대응',task.exceptions,v=>updateItem(task,'exceptions',v),{type:'textarea',rows:3}),field('완료 조건',task.doneWhen,v=>updateItem(task,'doneWhen',v),{type:'textarea',rows:2}),field('근거 또는 참고',task.evidence,v=>updateItem(task,'evidence',v),{type:'textarea',rows:2}),field('최종 확인일',task.verifiedAt,v=>updateItem(task,'verifiedAt',v),{type:'date'}),el('div',{class:'check-row'},check('첫날에 소개할 업무',task.firstDay,v=>updateItem(task,'firstDay',v)),check('첫 주에 해볼 업무',task.firstWeek,v=>updateItem(task,'firstWeek',v))),sourceInfo(task))),itemTools(task,false));
+ disclosure(`detail-${task.id}`,'담당·자료·자세한 설명 (선택)',el('div',{class:'detail-body'},field('이 업무의 목적',task.purpose,v=>updateItem(task,'purpose',v),{type:'textarea',rows:2}),field('준비자료와 위치',task.materials,v=>updateItem(task,'materials',v),{type:'textarea',rows:3,placeholder:'문서명 · 공용 폴더 경로 · 접근 권한을 확인할 역할'}),select('자료 접근 확인',task.accessStatus||(task.accessChecked?'confirmed':'unconfirmed'),[['unconfirmed','미확인'],['confirmed','확인함'],['notApplicable','해당 없음']],v=>{task.accessStatus=v;task.accessChecked=v==='confirmed';saved();}),note('자료 접근 확인은 업무 담당이나 실제 권한 이관의 완료를 뜻하지 않습니다.'),photos.decorate(field('진행 단계',task.steps,v=>updateItem(task,'steps',v),{type:'textarea',placeholder:'1. 자료 확인\n2. 내용 정리\n3. 확인 요청'}),{doc:current(),task,section:'steps'}),field('주담당 역할',task.ownerRole||'',v=>updateItem(task,'ownerRole',v),{placeholder:'예: 운영 담당',maxLength:1000}),field('지원 역할',task.supportRole||'',v=>updateItem(task,'supportRole',v),{placeholder:'예: 행정 지원',maxLength:1000}),field('문의할 역할',task.contacts,v=>updateItem(task,'contacts',v),{type:'textarea',rows:2,placeholder:'가능하면 개인 정보 대신 역할·공용 연락 창구'}),field('결재 또는 확인',task.approval,v=>updateItem(task,'approval',v),{type:'textarea',rows:2}),field('예외 상황과 대응',task.exceptions,v=>updateItem(task,'exceptions',v),{type:'textarea',rows:3}),field('완료 조건',task.doneWhen,v=>updateItem(task,'doneWhen',v),{type:'textarea',rows:2}),field('근거 또는 참고',task.evidence,v=>updateItem(task,'evidence',v),{type:'textarea',rows:2}),field('최종 확인일',task.verifiedAt,v=>updateItem(task,'verifiedAt',v),{type:'date'}),el('div',{class:'check-row'},check('첫날에 소개할 업무',task.firstDay,v=>updateItem(task,'firstDay',v)),check('첫 주에 해볼 업무',task.firstWeek,v=>updateItem(task,'firstWeek',v))),sourceInfo(task))),itemTools(task,false));
 }
 const cadences=[['daily','매일'],['weekly','매주'],['monthly','매월'],['quarterly','분기마다'],['halfyear','반기마다'],['yearly','매년'],['semester','학기마다']];
 function timingEditor(task){
@@ -222,7 +277,7 @@ function rangeFor(kind){
  const d=new Date(`${today()}T12:00:00`);if(kind==='week'){const day=d.getDay()||7;d.setDate(d.getDate()-day+1);const start=dateISO(d);d.setDate(d.getDate()+6);return [start,dateISO(d)];}
  return [`${today().slice(0,7)}-01`,dateISO(new Date(d.getFullYear(),d.getMonth()+1,0,12))];
 }
-function searchable(item){return JSON.stringify(item).normalize('NFKC').toLocaleLowerCase('ko-KR');}
+function searchable(item){return JSON.stringify(item,(key,value)=>key==='images'&&Array.isArray(value)?value.map(image=>({caption:image.caption,section:image.section})):value).normalize('NFKC').toLocaleLowerCase('ko-KR');}
 function matches(item,query){return query.normalize('NFKC').toLocaleLowerCase('ko-KR').trim().split(/\s+/).filter(Boolean).every(term=>searchable(item).includes(term));}
 function readerView(){
  const doc=current();const shell=el('section',{},el('div',{class:'reader-intro'},el('div',{},el('h2',{},'필요한 업무부터 살펴보세요'),note(`업무 ${doc.tasks.length}개 · 진행 중인 건 ${doc.cases.filter(c=>c.status!=='done').length}개 · 업무를 누르면 설명이 열립니다.`))));
@@ -278,7 +333,7 @@ function progressBox(item,date){
 }
 function taskCard(task,date){
  const details=el('details',{class:'read-card'},el('summary',{},el('div',{class:'read-summary'},el('div',{class:'read-title'},date||task.timing.kind!=='event'||task.timing.trigger?tag(date||timingLabel(task.timing),date&&date<today()?'amber':''):null,el('h3',{},task.title||'이름 없는 업무'),el('p',{},short(task.method)||'하는 방법이 아직 작성되지 않았어요.')),el('span',{class:'expand-hint'},'업무 설명 보기'))));
- details.append(el('div',{class:'read-content'},task.timing.startRule?readBlock('준비 시작',task.timing.startRule):null,readBlock('하는 방법',task.method||'아직 작성하지 않았어요.'),[['주담당 역할','ownerRole'],['지원 역할','supportRole'],['목적','purpose'],['준비자료','materials'],['단계','steps'],['연락할 역할','contacts'],['결재·확인','approval'],['예외 상황','exceptions'],['완료 조건','doneWhen'],['근거','evidence']].map(([label,key])=>task[key]?readBlock(label,task[key]):null),task.verifiedAt?note('최종 확인일 '+task.verifiedAt):null,sourceInfo(task),progressBox(task,date)));
+ details.append(el('div',{class:'read-content'},task.timing.startRule?readBlock('준비 시작',task.timing.startRule):null,readBlock('하는 방법',task.method||'아직 작성하지 않았어요.'),photos.gallery(task,'method'),[['주담당 역할','ownerRole'],['지원 역할','supportRole'],['목적','purpose'],['준비자료','materials'],['단계','steps'],['연락할 역할','contacts'],['결재·확인','approval'],['예외 상황','exceptions'],['완료 조건','doneWhen'],['근거','evidence']].map(([label,key])=>[task[key]?readBlock(label,task[key]):null,key==='steps'?photos.gallery(task,'steps'):null]),task.verifiedAt?note('최종 확인일 '+task.verifiedAt):null,sourceInfo(task),progressBox(task,date)));
  return details;
 }
 function readBlock(label,value){return el('div',{class:'read-block'},el('h4',{},label),el('p',{class:'pre-wrap'},value));}
@@ -291,11 +346,11 @@ function issuesPanel(){
  const unresolved=doc.tasks.filter(t=>dueInRange(t,today(),today()).unresolved);if(unresolved.length)section.append(el('details',{class:'situations',open:true},el('summary',{},`날짜 미확정 · 상황별 업무 ${unresolved.length}개`),note('날짜 목록에는 나오지 않는 업무입니다. 업무별 기준을 확인해 주세요.'),unresolved.map(t=>el('div',{},note(dueInRange(t,today(),today()).reason,'warning-text'),taskCard(t)))));return section;
 }
 function jsonImport(){
- const body=el('div',{},note('이 앱에서 전달받은 .json 파일을 선택하세요. 파일은 암호화되지 않으므로 비밀번호·인증키가 들어 있지 않은지 확인해 주세요.'),note('최대 5 MiB · 내용을 확인한 뒤 별도 사본으로 엽니다. 기존 문서는 유지됩니다.'));
+ const body=el('div',{},note('이 앱에서 전달받은 .json 파일을 선택하세요. 파일은 암호화되지 않으므로 비밀번호·인증키가 들어 있지 않은지 확인해 주세요.'),note('사진 포함 JSON은 최대 24 MiB · 내용을 확인한 뒤 별도 사본으로 엽니다. 기존 문서는 유지됩니다.'));
  const output=el('div',{class:'import-preview',role:'status'});let parsed=null,sourceName='',requestId=0;
  body.append(field('받은 파일 선택','',()=>{},{type:'file',accept:'.json,application/json',maxLength:null,onchange:async e=>{
   const thisRequest=++requestId;parsed=null;output.replaceChildren();const file=e.target.files?.[0];if(!file)return;sourceName=file.name;
-  try{if(file.size>5*1024*1024)throw new Error('파일이 5 MiB를 넘습니다. 더 작은 인수인계 파일로 나눠 주세요.');const result=parseImport(await file.text());if(thisRequest!==requestId||!handle.dialog.isConnected)return;parsed=result;const doc=parsed.document;output.append(el('h3',{},doc.title||'이름 없는 인수인계'),note(`업무 ${doc.tasks.length}개 · 진행 건 ${doc.cases.length}개 · 출처 ${doc.sourceFiles.length}개`),el('ul',{},doc.tasks.slice(0,5).map(t=>el('li',{},t.title||'이름 없는 업무'))),...(parsed.warnings||[]).map(w=>note(w,'warning-text')),note('기존 문서를 덮어쓰지 않습니다. 수행 체크는 가져오지 않아요.'));}
+  try{if(file.size>LIMITS.imageJsonBytes)throw new Error('파일이 24 MiB를 넘습니다. 더 작은 인수인계 파일로 나눠 주세요.');const text=await file.text();if(thisRequest!==requestId||!handle.dialog.isConnected)return;const result=parseImport(text);output.replaceChildren(note('본문과 사진을 확인하고 있습니다…'));await verifyDocumentImages(result.document,{isCurrent:()=>thisRequest===requestId&&handle.dialog.isConnected});if(thisRequest!==requestId||!handle.dialog.isConnected)return;parsed=result;const doc=parsed.document;output.replaceChildren();output.append(el('h3',{},doc.title||'이름 없는 인수인계'),note(`업무 ${doc.tasks.length}개 · 진행 건 ${doc.cases.length}개 · 출처 ${doc.sourceFiles.length}개 · 사진 ${imageStats(doc).count}장`),el('ul',{},doc.tasks.slice(0,5).map(t=>el('li',{},t.title||'이름 없는 업무'))),...(parsed.warnings||[]).map(w=>note(w,'warning-text')),note('기존 문서를 덮어쓰지 않습니다. 수행 체크는 가져오지 않아요.'));}
   catch(error){if(thisRequest!==requestId||!handle.dialog.isConnected)return;output.append(el('p',{class:'error',role:'alert'},error.message));}
  }}),output);
  const handle=modal('받은 인수인계서 열기',body,[close=>button('취소',close),close=>button('이 인수인계서 보기',()=>{if(!parsed){notice('먼저 이 앱에서 전달받은 파일을 선택해 내용을 확인해 주세요.');return;}try{const doc=importAsCopy(parsed.document);close();activate(doc,'reader');notice(`${sourceName}을 새 사본으로 불러왔습니다.`);}catch(e){notice(e.message);}},'primary')]);
@@ -303,7 +358,7 @@ function jsonImport(){
 function documentImport(){
  const targetId=state.view==='home'?null:state.current;
  let busy=false;const output=el('div',{role:'status'});
- const body=el('div',{},el('div',{class:'support-grid'},el('div',{},el('strong',{},'본문 추출 후 검토'),el('p',{},'DOCX · PPTX · HWPX · 텍스트 PDF')),el('div',{},el('strong',{},'별도 변환 또는 붙여넣기'),el('p',{},'HWP · 스캔 PDF · 이미지 안의 글'))),note('원본 파일을 바꾸지 않고 기기 안에서 읽습니다. 서식과 읽는 순서는 달라질 수 있어 원문 대조가 필요해요. 최대 20 MiB.'),
+ const body=el('div',{},el('div',{class:'support-grid'},el('div',{},el('strong',{},'본문 추출 후 검토'),el('p',{},'DOCX · PPTX · HWPX · 텍스트 PDF')),el('div',{},el('strong',{},'별도 변환 또는 붙여넣기'),el('p',{},'HWP · 스캔 PDF · 이미지 안의 글'))),note('원본 파일을 바꾸지 않고 기기 안에서 읽습니다. 서식과 읽는 순서는 달라질 수 있어 원문 대조가 필요해요. 최대 20 MiB.'),note('본문을 가져오는 기능입니다. 원문 속 사진·화면 캡처는 자동으로 붙거나 단계에 연결되지 않습니다. 먼저 추출한 업무를 다듬고, 꼭 필요한 사진을 설명 옆에 추가해 주세요.','warning-text'),
  field('기존 문서 선택','',()=>{},{type:'file',accept:'.docx,.pptx,.hwpx,.pdf,.hwp',maxLength:null,onchange:async e=>{
   const file=e.target.files?.[0];if(!file||busy)return;busy=true;e.target.disabled=true;output.replaceChildren(note('문서에서 글을 꺼내는 중입니다…'));
   try{const result=await extractDocument(file);if(!handle.dialog.isConnected)return;handle.close();reviewBlocks(result,file.name,targetId);}
@@ -321,8 +376,9 @@ function reviewBlocks(result,name,targetId){
  const targetDoc=()=>state.documents.find(d=>d.id===targetId);
  const original=result.blocks.map(b=>`[${b.source}]\n${b.text}`).join('\n\n');
  let groupId='',draftQuery='';const expanded=new Set();let shownDrafts=[];
- let drafts=result.blocks.filter(b=>b.text.trim()).map(b=>({...b,id:makeId(),selected:true,title:short(b.text.split('\n').find(l=>l.trim())||'',80),source:b.source}));
- const body=el('div',{},el('div',{class:'callout'},el('strong',{},'규칙으로 나눈 초안이에요. 의미를 자동으로 해석하지 않습니다.'),el('p',{},'원문과 비교하고 업무 단위로 나누거나 합쳐 주세요. 선택한 항목만 업무로 추가됩니다.')),
+ const textBlocks=result.blocks.filter(b=>b.text.trim());const proposedTitles=proposeDraftTitles(textBlocks);
+ let drafts=textBlocks.map((b,i)=>({...b,id:makeId(),selected:true,title:proposedTitles[i],source:b.source}));
+ const body=el('div',{},el('div',{class:'callout'},el('strong',{},'규칙으로 나눈 초안이에요. 의미를 자동으로 해석하지 않습니다.'),el('p',{},'원문과 비교하고 업무 단위로 나누거나 합쳐 주세요. 선택한 항목만 업무로 추가됩니다. 사진·화면 캡처와 설명의 연결은 자동으로 보존되지 않습니다. 필요한 사진은 추가한 업무의 ‘사진 넣기’로 붙여 주세요.')),
  el('details',{class:'import-warnings',open:true},el('summary',{},`추출 범위와 주의사항 ${result.warnings.length}개`),el('ul',{},result.warnings.map(w=>el('li',{},w)))),el('p',{},`${name} · ${result.format.toUpperCase()}`));
  const groups=targetDoc()?.groups||[];
  if(groups.length)body.append(select('추가할 큰 업무 영역 (선택)',groupId,[['','아직 분류하지 않음'],...groups.map(g=>[g.id,g.title||'이름 없는 영역'])],v=>groupId=v),note('선택한 초안에만 같은 영역을 적용합니다. 기존 업무의 분류는 바뀌지 않습니다.'));
@@ -375,7 +431,7 @@ function exportSelection(doc){
 function exportView(){
  const doc=current();const selection=exportSelection(doc);let includeContacts=false,includeMaterials=false,includeEvidence=false;
  const body=el('section',{class:'export-layout'});const panel=el('div',{class:'editor'},el('h2',{},'전달하거나 문서로 저장하세요'));
- panel.append(el('div',{class:'delivery-actions'},el('div',{class:'callout'},el('h3',{},'다음 담당자에게 전달하기'),el('p',{},'이 앱에서 다시 열고 고칠 수 있는 파일입니다. 백업할 때도 사용하세요.'),button('전달·백업 파일 받기 (.json)',backup,'primary'),note('모든 업무·진행 건·출처 원문이 포함됩니다. 수행 체크는 별도입니다. 파일은 암호화되지 않으므로 민감한 내용이 없는지 확인해 주세요.','warning-text')),
+ panel.append(el('div',{class:'delivery-actions'},el('div',{class:'callout'},el('h3',{},'다음 담당자에게 전달하기'),el('p',{},'이 앱에서 다시 열고 고칠 수 있는 파일입니다. 백업할 때도 사용하세요.'),button('전달·백업 파일 받기 (.json)',backup,'primary'),note('모든 업무·사진·진행 건·출처 원문이 단일 JSON에 포함됩니다. 사진 때문에 파일이 커질 수 있습니다. 수행 체크는 별도입니다. 파일은 암호화되지 않으므로 민감한 내용이 없는지 확인해 주세요.','warning-text')),
  el('div',{class:'callout'},el('h3',{},'제출하거나 문서 프로그램에서 열기'),el('p',{},'인수인계 전체 내용을 편집 가능한 문서로 받습니다.'),button('전체 문서 받기 (.docx)',async()=>{try{download(await exportDocx(doc),`${safeName(doc.title)}-전체.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}catch(error){notice(error.message);}},'secondary'),note('문서 프로그램에서 고친 내용은 이 앱에 자동 반영되지 않습니다. 다시 가져오면 별도 검토용 초안이 됩니다.'))));
  const scope=disclosure('export-scope','출력할 업무 선택 · 인쇄');
  const selectionCount=el('p',{class:'helper',role:'status','data-export-selection-count':''});
@@ -403,8 +459,8 @@ function aiPreview(selection,options,initialPurpose='write'){
  modal('AI에 공유하기 전 직접 확인하세요',el('div',{},note('외부 AI에 붙여넣으면 해당 서비스로 정보가 전달됩니다. 조직의 공유 기준을 확인하고, 아래 평문에서 민감한 부분을 직접 지우세요.','warning-text'),select('도움받을 목적',purpose,[['write','작성 내용을 다듬기'],['ask','인수자 질문 만들기']],v=>{purpose=v;refresh();}),check('연락할 역할·회신 대기 포함',config.includeContacts,v=>{config.includeContacts=v;refresh();}),check('준비자료 포함',config.includeMaterials,v=>{config.includeMaterials=v;refresh();}),check('근거 포함',config.includeEvidence,v=>{config.includeEvidence=v;refresh();}),note('포함 설정을 바꾸면 미리보기를 다시 만듭니다. 직접 지운 내용이 있다면 마지막에 다시 확인해 주세요.'),preview),[close=>button('닫기',close),()=>button('텍스트 파일 내려받기',()=>download(preview.value,'인수인계-AI-공유전확인.txt','text/plain'),'primary')]);
 }
 function printView(){
- const doc=current();const selection=state.printSelection||{taskIds:doc.tasks.map(t=>t.id),caseIds:doc.cases.map(c=>c.id)};return el('section',{class:'print-sheet'},el('div',{class:'actions no-print'},button('내보내기로 돌아가기',()=>switchView('export')),button('인쇄 / PDF 저장',()=>window.print(),'primary')),el('header',{class:'print-heading'},el('p',{class:'eyebrow'},'인수인계 A to Z'),el('h2',{},doc.title||'인수인계'),note(`출력일 ${today()} · 원본 최종 수정 ${doc.updatedAt.slice(0,10)}`)),doc.onboarding.dayOne?readBlock('첫날 안내',doc.onboarding.dayOne):null,doc.onboarding.firstWeek?readBlock('첫 주 안내',doc.onboarding.firstWeek):null,el('h2',{},'업무 매뉴얼'),doc.tasks.filter(t=>selection.taskIds.includes(t.id)).map((t,i)=>el('article',{class:'print-item'},el('h3',{},`${i+1}. ${t.title||'이름 없는 업무'}`),note(timingLabel(t.timing)),t.timing.startRule?readBlock('준비 시작',t.timing.startRule):null,...[['주담당 역할','ownerRole'],['지원 역할','supportRole'],['하는 방법','method'],['목적','purpose'],['준비자료','materials'],['단계','steps'],['연락할 역할','contacts'],['결재·확인','approval'],['예외','exceptions'],['완료 조건','doneWhen'],['근거','evidence']].map(([label,key])=>t[key]?readBlock(label,t[key]):null),note('자료 접근 확인: '+(t.accessStatus==='notApplicable'?'해당 없음':t.accessStatus==='confirmed'||(!t.accessStatus&&t.accessChecked)?'확인됨':'미확인')),t.verifiedAt?note('최종 확인일 '+t.verifiedAt):null)),el('h2',{},'진행 중인 건'),doc.cases.filter(c=>selection.caseIds.includes(c.id)).map(c=>el('article',{class:'print-item'},el('h3',{},c.title),note(statusLabel(c.status)+' · 기한 '+(c.dueDate||'미확정')),readBlock('다음 행동',c.nextAction||'미작성'),c.waitingFor?readBlock('회신 대기',c.waitingFor):null,c.notes?readBlock('진행 메모',c.notes):null)),note('수행 체크는 별도 기록입니다. 이 문서를 편집해도 JSON에 자동 동기화되지 않습니다.'));
+ const doc=current();const selection=state.printSelection||{taskIds:doc.tasks.map(t=>t.id),caseIds:doc.cases.map(c=>c.id)};return el('section',{class:'print-sheet'},el('div',{class:'actions no-print'},button('내보내기로 돌아가기',()=>switchView('export')),button('인쇄 / PDF 저장',()=>window.print(),'primary')),el('header',{class:'print-heading'},el('p',{class:'eyebrow'},'인수인계 A to Z'),el('h2',{},doc.title||'인수인계'),note(`출력일 ${today()} · 원본 최종 수정 ${doc.updatedAt.slice(0,10)}`)),doc.onboarding.dayOne?readBlock('첫날 안내',doc.onboarding.dayOne):null,doc.onboarding.firstWeek?readBlock('첫 주 안내',doc.onboarding.firstWeek):null,el('h2',{},'업무 매뉴얼'),doc.tasks.filter(t=>selection.taskIds.includes(t.id)).map((t,i)=>el('article',{class:'print-item'},el('h3',{},`${i+1}. ${t.title||'이름 없는 업무'}`),note(timingLabel(t.timing)),t.timing.startRule?readBlock('준비 시작',t.timing.startRule):null,...[['주담당 역할','ownerRole'],['지원 역할','supportRole'],['하는 방법','method'],['목적','purpose'],['준비자료','materials'],['단계','steps'],['연락할 역할','contacts'],['결재·확인','approval'],['예외','exceptions'],['완료 조건','doneWhen'],['근거','evidence']].map(([label,key])=>[t[key]?readBlock(label,t[key]):null,['method','steps'].includes(key)?photos.gallery(t,key,{print:true}):null]),note('자료 접근 확인: '+(t.accessStatus==='notApplicable'?'해당 없음':t.accessStatus==='confirmed'||(!t.accessStatus&&t.accessChecked)?'확인됨':'미확인')),t.verifiedAt?note('최종 확인일 '+t.verifiedAt):null)),el('h2',{},'진행 중인 건'),doc.cases.filter(c=>selection.caseIds.includes(c.id)).map(c=>el('article',{class:'print-item'},el('h3',{},c.title),note(statusLabel(c.status)+' · 기한 '+(c.dueDate||'미확정')),readBlock('다음 행동',c.nextAction||'미작성'),c.waitingFor?readBlock('회신 대기',c.waitingFor):null,c.notes?readBlock('진행 메모',c.notes):null)),el('section',{class:'print-overview'},note('아래 업무표는 이 인쇄에서 선택한 업무 제목으로 만들었습니다.'),renderWorkOverview({doc,taskIds:selection.taskIds,el,button})),note('수행 체크는 별도 기록입니다. 이 문서를 편집해도 JSON에 자동 동기화되지 않습니다.'));
 }
 window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&current()){e.preventDefault();backup();}});
-window.addEventListener('beforeunload',e=>{if(state.storageError&&current()){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if((state.storageError||savePending||saveRunning)&&current()){e.preventDefault();e.returnValue='';}});
 render();
