@@ -12,6 +12,10 @@ for(const path of ['app.js','styles.css']){
 await writeFile('dist/index.html',html);
 await mkdir('dist/assets',{recursive:true});
 await copyFile('assets/mach-selected-A.svg','dist/assets/mach-selected-A.svg');
+await mkdir('dist/assets/guide',{recursive:true});
+for(const name of ['start','author-photo','reader','overview','delivery']){
+ await copyFile(`assets/guide/${name}.jpg`,`dist/assets/guide/${name}.jpg`);
+}
 await copyFile('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs','dist/pdf.worker.min.mjs');
 await copyFile('THIRD_PARTY_LICENSES.txt','dist/THIRD_PARTY_LICENSES.txt');
 await writeFile('dist/.nojekyll','');

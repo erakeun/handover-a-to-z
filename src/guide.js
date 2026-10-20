@@ -1,11 +1,45 @@
-// The in-app guide and the Markdown handout share this reviewed text.
-// Screenshots are deliberately not invented: new-screen capture remains pending.
+// The app and handout share this text. Screen images are actual public-site
+// captures with synthetic example data; they do not prove native file gestures.
+export const GUIDE_SCREENSHOTS = Object.freeze({
+  start: {
+    src: './assets/guide/start.jpg',
+    title: '화면 1 · 시작 화면',
+    alt: '인수인계서 만들기와 받은 인수인계서 보기 버튼이 있는 시작 화면',
+    caption: '새로 작성할 때는 왼쪽, 받은 JSON을 열 때는 오른쪽을 고릅니다. 처음에는 가상 예시로 연습할 수 있습니다.',
+  },
+  'author-photo': {
+    src: './assets/guide/author-photo.jpg',
+    title: '화면 2 · 설명과 사진 작성',
+    alt: '가상 업무의 하는 방법, 사진 넣기 버튼, 미리 포함된 가상 사진과 사진 설명이 보이는 작성 화면',
+    caption: '하는 방법 옆에 사진 넣기 버튼이 있습니다. 이 화면의 사진은 내장 가상 예시에 미리 포함된 사진입니다.',
+  },
+  reader: {
+    src: './assets/guide/reader.jpg',
+    title: '화면 3 · 인수자 보기',
+    alt: '가상 인수인계에서 필요한 업무를 찾아 설명을 읽는 인수자 화면',
+    caption: '필요한 업무를 찾아 제목을 누르면 설명을 읽을 수 있습니다. 사진이 있는 업무에서는 작은 사진을 눌러 크게 봅니다.',
+  },
+  overview: {
+    src: './assets/guide/overview.jpg',
+    title: '화면 4 · 내 업무 한눈에 보기',
+    alt: '가상 업무의 담당 역할, 큰 업무 영역, 세부 업무 제목이 차례로 정리된 업무표',
+    caption: '이미 적은 내용을 바탕으로 만든 업무표입니다. 세부 업무 제목을 누르면 해당 업무로 이동합니다.',
+  },
+  delivery: {
+    src: './assets/guide/delivery.jpg',
+    title: '화면 5 · 전달·출력하기',
+    alt: '전달·백업 JSON 파일과 제출용 DOCX 문서를 받는 버튼이 나란히 있는 내보내기 화면',
+    caption: '다음 담당자가 앱에서 이어 쓸 때는 JSON, 제출하거나 문서 프로그램에서 편집할 때는 DOCX를 고릅니다.',
+  },
+});
+
 export const USAGE_GUIDE = {
-  title: '인수인계 A to Z 사용설명서 · 검토 초안',
+  title: '인수인계 A to Z 사용설명서',
   introduction: '처음부터 모든 칸을 채우지 않아도 됩니다. 업무 하나를 적고, 받는 사람 화면에서 읽어 본 뒤, 파일 한 개로 전달하세요.',
   quick: {
     sender: {
       title: '3분 시작 · 업무 하나 적고 저장하기',
+      screenshot: 'start',
       steps: [
         ['첫 화면에서 ‘인수인계서 만들기’를 누릅니다.', '빈 작성 화면이 열립니다.'],
         ['‘업무명’과 ‘하는 방법’에 아는 내용을 적습니다.', '예: 업무명은 “매월 자료 정리”, 방법은 “공용 폴더에서 이번 달 자료를 모아 확인한다.” 일정이나 담당은 나중에 적어도 됩니다.'],
@@ -15,6 +49,7 @@ export const USAGE_GUIDE = {
     },
     receiver: {
       title: '3분 시작 · 받은 파일에서 할 일 찾기',
+      screenshot: 'start',
       steps: [
         ['첫 화면에서 ‘받은 인수인계서 보기’를 누릅니다.', '받은 파일을 고르는 창이 열립니다. 이 앱에서 만든 .json 파일이 필요합니다.'],
         ['‘받은 파일 선택’에서 .json 파일을 고릅니다.', '문서 이름과 업무·진행 건·사진 개수가 나옵니다. 내가 받은 문서가 맞는지 확인하세요.'],
@@ -30,7 +65,7 @@ export const USAGE_GUIDE = {
         ['첫 화면의 ‘인수인계서 만들기’를 누릅니다.', '첫 업무를 적는 화면이 열립니다. 새 화면을 열기만 해서는 가짜 업무가 생기지 않습니다.'],
         ['‘업무명’에 한 가지 일을 알아볼 수 있는 제목을 적습니다.', '“행정 업무”처럼 넓은 제목보다 “매월 지출 자료 정리”처럼 구체적으로 적으면 찾기 쉽습니다.'],
         ['‘하는 방법’에 실제로 하는 순서를 적습니다.', '문장, 줄바꿈, 기존 메모 붙여넣기를 사용할 수 있습니다. 짧게 시작해도 됩니다.'],
-        ['필요할 때 ‘일정·담당·자료 더 적기’를 누릅니다.', '일정, 담당 역할, 자료 위치 등 자세한 칸을 펼칠 수 있습니다. 모두 채울 필요는 없습니다.'],
+        ['필요할 때 ‘일정·담당·자료 더 적기’를 누릅니다.', '이후 ‘언제 하는 업무인가요? (선택)’ 또는 ‘담당·자료·자세한 설명 (선택)’을 펼칩니다. 모두 채울 필요는 없습니다.'],
         ['다른 업무를 적으려면 ‘＋ 업무 추가’를 누릅니다.', '현재 업무를 남겨 둔 채 새 업무를 추가합니다.'],
       ],
     },
@@ -63,6 +98,7 @@ export const USAGE_GUIDE = {
     },
     {
       title: '4. 설명과 진행 단계에 사진 넣기',
+      screenshot: 'author-photo',
       steps: [
         ['사진을 넣을 업무를 엽니다.', '어느 업무의 설명인지 먼저 확인하세요.'],
         ['‘하는 방법’ 옆의 ‘사진 넣기’를 누릅니다.', 'JPEG·PNG·WebP 사진을 한 장 고릅니다. 설명 칸으로 사진을 끌어놓거나, 복사한 사진을 설명 칸에 붙여넣을 수도 있습니다.'],
@@ -119,8 +155,9 @@ export const USAGE_GUIDE = {
     },
     {
       title: '8. ‘내 업무 한눈에 보기’에서 전체 흐름 확인하기',
+      screenshot: 'overview',
       steps: [
-        ['‘내 업무 한눈에 보기’를 엽니다.', '입력한 주담당 역할 → 큰 업무 → 세부 업무 제목 순으로 모인 목록을 봅니다. 따로 표를 작성할 필요가 없습니다.'],
+        ['작성하기 화면에서 ‘내 업무 한눈에 보기’를 엽니다.', '입력한 주담당 역할 → 큰 업무 → 세부 업무 제목 순으로 모인 목록을 봅니다. 따로 표를 작성할 필요가 없습니다.'],
         ['큰 업무 아래의 세부 업무 제목을 누릅니다.', '해당 업무를 열어 설명을 읽거나 작성 화면에서 고칠 수 있습니다. 긴 제목도 생략하지 않습니다.'],
         ['‘업무표로 돌아가기’를 누릅니다.', '방금 보던 업무표로 돌아와 다음 업무를 계속 살펴볼 수 있습니다.'],
       ],
@@ -141,9 +178,10 @@ export const USAGE_GUIDE = {
     },
     {
       title: '10. 마지막 확인 후 다음 담당자에게 전달하기',
+      screenshot: 'delivery',
       steps: [
         ['‘받는 사람 화면 확인’을 누릅니다.', '받는 사람이 글과 사진을 읽을 수 있는지 확인합니다. 설명을 쓴 본인만 아는 말은 풀어서 적으세요.'],
-        ['‘문서 이름 · 첫날 안내 · 점검’의 ‘확인할 내용’을 봅니다.', '빠진 시작 기준이나 다음 행동, 자료 접근 확인처럼 한 번 더 볼 항목이 나옵니다. 점수가 아니라 확인을 돕는 목록입니다.'],
+        ['위쪽 ‘작성하기’로 돌아와 ‘문서 이름 · 첫날 안내 · 점검’의 ‘확인할 내용’을 봅니다.', '빠진 시작 기준이나 다음 행동, 자료 접근 확인처럼 한 번 더 볼 항목이 나옵니다. 점수가 아니라 확인을 돕는 목록입니다.'],
         ['‘내보내기’를 누릅니다.', '전달 파일과 제출용 문서를 받을 수 있는 화면이 열립니다.'],
         ['‘전달·백업 파일 받기 (.json)’를 누릅니다.', '전체 업무·사진·진행 건·출처 원문이 들어 있습니다. 업무를 일부 선택했어도 JSON은 전체를 담습니다.'],
         ['내려받은 파일을 확인한 뒤 조직에서 허용한 방법으로 전달합니다.', '받는 사람에게 “인수인계 A to Z에서 ‘받은 인수인계서 보기’로 열어 주세요”라고 안내하세요. 앱이 대신 발송하지는 않습니다.'],
@@ -199,7 +237,7 @@ export const USAGE_GUIDE = {
       steps: [
         ['‘이번 주’를 누릅니다.', '이번 주에 확정된 날짜가 있는 업무를 봅니다.'],
         ['더 넓은 기간을 보려면 ‘다른 기준으로 보기’의 ‘이번 달’을 누릅니다.', '이번 달의 확정된 일정이 나옵니다.'],
-        ['날짜가 정해지지 않은 일을 보려면 ‘상황별’을 누릅니다.', '특정 상황이 생겼을 때 해야 할 일을 봅니다.'],
+        ['특정 상황이 생겼을 때 시작하는 일을 보려면 ‘상황별’을 누릅니다.', '특정 상황이 생겼을 때 해야 할 일을 봅니다.'],
         ['달력으로 보려면 ‘전체 업무’를 누릅니다.', '달력의 ‘월’·‘주’를 바꾸거나 날짜를 눌러 해당 업무를 엽니다.'],
         ['‘확인 필요’도 확인합니다.', '날짜가 미확정이거나 작성 내용에서 추가 확인이 필요한 업무를 찾을 수 있습니다.'],
       ],
@@ -207,6 +245,7 @@ export const USAGE_GUIDE = {
     },
     {
       title: '4. 검색하고 설명·사진 읽기',
+      screenshot: 'reader',
       steps: [
         ['‘업무나 상황 찾기’에 짧은 말을 적습니다.', '업무 제목뿐 아니라 하는 방법, 예외 상황, 진행 메모도 검색합니다. 사진 속 글자를 읽어 검색하지는 않습니다.'],
         ['검색 결과의 업무 제목을 누릅니다.', '요약 아래에 자세한 설명이 펼쳐집니다.'],
@@ -218,6 +257,7 @@ export const USAGE_GUIDE = {
     },
     {
       title: '5. 업무 전체를 한눈에 보고 제목으로 이동하기',
+      screenshot: 'overview',
       steps: [
         ['‘내 업무 한눈에 보기’를 엽니다.', '담당 역할별로 큰 업무와 세부 업무 제목을 볼 수 있습니다.'],
         ['읽을 세부 업무 제목을 누릅니다.', '그 업무의 실제 설명으로 이동합니다.'],
@@ -261,7 +301,7 @@ export const USAGE_GUIDE = {
         ['오류가 보이면 창을 닫거나 새로고침하지 않습니다.', '저장하지 못한 내용이 현재 화면에만 남아 있을 수 있습니다.'],
         ['‘현재 내용 파일로 저장’ 또는 ‘파일로 저장’을 누릅니다.', '현재 내용과 사진이 들어 있는 JSON을 먼저 보관합니다. 내려받은 파일이 실제로 있는지 확인하세요.'],
         ['다른 창의 변경 안내라면 백업 후 ‘변경된 저장 불러오기’를 누릅니다.', '다른 창에서 저장한 최신 내용으로 현재 화면을 바꿉니다. 두 내용을 자동으로 합치지는 않습니다.'],
-        ['이전 저장을 읽지 못하면 표시된 ‘저장 원본 내려받기’를 먼저 사용합니다.', '복구용 원본을 보관하기 전에는 ‘저장 공간 초기화’를 누르지 마세요. 초기화는 기기 안의 문서 목록을 지웁니다.'],
+        ['이전 저장을 읽지 못하면 표시된 ‘저장 원본 1 내려받기’ 등의 버튼을 사용합니다.', '표시된 저장 원본을 각각 따로 보관하고 현재 창을 유지하세요. 오류 상황에 따라 보관할 원본이 여러 개일 수 있습니다.'],
       ],
       notes: ['JSON 저장 자체도 실패하면 오류 내용을 남기고 현재 화면을 유지하세요. 저장 공간을 지우거나 원본 파일을 직접 고치기 전에 복구 방법을 확인하는 것이 좋습니다.'],
     },
@@ -306,7 +346,7 @@ export const USAGE_GUIDE = {
       notes: ['읽는 화면에서 업무를 연 뒤 ‘이 업무를 AI에 질문’을 사용할 수도 있습니다. AI 답변이 인수인계 원본을 자동으로 고치지는 않습니다.'],
     },
   ],
-  reviewNote: '이 설명서는 사진·업무표를 포함한 검토본 기준입니다. 새 기능은 아직 공개 사이트에 배포되지 않았습니다. 사진·업무표 새 화면 캡처는 허용된 브라우저 검증 후 보완 예정입니다. 실제 파일 선택·클립보드·브라우저 인쇄창 동작은 아직 검증하지 않았습니다.',
+  reviewNote: '화면 1~5는 0.2.0 공개 사이트에서 가상 예시로 촬영한 화면입니다. 작성 화면의 사진은 예시에 미리 들어 있는 사진입니다. 실제 파일 선택·클립보드 붙여넣기·브라우저 인쇄창 동작은 아직 검증하지 않았습니다. 화면 캡처만으로 파일 추가나 다운로드까지 완료되었다는 뜻은 아닙니다.',
 };
 
 /** Native buttons and details keep the long guide usable without a tab framework. */
@@ -316,14 +356,23 @@ export function renderUsageGuide({ el, button, onClose } = {}) {
   const root = el('section', { class: 'usage-guide', 'aria-label': data.title });
   root.append(el('header', { class: 'guide-heading' },
     el('h1', {}, data.title), el('p', { class: 'lede' }, data.introduction),
-    el('p', { class: 'callout warning' }, '단계별 글 안내를 먼저 만든 검토 초안입니다. 번호가 붙은 실제 새 화면 캡처와 브라우저 확인은 아직 끝나지 않았습니다.'),
     el('p', { class: 'helper' }, '처음이라면 첫 화면의 ‘가상 예시 체험’으로 연습해 보세요. 비밀번호와 인증키는 글이나 사진에 넣지 마세요.'),
     typeof onClose === 'function' ? button('설명서 닫기', onClose, 'secondary') : null,
   ));
   const steps = entries => el('ol', { class: 'usage-steps' }, entries.map(([action, result]) => el('li', {},
     el('strong', {}, action), el('p', {}, result))));
+  const screenshot = key => {
+    const screen = GUIDE_SCREENSHOTS[key];
+    if (!screen) return null;
+    return el('figure', { class: 'guide-screenshot', 'data-guide-screen': key },
+      el('a', { href: screen.src, target: '_blank', rel: 'noopener', 'aria-label': `${screen.title} 원래 크기로 보기 (새 탭)` },
+        el('img', { src: screen.src, alt: screen.alt, loading: 'lazy', decoding: 'async' })),
+      el('figcaption', {}, el('strong', {}, screen.title), el('p', {}, screen.caption)),
+    );
+  };
   const topic = section => el('details', { class: 'usage-topic' },
     el('summary', {}, section.title), steps(section.steps),
+    section.screenshot ? screenshot(section.screenshot) : null,
     ...(section.notes || []).map(text => el('p', { class: 'helper guide-note' }, text)),
   );
   const panels = {};
@@ -340,7 +389,8 @@ export function renderUsageGuide({ el, button, onClose } = {}) {
     switches[lane] = button(label, () => choose(lane), lane === 'sender' ? 'pill selected' : 'pill', { 'aria-pressed': lane === 'sender' });
     choices.append(switches[lane]);
     panels[lane] = el('section', { class: 'guide-lane', 'aria-label': label, hidden: lane !== 'sender' },
-      el('div', { class: 'guide-quick callout' }, el('h2', {}, data.quick[lane].title), steps(data.quick[lane].steps)),
+      el('div', { class: 'guide-quick callout' }, el('h2', {}, data.quick[lane].title), steps(data.quick[lane].steps),
+        el('details', { class: 'guide-screen-toggle' }, el('summary', {}, '화면 1 · 시작 화면 보기'), screenshot(data.quick[lane].screenshot))),
       el('h2', {}, '필요한 설명만 펼쳐 보세요'),
       ...data[lane].map(topic));
   }
@@ -350,7 +400,7 @@ export function renderUsageGuide({ el, button, onClose } = {}) {
     el('section', { class: 'guide-ai', 'aria-label': '선택 AI 기능' },
       el('h2', {}, 'AI 도움은 선택입니다'),
       el('p', {}, 'AI를 쓰지 않아도 인수인계를 완성할 수 있습니다.'), ...data.ai.map(topic)),
-    el('details', { class: 'guide-review-note' }, el('summary', {}, '검토본 안내'), el('p', { class: 'helper' }, data.reviewNote)),
+    el('details', { class: 'guide-review-note' }, el('summary', {}, '화면과 검증 범위'), el('p', { class: 'helper' }, data.reviewNote)),
   );
   return root;
 }
