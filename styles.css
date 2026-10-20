@@ -10,3 +10,4 @@
 /* The date cell is the primary touch target. Full task names are below the grid. */
 .calendar-date-button{min-height:44px!important}.calendar-task-preview{font-size:.72rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.calendar-more-button{font-size:.7rem}
 @media(max-width:760px){.calendar-task-previews{display:none}.calendar-date-count{font-size:.72rem}.calendar-task-action{min-height:44px;font-size:.9rem}}
+.header-inner{flex-wrap:wrap}.header-branding{display:flex;align-items:center;flex-wrap:wrap;gap:.65rem 1.25rem;min-width:0}.mach-home-link{display:inline-flex;align-items:center;min-height:44px;flex-shrink:0}.mach-logo{display:block;width:144px;height:auto}

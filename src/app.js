@@ -87,7 +87,9 @@ function render(focus=false){
  if(focus)main.focus({preventScroll:true});else if(focusKey)queueMicrotask(()=>{const candidate=[...app.querySelectorAll(focusKey.tag.toLowerCase())].find(n=>focusKey.tag==='BUTTON'?(n.getAttribute('aria-label')||n.textContent)===focusKey.label:document.querySelector(`label[for="${n.id}"]`)?.textContent===focusKey.label);candidate?.focus({preventScroll:true});});
 }
 function header(){
- const doc=current();return el('header',{class:'header'},el('div',{class:'header-inner'},button(el('span',{class:'brand'},el('span',{class:'brand-icon','aria-hidden':'true'},'A'),el('span',{},'인수인계 ',el('strong',{},'A to Z'))),()=>switchView('home'),'brand-button'),
+ const doc=current();return el('header',{class:'header'},el('div',{class:'header-inner'},el('div',{class:'header-branding'},
+ el('a',{class:'mach-home-link',href:'https://erakeun.github.io/ERICAAI/','aria-label':'MACH 메인으로 이동'},el('img',{class:'mach-logo',src:'./assets/mach-selected-A.svg',width:340,height:94,alt:'PROJECT MACH — Making Administration Change at Hanyang'})),
+ button(el('span',{class:'brand'},el('span',{class:'brand-icon','aria-hidden':'true'},'A'),el('span',{},'인수인계 ',el('strong',{},'A to Z'))),()=>switchView('home'),'brand-button')),
  doc?el('nav',{'aria-label':'작업 화면',class:'top-nav'},[['author','작성하기'],['reader','인수자 보기'],['export','내보내기']].map(([v,t])=>button(t,()=>switchView(v),state.view===v?'nav active':'nav',{'aria-current':state.view===v?'page':null}))):tag('로컬 검토본','soft')));
 }
 function home(){

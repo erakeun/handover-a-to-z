@@ -61942,7 +61942,12 @@ function header() {
   return el("header", { class: "header" }, el(
     "div",
     { class: "header-inner" },
-    button2(el("span", { class: "brand" }, el("span", { class: "brand-icon", "aria-hidden": "true" }, "A"), el("span", {}, "\uC778\uC218\uC778\uACC4 ", el("strong", {}, "A to Z"))), () => switchView("home"), "brand-button"),
+    el(
+      "div",
+      { class: "header-branding" },
+      el("a", { class: "mach-home-link", href: "https://erakeun.github.io/ERICAAI/", "aria-label": "MACH \uBA54\uC778\uC73C\uB85C \uC774\uB3D9" }, el("img", { class: "mach-logo", src: "./assets/mach-selected-A.svg", width: 340, height: 94, alt: "PROJECT MACH \u2014 Making Administration Change at Hanyang" })),
+      button2(el("span", { class: "brand" }, el("span", { class: "brand-icon", "aria-hidden": "true" }, "A"), el("span", {}, "\uC778\uC218\uC778\uACC4 ", el("strong", {}, "A to Z"))), () => switchView("home"), "brand-button")
+    ),
     doc ? el("nav", { "aria-label": "\uC791\uC5C5 \uD654\uBA74", class: "top-nav" }, [["author", "\uC791\uC131\uD558\uAE30"], ["reader", "\uC778\uC218\uC790 \uBCF4\uAE30"], ["export", "\uB0B4\uBCF4\uB0B4\uAE30"]].map(([v, t]) => button2(t, () => switchView(v), state.view === v ? "nav active" : "nav", { "aria-current": state.view === v ? "page" : null }))) : tag("\uB85C\uCEEC \uAC80\uD1A0\uBCF8", "soft")
   ));
 }

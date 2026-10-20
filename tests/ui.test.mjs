@@ -194,6 +194,27 @@ async function backupText() {
   return download.blob.text();
 }
 
+test('MACH main link uses a local logo and leaves the app home action independent', async () => {
+  await mount();
+  const link = ui.document.querySelector('.header a.mach-home-link');
+  assert.ok(link);
+  assert.equal(link.href, 'https://erakeun.github.io/ERICAAI/');
+  assert.equal(link.getAttribute('aria-label'), 'MACH 메인으로 이동');
+  assert.equal(link.querySelector('img').getAttribute('src'), './assets/mach-selected-A.svg');
+  assert.equal(link.closest('button'), null);
+  assert.equal(link.querySelector('button'), null);
+  link.focus();
+  assert.equal(ui.document.activeElement, link);
+
+  await startNew();
+  const before = ui.localStorage.getItem(DATA_KEY);
+  await click(ui.document.querySelector('.brand-button'));
+  assert.ok(ui.document.querySelector('.start-grid'));
+  assert.equal(ui.localStorage.getItem(DATA_KEY), before);
+  assert.ok(ui.document.querySelector('.header a.mach-home-link'));
+  assert.equal(networkAttempts.length, 0);
+});
+
 test('export renders selectable controls and preserves one-item scope through print, return and real DOCX download', async () => {
   const chosen = createTask({ title: '선택한 업무 고유 제목', method: '선택한 방법만 전달합니다.' });
   const omitted = createTask({ title: '제외한 업무 고유 제목', method: '제외한 방법 고유 내용' });
@@ -375,7 +396,8 @@ test('pasted markup remains literal in import review and committed tasks; unsele
   assert.equal(doc.tasks[0].method, malicious);
   assert.ok(doc.sourceFiles[0].excerpt.includes(malicious));
   assert.ok(doc.sourceFiles[0].excerpt.includes(omitted));
-  assert.equal(ui.document.querySelectorAll('img, script, [onerror]').length, 0);
+  assert.deepEqual([...ui.document.querySelectorAll('img')], [ui.document.querySelector('.header .mach-logo')]);
+  assert.equal(ui.document.querySelectorAll('script, [onerror]').length, 0);
   await click('인수자 보기', ui.document.querySelector('.top-nav'));
   assert.ok(ui.document.querySelector('.work-map').textContent.includes('<img src=x'));
   await click(ui.document.querySelector('.work-map [data-task-id]'));
