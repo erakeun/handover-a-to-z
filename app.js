@@ -60905,7 +60905,7 @@ function field(children2, label, value) {
   children2.push(paragraph(value === "" || value === void 0 ? "\uBBF8\uC785\uB825" : value));
 }
 var filled = (value) => value !== "" && value !== null && value !== void 0;
-function timingText(timing) {
+function timingText(timing, includeStartRule = true) {
   const lines = [];
   const used = /* @__PURE__ */ new Set(["kind", "startRule"]);
   if (timing.dayRule === "dayOfMonth") used.add("dayRule");
@@ -60951,7 +60951,7 @@ function timingText(timing) {
   } else {
     lines.push("\uC2DC\uC810 \uBBF8\uC815");
   }
-  if (filled(timing.startRule)) lines.push(`\uC2DC\uC791\xB7\uC0B0\uC815 \uAE30\uC900: ${timing.startRule}`);
+  if (includeStartRule && filled(timing.startRule)) lines.push(`\uC2DC\uC791\xB7\uC0B0\uC815 \uAE30\uC900: ${timing.startRule}`);
   const saved2 = [
     ["dayRule", "\uC6D4\uAC04 \uB0A0\uC9DC \uADDC\uCE59", (value) => DAY_RULES2[value] ?? value],
     ["cadence", "\uC8FC\uAE30", (value) => CADENCES2[value] ?? value],
@@ -61009,7 +61009,7 @@ function summaryTable(tasks, numbers) {
     },
     rows: [
       row(["\uBC88\uD638", "\uC5C5\uBB34\uBA85", "\uC5B8\uC81C \uD558\uB098\uC694"], true),
-      ...tasks.map((task, index) => row([String(numbers?.get(task.id) ?? index + 1), task.title, timingText(task.timing)]))
+      ...tasks.map((task, index) => row([String(numbers?.get(task.id) ?? index + 1), task.title, timingText(task.timing, false)]))
     ]
   });
 }
@@ -61017,8 +61017,9 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
   children2.push(heading(`${index + 1}. ${task.title}`, level));
   field(children2, "\uC5C5\uBB34 ID", task.id);
   field(children2, "\uC5B8\uC81C \uD558\uB098\uC694", timingText(task.timing));
+  field(children2, "\uC5B4\uB5A4 \uBC29\uC2DD\uC73C\uB85C \uD558\uB098\uC694", task.method);
+  const missing = [];
   for (const [label, key] of [
-    ["\uC5B4\uB5A4 \uBC29\uC2DD\uC73C\uB85C \uD558\uB098\uC694", "method"],
     ["\uC5C5\uBB34 \uBAA9\uC801", "purpose"],
     ["\uC900\uBE44 \uC790\uB8CC\xB7\uC811\uADFC \uACBD\uB85C", "materials"],
     ["\uC218\uD589 \uC808\uCC28", "steps"],
@@ -61030,7 +61031,11 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
     ["\uC644\uB8CC \uAE30\uC900", "doneWhen"],
     ["\uC99D\uBE59\xB7\uACB0\uACFC\uBB3C", "evidence"],
     ["\uCD5C\uC885 \uD655\uC778\uC77C", "verifiedAt"]
-  ]) field(children2, label, task[key]);
+  ]) {
+    if (filled(task[key])) field(children2, label, task[key]);
+    else missing.push(label);
+  }
+  if (missing.length) children2.push(paragraph(`\uBBF8\uC785\uB825 \uD56D\uBAA9: ${missing.join(", ")}`));
   field(children2, "\uC811\uADFC \uAD8C\uD55C \uD655\uC778", task.accessStatus === "notApplicable" ? "\uD574\uB2F9 \uC5C6\uC74C" : task.accessStatus ? task.accessStatus === "confirmed" ? "\uD655\uC778\uD568" : "\uBBF8\uD655\uC778" : task.accessChecked ? "\uD655\uC778\uD568" : "\uBBF8\uD655\uC778");
   field(children2, "\uCD08\uAE30 \uD655\uC778 \uB300\uC0C1", [
     `\uCCAB\uB0A0: ${task.firstDay ? "\uD574\uB2F9" : "\uD574\uB2F9 \uC5C6\uC74C"}`,
@@ -61711,7 +61716,7 @@ ${validation.errors.join("\n")}`);
 // src/app.js
 var app = document.querySelector("#app");
 var modalRoot = document.querySelector("#modal-root");
-var state = { documents: [], current: null, view: "home", authorSection: "tasks", selected: null, readerTab: "map", calendarMode: "month", calendarAnchor: dateISO(), calendarSelected: "", mobilePane: "map", roleQuery: "", query: "", limit: 12, progress: {}, exportSelections: /* @__PURE__ */ new Map(), saveMessage: "\uAE30\uAE30\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB429\uB2C8\uB2E4", storageBlocked: false, storageConflict: false, progressBlocked: false, storageError: "", progressError: "" };
+var state = { documents: [], current: null, view: "home", authorSection: "tasks", selected: null, readerTab: "map", calendarMode: "month", calendarAnchor: dateISO(), calendarSelected: "", mobilePane: "map", roleQuery: "", query: "", authorQuery: "", limit: 12, progress: {}, exportSelections: /* @__PURE__ */ new Map(), saveMessage: "\uC785\uB825\uD558\uBA74 \uC774 \uAE30\uAE30\uC5D0 \uC790\uB3D9 \uC800\uC7A5\uB429\uB2C8\uB2E4", storageBlocked: false, storageConflict: false, progressBlocked: false, storageError: "", progressError: "" };
 var storage;
 var lastDocumentsRaw = null;
 try {
@@ -61734,6 +61739,16 @@ try {
 }
 if (!state.documents.some((d) => d.id === state.current)) state.current = state.documents[0]?.id || null;
 var fieldCount = 0;
+var openSections = /* @__PURE__ */ new Set();
+function disclosure(key, label, ...children2) {
+  const node = el("details", { class: "optional-section", open: openSections.has(key) }, el("summary", {}, label), ...children2);
+  node.addEventListener("toggle", () => {
+    if (!node.isConnected) return;
+    if (node.open) openSections.add(key);
+    else openSections.delete(key);
+  });
+  return node;
+}
 var today = () => dateISO();
 var current = () => state.documents.find((d) => d.id === state.current);
 var short = (s, n = 110) => String(s || "").length > n ? String(s).slice(0, n) + "\u2026" : String(s || "");
@@ -61798,10 +61813,10 @@ function saved() {
     if (!storage) throw new Error("\uC800\uC7A5 \uACF5\uAC04\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4");
     saveDocuments(storage, state.documents, lastDocumentsRaw);
     lastDocumentsRaw = storage.getItem(DATA_KEY);
-    state.saveMessage = "\uC774 \uAE30\uAE30\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB428 \xB7 " + (/* @__PURE__ */ new Date()).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    state.saveMessage = "\uC774 \uAE30\uAE30\uC5D0 \uC790\uB3D9 \uC800\uC7A5\uB428 \xB7 " + (/* @__PURE__ */ new Date()).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
     state.storageError = "";
   } catch (e) {
-    state.saveMessage = e.code === "STORAGE_CONFLICT" ? "\uB2E4\uB978 \uCC3D\uC758 \uBCC0\uACBD \uAC10\uC9C0 \xB7 \uBA3C\uC800 JSON\uC73C\uB85C \uBC31\uC5C5\uD574 \uC8FC\uC138\uC694" : "\uC784\uC2DC\uC800\uC7A5 \uC2E4\uD328 \xB7 JSON\uC73C\uB85C \uBC31\uC5C5\uD574 \uC8FC\uC138\uC694";
+    state.saveMessage = e.code === "STORAGE_CONFLICT" ? "\uB2E4\uB978 \uCC3D\uC758 \uBCC0\uACBD \uAC10\uC9C0 \xB7 \uBA3C\uC800 \uD30C\uC77C\uB85C \uC800\uC7A5\uD574 \uC8FC\uC138\uC694" : "\uC784\uC2DC\uC800\uC7A5 \uC2E4\uD328 \xB7 \uD30C\uC77C\uB85C \uC800\uC7A5\uD574 \uC8FC\uC138\uC694";
     state.storageError = e.message;
     if (e.code === "STORAGE_CONFLICT") {
       state.storageConflict = true;
@@ -61823,6 +61838,7 @@ function saved() {
         node.querySelector(".map-task-timing").textContent = timingLabel(task.timing);
       }
     }
+    if (state.view === "author") document.querySelector(".work-map")?.dispatchEvent(new window.Event("author-map-refresh"));
     const calendar = document.querySelector(".map-calendar");
     if (calendar && state.view === "author") calendar.replaceWith(calendarFor(doc, true));
   }
@@ -61831,6 +61847,7 @@ function chooseDocument(id) {
   state.current = id;
   state.selected = null;
   state.query = "";
+  state.authorQuery = "";
   state.roleQuery = "";
   try {
     storage?.setItem(CURRENT_KEY, id);
@@ -61854,6 +61871,7 @@ function activate(doc, view = "author") {
   state.selected = doc.tasks[0]?.id || null;
   state.authorSection = "tasks";
   state.query = "";
+  state.authorQuery = "";
   state.readerTab = "map";
   state.roleQuery = "";
   saved();
@@ -61882,7 +61900,7 @@ function safeName(s) {
 function backup() {
   try {
     download(stringifyDocument(current()), `${safeName(current().title)}-${today()}.json`);
-    notice("JSON \uBC31\uC5C5 \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC5C8\uC2B5\uB2C8\uB2E4. \uB2E4\uC6B4\uB85C\uB4DC\uD55C \uD30C\uC77C\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+    notice("\uC804\uB2EC\xB7\uBC31\uC5C5 \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC5C8\uC2B5\uB2C8\uB2E4. \uB2E4\uC6B4\uB85C\uB4DC\uD55C \uD30C\uC77C\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
   } catch (e) {
     notice(e.message);
   }
@@ -61948,7 +61966,7 @@ function header() {
       el("a", { class: "mach-home-link", href: "https://erakeun.github.io/ERICAAI/", "aria-label": "MACH \uBA54\uC778\uC73C\uB85C \uC774\uB3D9" }, el("img", { class: "mach-logo", src: "./assets/mach-selected-A.svg", width: 340, height: 94, alt: "PROJECT MACH \u2014 Making Administration Change at Hanyang" })),
       button2(el("span", { class: "brand" }, el("span", { class: "brand-icon", "aria-hidden": "true" }, "A"), el("span", {}, "\uC778\uC218\uC778\uACC4 ", el("strong", {}, "A to Z"))), () => switchView("home"), "brand-button")
     ),
-    doc ? el("nav", { "aria-label": "\uC791\uC5C5 \uD654\uBA74", class: "top-nav" }, [["author", "\uC791\uC131\uD558\uAE30"], ["reader", "\uC778\uC218\uC790 \uBCF4\uAE30"], ["export", "\uB0B4\uBCF4\uB0B4\uAE30"]].map(([v, t]) => button2(t, () => switchView(v), state.view === v ? "nav active" : "nav", { "aria-current": state.view === v ? "page" : null }))) : tag("\uB85C\uCEEC \uAC80\uD1A0\uBCF8", "soft")
+    doc && state.view !== "home" ? el("nav", { "aria-label": "\uC791\uC5C5 \uD654\uBA74", class: "top-nav" }, [["author", "\uC791\uC131\uD558\uAE30"], ["reader", "\uC778\uC218\uC790 \uBCF4\uAE30"], ["export", "\uB0B4\uBCF4\uB0B4\uAE30"]].map(([v, t]) => button2(t, () => switchView(v), state.view === v ? "nav active" : "nav", { "aria-current": state.view === v ? "page" : null }))) : tag("\uB85C\uCEEC \uAC80\uD1A0\uBCF8", "soft")
   ));
 }
 function home() {
@@ -61962,31 +61980,28 @@ function home() {
     state.current = null;
     render();
   }), "danger")) : note("\uD604\uC7AC \uB0B4\uC6A9\uC744 \uD30C\uC77C\uB85C \uBC31\uC5C5\uD558\uBA74\uC11C \uC0AC\uC6A9\uD574 \uC8FC\uC138\uC694.")));
-  section.append(el(
-    "div",
-    { class: "hero" },
-    el("div", { class: "hero-copy" }, el("p", { class: "eyebrow" }, "\uC77C\uC740 \uC774\uC5B4\uC9C0\uACE0, \uB9E5\uB77D\uC740 \uB0A8\uB3C4\uB85D"), el("h1", {}, "\uB118\uACA8\uC8FC\uB294 \uC77C\uC740 \uAC00\uBCCD\uAC8C.", el("br"), "\uC774\uC5B4\uBC1B\uB294 \uC77C\uC740 \uBA85\uD655\uD558\uAC8C."), el("p", { class: "lede" }, "\uC544\uB294 \uB9CC\uD07C \uC801\uACE0, \uD544\uC694\uD55C \uC21C\uAC04 \uCC3E\uC544\uBCF4\uC138\uC694.", el("br"), "\uAC19\uC740 \uC790\uB8CC\uAC00 \uC791\uC131\uC790\uC5D0\uAC8C\uB294 \uB178\uD2B8\uB85C, \uC778\uC218\uC790\uC5D0\uAC8C\uB294 \uC5C5\uBB34 \uAE38\uC7A1\uC774\uB85C \uBC14\uB01D\uB2C8\uB2E4."), el("div", { class: "trust-line" }, tag("\uD68C\uC6D0\uAC00\uC785 \uC5C6\uC774"), tag("\uAE30\uAE30 \uC548\uC5D0\uC11C \uC800\uC7A5"), tag("\uD30C\uC77C\uB85C \uC7AC\uC804\uB2EC"))),
-    el("aside", { class: "hero-preview", "aria-label": "\uC778\uC218\uC790 \uD654\uBA74 \uC608\uC2DC" }, el("div", { class: "preview-top" }, tag("\uC778\uC218\uC790 \uBCF4\uAE30", "green"), el("span", { class: "helper" }, "\uAC00\uC0C1 \uD654\uBA74")), el("h2", {}, "\uC624\uB298, \uC5B4\uB514\uC11C\uBD80\uD130 \uD560\uAE4C\uC694?"), el("div", { class: "preview-line" }, el("span", { class: "number-disc" }, "1"), el("div", {}, el("strong", {}, "\uBA3C\uC800 \uC5C5\uBB34\uC758 \uB9E5\uB77D\uC744 \uC77D\uC5B4\uC694"), el("p", {}, "\uCCAB\uB0A0 \uC548\uB0B4 \xB7 \uC790\uB8CC \uC704\uCE58 \uD655\uC778"))), el("div", { class: "preview-line" }, el("span", { class: "number-disc" }, "2"), el("div", {}, el("strong", {}, "\uC9C0\uAE08 \uC774\uC5B4\uBC1B\uC744 \uC77C\uC744 \uBD10\uC694"), el("p", {}, "\uC774\uBC88 \uC8FC \uD560 \uC77C \xB7 \uC9C4\uD589 \uC911\uC778 \uAC74"))), el("div", { class: "preview-line" }, el("span", { class: "number-disc" }, "3"), el("div", {}, el("strong", {}, "\uD544\uC694\uD55C \uC124\uBA85\uB9CC \uD3BC\uCCD0\uC694"), el("p", {}, "\uC5C5\uBB34 \uBC29\uBC95 \xB7 \uC608\uC678 \xB7 \uD655\uC778\uD560 \uC0AC\uB78C"))))
-  ));
-  section.append(el(
-    "section",
-    { "aria-labelledby": "start-title" },
-    el("div", { class: "section-heading" }, el("h2", { id: "start-title" }, "\uC5B4\uB5BB\uAC8C \uC2DC\uC791\uD560\uAE4C\uC694?"), el("span", { class: "helper" }, "\uC138 \uAC00\uC9C0 \uC815\uBCF4\uBA74 \uCCAB \uC5C5\uBB34\uB97C \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694")),
-    el("div", { class: "start-grid" }, startCard("01", "\uC0C8\uB85C \uC791\uC131", "\uC5C5\uBB34\uBA85, \uC218\uD589 \uC2DC\uC810, \uD558\uB294 \uBC29\uBC95\uBD80\uD130.", () => activate(createDocument()), true), startCard("02", "\uAE30\uC874 \uBB38\uC11C\uB85C \uC2DC\uC791", "\uCD94\uCD9C\uD55C \uAE00\uACFC \uD45C\uB97C \uD655\uC778\uD558\uACE0 \uC5C5\uBB34\uB85C \uB098\uB220\uC694.", documentImport), startCard("03", "JSON \uBD88\uB7EC\uC624\uAE30", "\uC804\uB2EC\uBC1B\uC740 \uC778\uC218\uC778\uACC4 \uD30C\uC77C\uC744 \uC0C8 \uC0AC\uBCF8\uC73C\uB85C.", jsonImport), startCard("04", "\uAC00\uC0C1 \uC608\uC2DC \uCCB4\uD5D8", "\uC5C5\uBB34 10\uAC1C\uC640 \uC9C4\uD589 \uAC74 3\uAC1C\uB85C \uB458\uB7EC\uBCF4\uAE30.", () => activate(exampleDocument(today()), "reader")))
-  ));
+  section.append(
+    el("div", { class: "home-intro" }, el("h1", {}, "\uC778\uC218\uC778\uACC4 A to Z"), el("p", { class: "lede" }, "\uC544\uB294 \uC77C\uC744 \uC801\uACE0, \uC774\uC5B4\uBC1B\uC744 \uC77C\uC744 \uCC3E\uC544\uBCF4\uC138\uC694.")),
+    el(
+      "section",
+      { "aria-label": "\uC2DC\uC791\uD558\uAE30" },
+      el("div", { class: "start-grid" }, startCard("01", "\uC778\uC218\uC778\uACC4\uC11C \uB9CC\uB4E4\uAE30", "\uC5C5\uBB34\uBA85\uACFC \uD558\uB294 \uBC29\uBC95\uBD80\uD130 \uC801\uC5B4\uC694.", () => activate(createDocument()), true), startCard("02", "\uBC1B\uC740 \uC778\uC218\uC778\uACC4\uC11C \uBCF4\uAE30", "\uC774 \uC571\uC5D0\uC11C \uC804\uB2EC\uBC1B\uC740 \uD30C\uC77C\uC744 \uC5F4\uC5B4\uC694.", jsonImport)),
+      el("div", { class: "home-secondary actions" }, button2("\uAE30\uC874 \uBB38\uC11C\uB85C \uC2DC\uC791", documentImport, "quiet", { disabled: state.storageBlocked }), button2("\uAC00\uC0C1 \uC608\uC2DC \uCCB4\uD5D8", () => activate(exampleDocument(today()), "reader"), "quiet", { disabled: state.storageBlocked }))
+    )
+  );
   if (state.documents.length) section.append(el("section", { class: "recent" }, el("div", { class: "section-heading" }, el("h2", {}, "\uC774 \uAE30\uAE30\uC5D0\uC11C \uC774\uC5B4\uD558\uAE30"), el("span", { class: "helper" }, `${state.documents.length}\uAC1C \uBB38\uC11C`)), el("div", { class: "document-grid" }, state.documents.map((doc) => el("article", { class: "document-card" }, el("div", {}, tag(doc.title.includes("\uAC00\uC0C1") ? "\uAC00\uC0C1 \uC608\uC2DC" : "\uC784\uC2DC\uC800\uC7A5"), el("h3", {}, doc.title || "\uC774\uB984 \uC5C6\uB294 \uC778\uC218\uC778\uACC4"), el("p", { class: "helper" }, `\uC5C5\uBB34 ${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C`)), el("div", { class: "actions" }, button2("\uC774\uC5B4\uC11C \uC791\uC131", () => {
     state.view = "author";
     chooseDocument(doc.id);
   }), button2("\uC778\uC218\uC790 \uBCF4\uAE30", () => {
     state.view = "reader";
     chooseDocument(doc.id);
-  }, "quiet"), button2("\uC0AD\uC81C", () => confirmAction("\uAE30\uAE30\uC5D0\uC11C \uBB38\uC11C\uB97C \uC9C0\uC6B8\uAE4C\uC694?", `${doc.title || "\uC774 \uBB38\uC11C"}\uC758 JSON \uBC31\uC5C5\uC774 \uC788\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB0B4\uB824\uBC1B\uC740 \uD30C\uC77C\uC740 \uC720\uC9C0\uB429\uB2C8\uB2E4.`, () => {
+  }, "quiet"), button2("\uC0AD\uC81C", () => confirmAction("\uAE30\uAE30\uC5D0\uC11C \uBB38\uC11C\uB97C \uC9C0\uC6B8\uAE4C\uC694?", `${doc.title || "\uC774 \uBB38\uC11C"}\uC758 \uBC31\uC5C5 \uD30C\uC77C\uC774 \uC788\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB0B4\uB824\uBC1B\uC740 \uD30C\uC77C\uC740 \uC720\uC9C0\uB429\uB2C8\uB2E4.`, () => {
     state.documents = state.documents.filter((d) => d.id !== doc.id);
     if (state.current === doc.id) state.current = state.documents[0]?.id || null;
     saved();
     render();
   }), "quiet danger-text")))))));
-  section.append(el("div", { class: "privacy-note" }, el("strong", {}, "\uBE44\uBC00\uBC88\uD638\uC640 \uC778\uC99D\uD0A4\uB294 \uC801\uC9C0 \uB9C8\uC138\uC694."), el("span", {}, "\uC784\uC2DC\uC800\uC7A5\uC740 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uB9CC \uB0A8\uACE0, \uBE0C\uB77C\uC6B0\uC800 \uB370\uC774\uD130 \uC0AD\uC81C \uC2DC \uC0AC\uB77C\uC9C8 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC911\uC694\uD55C \uB0B4\uC6A9\uC740 JSON \uD30C\uC77C\uB85C \uBC31\uC5C5\uD574 \uC8FC\uC138\uC694.")));
+  section.append(el("div", { class: "privacy-note" }, el("strong", {}, "\uBE44\uBC00\uBC88\uD638\uC640 \uC778\uC99D\uD0A4\uB294 \uC801\uC9C0 \uB9C8\uC138\uC694."), el("span", {}, "\uC784\uC2DC\uC800\uC7A5\uC740 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uB9CC \uB0A8\uACE0, \uBE0C\uB77C\uC6B0\uC800 \uB370\uC774\uD130 \uC0AD\uC81C \uC2DC \uC0AC\uB77C\uC9C8 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC911\uC694\uD55C \uB0B4\uC6A9\uC740 \uC804\uB2EC\xB7\uBC31\uC5C5 \uD30C\uC77C\uB85C \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.")));
   return section;
 }
 function startCard(num, title, desc, action, primary = false) {
@@ -61994,7 +62009,7 @@ function startCard(num, title, desc, action, primary = false) {
 }
 function documentBar() {
   const doc = current();
-  return el("div", {}, el("div", { class: "document-bar" }, el("div", {}, el("p", { class: "eyebrow" }, "\uB098\uC758 \uC778\uC218\uC778\uACC4"), el("h1", {}, doc.title || "\uC774\uB984 \uC5C6\uB294 \uC778\uC218\uC778\uACC4"), el("p", { "data-save-status": "", class: `save-status${state.storageError ? " danger-text" : ""}`, role: "status" }, state.saveMessage)), el("div", { class: "actions" }, button2("\uBB38\uC11C \uBD88\uB7EC\uC624\uAE30", documentImport, "quiet"), button2("JSON \uBC31\uC5C5", backup, "primary"))), el("div", { id: "conflict-notice", class: "callout warning", role: "alert", hidden: !state.storageConflict }, el("p", {}, "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uC800\uC7A5\uD55C \uBCC0\uACBD\uC744 \uBC1C\uACAC\uD574 \uB36E\uC5B4\uC4F0\uAE30\uB97C \uBA48\uCDC4\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB0B4\uC6A9\uC740 JSON\uC73C\uB85C \uBC31\uC5C5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), button2("\uD604\uC7AC \uB0B4\uC6A9 JSON \uBC31\uC5C5", backup), button2("\uBCC0\uACBD\uB41C \uC800\uC7A5 \uBD88\uB7EC\uC624\uAE30", () => confirmAction("\uB2E4\uB978 \uCC3D\uC758 \uCD5C\uC2E0 \uC800\uC7A5\uC744 \uBD88\uB7EC\uC62C\uAE4C\uC694?", "\uD604\uC7AC \uD654\uBA74\uC758 \uBCC0\uACBD\uC740 \uBA3C\uC800 JSON\uC73C\uB85C \uBC31\uC5C5\uD574 \uC8FC\uC138\uC694. \uCD5C\uC2E0 \uC800\uC7A5\uC73C\uB85C \uC774 \uD654\uBA74\uC744 \uAD50\uCCB4\uD569\uB2C8\uB2E4.", () => {
+  return el("div", {}, el("div", { class: "document-bar" }, el("div", {}, el("p", { class: "eyebrow" }, "\uB098\uC758 \uC778\uC218\uC778\uACC4"), el("h1", {}, doc.title || "\uC774\uB984 \uC5C6\uB294 \uC778\uC218\uC778\uACC4"), el("p", { "data-save-status": "", class: `save-status${state.storageError ? " danger-text" : ""}`, role: "status" }, state.saveMessage)), el("div", { class: "actions" }, button2("\uD30C\uC77C\uB85C \uC800\uC7A5", backup, "secondary"), state.view === "author" ? button2("\uBC1B\uB294 \uC0AC\uB78C \uD654\uBA74 \uD655\uC778", () => switchView("reader"), "primary") : state.view === "reader" ? button2("\uC804\uB2EC\xB7\uCD9C\uB825\uD558\uAE30", () => switchView("export"), "primary") : null)), el("div", { id: "conflict-notice", class: "callout warning", role: "alert", hidden: !state.storageConflict }, el("p", {}, "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uC800\uC7A5\uD55C \uBCC0\uACBD\uC744 \uBC1C\uACAC\uD574 \uB36E\uC5B4\uC4F0\uAE30\uB97C \uBA48\uCDC4\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB0B4\uC6A9\uC740 \uD30C\uC77C\uB85C \uC800\uC7A5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), button2("\uD604\uC7AC \uB0B4\uC6A9 \uD30C\uC77C\uB85C \uC800\uC7A5", backup), button2("\uBCC0\uACBD\uB41C \uC800\uC7A5 \uBD88\uB7EC\uC624\uAE30", () => confirmAction("\uB2E4\uB978 \uCC3D\uC758 \uCD5C\uC2E0 \uC800\uC7A5\uC744 \uBD88\uB7EC\uC62C\uAE4C\uC694?", "\uD604\uC7AC \uD654\uBA74\uC758 \uBCC0\uACBD\uC740 \uBA3C\uC800 \uD30C\uC77C\uB85C \uC800\uC7A5\uD574 \uC8FC\uC138\uC694. \uCD5C\uC2E0 \uC800\uC7A5\uC73C\uB85C \uC774 \uD654\uBA74\uC744 \uAD50\uCCB4\uD569\uB2C8\uB2E4.", () => {
     try {
       state.documents = loadDocuments(storage);
       lastDocumentsRaw = storage.getItem(DATA_KEY);
@@ -62015,11 +62030,14 @@ function updateItem(item, key, value) {
 }
 function authorView() {
   const doc = current();
-  const nav = el("div", { class: "pill-nav", "aria-label": "\uC791\uC131 \uD56D\uBAA9" }, [["tasks", `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}`], ["cases", `\uC9C4\uD589 \uC911\uC778 \uAC74 ${doc.cases.length}`], ["guide", "\uCCAB\uB0A0 \xB7 \uCCAB \uC8FC \uC548\uB0B4"], ["check", "\uD655\uC778\uD560 \uB0B4\uC6A9"]].map(([v, t]) => button2(t, () => {
+  const authorTab = (v, t) => button2(t, () => {
     state.authorSection = v;
     state.selected = null;
     render();
-  }, state.authorSection === v ? "pill selected" : "pill", { "aria-pressed": state.authorSection === v })));
+  }, state.authorSection === v ? "pill selected" : "pill", { "aria-pressed": state.authorSection === v, ...v === "tasks" ? { "data-author-task-count": "" } : {} });
+  const extras = disclosure("author-options", "\uBB38\uC11C \uC774\uB984 \xB7 \uCCAB\uB0A0 \uC548\uB0B4 \xB7 \uC810\uAC80", el("div", { class: "actions" }, authorTab("guide", "\uCCAB\uB0A0 \xB7 \uCCAB \uC8FC \uC548\uB0B4"), authorTab("check", "\uD655\uC778\uD560 \uB0B4\uC6A9")));
+  if (["guide", "check"].includes(state.authorSection)) extras.open = true;
+  const nav = el("div", { class: "pill-nav", "aria-label": "\uC791\uC131 \uD56D\uBAA9" }, authorTab("tasks", `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}`), authorTab("cases", `\uC9C4\uD589 \uC911\uC778 \uAC74 ${doc.cases.length}`), extras);
   const section = el("section", {}, nav);
   if (state.authorSection === "guide") {
     section.append(el("div", { class: "editor single" }, el("h2", {}, "\uCC98\uC74C \uC624\uB294 \uC0AC\uB78C\uC5D0\uAC8C \uAC74\uB124\uB294 \uC548\uB0B4"), note("\uC5C5\uBB34 \uBAA9\uB85D \uC804\uCCB4\uB97C \uCCAB\uB0A0\uBD80\uD130 \uC77D\uC9C0 \uC54A\uC544\uB3C4 \uB418\uB3C4\uB85D, \uCD9C\uBC1C\uC810\uB9CC \uC801\uC5B4 \uC8FC\uC138\uC694."), field2("\uC778\uC218\uC778\uACC4 \uBB38\uC11C \uC774\uB984", doc.title, (v) => {
@@ -62039,14 +62057,14 @@ function authorView() {
     return section;
   }
   if (state.authorSection === "tasks") {
-    section.append(mapWorkspace(true));
-    if (state.selected) {
-      const chosen = doc.tasks.find((t) => t.id === state.selected);
-      if (chosen) section.append(el("div", { class: "selected-editor" }, el("div", { class: "section-heading" }, el("h2", {}, "\uC120\uD0DD\uD55C \uC138\uBD80 \uC5C5\uBB34"), button2("\uD3B8\uC9D1 \uC811\uAE30", () => {
-        state.selected = null;
-        render();
-      }, "quiet")), taskEditor(chosen)));
-    }
+    const chosen = doc.tasks.find((t) => t.id === state.selected);
+    const workspace = el("div", { class: "author-workspace" }, mapWorkspace(true));
+    const pane = chosen ? el("div", { class: "selected-editor" }, el("div", { class: "section-heading" }, el("h2", {}, "\uC120\uD0DD\uD55C \uC5C5\uBB34"), button2("\uD3B8\uC9D1 \uC811\uAE30", () => {
+      state.selected = null;
+      render();
+    }, "quiet")), taskEditor(chosen)) : doc.tasks.length ? el("div", { class: "selected-editor" }, empty("\uC67C\uCABD\uC5D0\uC11C \uC5C5\uBB34\uB97C \uC120\uD0DD\uD558\uC138\uC694", "\uD070 \uC5C5\uBB34 \uBAA9\uB85D\uC744 \uBCF4\uBA74\uC11C \uD55C \uC5C5\uBB34\uC529 \uC801\uACE0 \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694.")) : el("div", { class: "selected-editor" }, firstTaskEditor(doc));
+    workspace.append(pane);
+    section.append(workspace);
     return section;
   }
   const cases = true;
@@ -62062,6 +62080,37 @@ function authorView() {
   section.append(el("div", { class: "author-layout" }, sidebar, editor));
   return section;
 }
+function firstTaskEditor(doc) {
+  const task = createTask();
+  const write = (key, value) => {
+    task[key] = value;
+    if (!doc.tasks.includes(task)) {
+      if (!task.title.trim() && !task.method.trim()) return;
+      doc.tasks.push(task);
+      state.selected = task.id;
+    }
+    saved();
+    const count = document.querySelector("[data-author-task-count]");
+    if (count) count.textContent = `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}`;
+    document.querySelector(".author-workspace>.map-workspace")?.replaceWith(mapWorkspace(true));
+  };
+  return el("section", { class: "editor first-task-editor", "aria-label": "\uCCAB \uC5C5\uBB34 \uC791\uC131" }, el("h2", {}, "\uCCAB \uC5C5\uBB34\uB97C \uC801\uC5B4 \uBCF4\uC138\uC694"), note("\uC5C5\uBB34\uBA85\uACFC \uD558\uB294 \uBC29\uBC95\uBD80\uD130 \uC801\uC73C\uBA74 \uB429\uB2C8\uB2E4. \uC785\uB825\uD55C \uB0B4\uC6A9\uC740 \uC790\uB3D9 \uC800\uC7A5\uB429\uB2C8\uB2E4."), field2("\uC5C5\uBB34\uBA85", "", (v) => write("title", v), { placeholder: "\uC608: \uB9E4\uC6D4 \uC9C0\uCD9C \uC790\uB8CC \uC815\uB9AC", maxLength: 300 }), field2("\uD558\uB294 \uBC29\uBC95", "", (v) => write("method", v), { type: "textarea", rows: 8, placeholder: "\uBB34\uC5C7\uC744 \uD558\uB294\uC9C0, \uC5B4\uB5BB\uAC8C \uD558\uB294\uC9C0 \uC544\uB294 \uB9CC\uD07C \uC801\uC5B4 \uC8FC\uC138\uC694." }), button2("\uC77C\uC815\xB7\uB2F4\uB2F9\xB7\uC790\uB8CC \uB354 \uC801\uAE30", () => {
+    if (!doc.tasks.includes(task)) {
+      notice("\uC5C5\uBB34\uBA85\uC774\uB098 \uD558\uB294 \uBC29\uBC95\uC744 \uBA3C\uC800 \uC801\uC5B4 \uC8FC\uC138\uC694.");
+      return;
+    }
+    render();
+  }, "quiet"), note("\uBE44\uBC00\uBC88\uD638\uC640 \uC778\uC99D\uD0A4\uB294 \uC801\uC9C0 \uB9C8\uC138\uC694. \uD070 \uC5C5\uBB34 \uBD84\uB958\uC640 \uC77C\uC815\uC740 \uB098\uC911\uC5D0 \uCD94\uAC00\uD560 \uC218 \uC788\uC5B4\uC694."));
+}
+function newTask(groupId = "") {
+  const task = createTask({ groupId });
+  current().tasks.push(task);
+  state.authorQuery = "";
+  state.selected = task.id;
+  saved();
+  render();
+  focusEditor();
+}
 function mapWorkspace(editable) {
   const base = current();
   const doc = editable || !state.roleQuery ? base : { ...base, tasks: base.tasks.filter((t) => t.ownerRole === state.roleQuery) };
@@ -62069,8 +62118,8 @@ function mapWorkspace(editable) {
   const section = el(
     "section",
     { class: `map-workspace mobile-${state.mobilePane}` },
-    el("div", { class: "section-heading" }, el("div", {}, el("h2", {}, editable ? "\uD070 \uC5C5\uBB34\uBD80\uD130, \uD55C\uB208\uC5D0 \uC815\uB9AC\uD558\uC138\uC694" : "\uB098\uC758 \uC5C5\uBB34, \uD55C\uB208\uC5D0 \uBCF4\uAE30"), note(editable ? "\uD070 \uC5C5\uBB34 \uC601\uC5ED\uC744 \uB9CC\uB4E4\uACE0 \uADF8 \uC548\uC5D0 \uC138\uBD80 \uC5C5\uBB34\uB97C \uCD94\uAC00\uD558\uC138\uC694. \uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uD3B8\uC9D1\uD569\uB2C8\uB2E4." : "\uD070 \uC5C5\uBB34\uC640 \uC218\uD589 \uC2DC\uC810\uC744 \uD568\uAED8 \uBCF4\uC138\uC694. \uB0A0\uC9DC \uC5C6\uB294 \uC5C5\uBB34\uB3C4 \uC9C0\uB3C4\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4.")), editable ? el("div", { class: "actions" }, button2("\uFF0B \uD070 \uC5C5\uBB34 \uC601\uC5ED", addGroup, "primary"), button2("\uBA54\uBAA8 \uBD99\uC5EC\uB123\uAE30", pasteImport, "quiet"), button2("AI\uB85C \uCD08\uC548 \uB9CC\uB4E4\uAE30", authorAI, "quiet")) : null),
-    el("div", { class: "mobile-view-switch" }, button2("\uC5C5\uBB34 \uC9C0\uB3C4", () => {
+    el("div", { class: "section-heading" }, el("div", {}, el("h2", {}, editable ? "\uC5C5\uBB34 \uC804\uCCB4 \uBCF4\uAE30" : "\uB098\uC758 \uC5C5\uBB34, \uD55C\uB208\uC5D0 \uBCF4\uAE30"), note(editable ? "\uC5C5\uBB34\uB97C \uB204\uB974\uBA74 \uC624\uB978\uCABD\uC5D0\uC11C \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694. \uD070 \uC5C5\uBB34\uBCC4\uB85C \uBB36\uB294 \uAC83\uC740 \uC120\uD0DD\uC785\uB2C8\uB2E4." : "\uD544\uC694\uD55C \uC5C5\uBB34\uB97C \uB204\uB974\uBA74 \uC124\uBA85\uC744 \uBCFC \uC218 \uC788\uC5B4\uC694. \uB0A0\uC9DC \uC5C6\uB294 \uC5C5\uBB34\uB3C4 \uC5EC\uAE30\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4."))),
+    editable ? el("div", { class: "map-actions" }, el("div", { class: "actions" }, button2("\uFF0B \uC5C5\uBB34 \uCD94\uAC00", () => newTask(), "primary"), button2("\uFF0B \uD070 \uC5C5\uBB34 \uC601\uC5ED", addGroup, "quiet")), disclosure("author-import", "\uBB38\uC11C\xB7\uBA54\uBAA8 \uAC00\uC838\uC624\uAE30 \xB7 AI \uB3C4\uC6C0", el("div", { class: "actions" }, button2("\uBB38\uC11C \uBD88\uB7EC\uC624\uAE30", documentImport, "quiet"), button2("\uBA54\uBAA8 \uBD99\uC5EC\uB123\uAE30", pasteImport, "quiet"), button2("AI\uB85C \uCD08\uC548 \uB9CC\uB4E4\uAE30", authorAI, "quiet")))) : el("div", { class: "mobile-view-switch" }, button2("\uC5C5\uBB34 \uC9C0\uB3C4", () => {
       state.mobilePane = "map";
       render();
     }, state.mobilePane === "map" ? "pill selected" : "pill"), button2("\uC77C\uC815", () => {
@@ -62081,32 +62130,56 @@ function mapWorkspace(editable) {
   const map = el("div", { class: "work-map" });
   const visibleGroups = [...groups];
   if (doc.tasks.some((t) => !t.groupId)) visibleGroups.push({ id: "", title: "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC740 \uC5C5\uBB34" });
-  if (!visibleGroups.length) map.append(empty("\uD070 \uC5C5\uBB34 \uC601\uC5ED\uC744 \uBA3C\uC800 \uB9CC\uB4E4\uC5B4 \uBCF4\uC138\uC694", "\uC608: \uC815\uAE30 \uC6B4\uC601, \uD589\uC0AC\xB7\uD504\uB85C\uC81D\uD2B8, \uC790\uB8CC\xB7\uD589\uC815", editable ? button2("\uCCAB \uD070 \uC5C5\uBB34 \uB9CC\uB4E4\uAE30", addGroup, "primary") : null));
+  if (!visibleGroups.length) map.append(empty("\uC791\uC131\uD55C \uC5C5\uBB34\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694", editable ? "\uC624\uB978\uCABD\uC5D0 \uCCAB \uC5C5\uBB34\uB97C \uC801\uC5B4 \uBCF4\uC138\uC694. \uD070 \uC5C5\uBB34\uBCC4\uB85C \uBB36\uB294 \uC77C\uC740 \uB098\uC911\uC5D0 \uD574\uB3C4 \uB429\uB2C8\uB2E4." : "\uC544\uC9C1 \uC791\uC131\uB41C \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   for (const group of visibleGroups) {
     const tasks = doc.tasks.filter((t) => (t.groupId || "") === group.id);
     const groupCard = el("article", { class: "group-card", "data-group-id": group.id }, el("div", { class: "group-heading" }, el("div", {}, el("h3", {}, group.title || "\uC774\uB984 \uC5C6\uB294 \uC601\uC5ED"), note(`${tasks.length}\uAC1C \uC138\uBD80 \uC5C5\uBB34`)), editable && group.id ? button2("\uC774\uB984\xB7\uC21C\uC11C", () => editGroup(group), "quiet") : null));
     if (tasks.length) groupCard.append(el("ul", { class: "map-task-list" }, tasks.map((task) => el("li", {}, el("button", { type: "button", class: `map-task${state.selected === task.id ? " active" : ""}`, "data-task-id": task.id, onclick: () => selectTask(task.id, editable) }, el("span", { class: "map-task-title" }, task.title || "\uC0C8 \uC138\uBD80 \uC5C5\uBB34"), el("span", { class: "map-task-timing" }, timingLabel(task.timing)), el("span", { "aria-hidden": "true", class: "map-task-arrow" }, "\u203A"))))));
     else groupCard.append(note("\uC544\uC9C1 \uC138\uBD80 \uC5C5\uBB34\uAC00 \uC5C6\uC5B4\uC694."));
-    if (editable) groupCard.append(button2("\uFF0B \uC138\uBD80 \uC5C5\uBB34", () => {
-      const task = createTask({ groupId: group.id });
-      doc.tasks.push(task);
-      state.selected = task.id;
-      saved();
-      render();
-      focusEditor();
-    }, "quiet full"));
+    if (editable) groupCard.append(button2("\uFF0B \uC138\uBD80 \uC5C5\uBB34", () => newTask(group.id), "quiet full"));
     map.append(groupCard);
   }
-  if (editable && visibleGroups.length) map.append(button2("\uBD84\uB958 \uC5C6\uC774 \uBE60\uB974\uAC8C \uC5C5\uBB34 \uCD94\uAC00", () => {
-    const task = createTask();
-    doc.tasks.push(task);
-    state.selected = task.id;
-    saved();
-    render();
-    focusEditor();
-  }, "quiet full"));
+  if (editable && doc.tasks.length) {
+    const count = el("p", { class: "helper", role: "status", "data-author-map-count": "" });
+    const noMatch = empty("\uC77C\uCE58\uD558\uB294 \uC5C5\uBB34\uAC00 \uC5C6\uC5B4\uC694", "\uC5C5\uBB34\uBA85, \uBC29\uBC95 \uB610\uB294 \uD070 \uC5C5\uBB34 \uC774\uB984\uC73C\uB85C \uB2E4\uC2DC \uCC3E\uC544\uBCF4\uC138\uC694.");
+    noMatch.hidden = true;
+    const filterMap = () => {
+      let shown = 0;
+      for (const card of map.querySelectorAll(".group-card")) {
+        const groupTitle = card.querySelector("h3").textContent;
+        let groupShown = 0;
+        for (const row of card.querySelectorAll(".map-task-list li")) {
+          const task = doc.tasks.find((t) => t.id === row.querySelector(".map-task").dataset.taskId);
+          if (!task) {
+            row.hidden = true;
+            continue;
+          }
+          row.hidden = !!state.authorQuery.trim() && !matches({ title: task.title, method: task.method, ownerRole: task.ownerRole, supportRole: task.supportRole, groupTitle }, state.authorQuery);
+          if (!row.hidden) groupShown++;
+        }
+        card.hidden = !!state.authorQuery.trim() && !groupShown;
+        shown += groupShown;
+      }
+      count.textContent = `\uC9C0\uB3C4\uC5D0 ${shown}/${doc.tasks.length}\uAC1C \uC5C5\uBB34 \uD45C\uC2DC`;
+      noMatch.hidden = !state.authorQuery.trim() || shown > 0;
+    };
+    const search = field2("\uC5C5\uBB34 \uC9C0\uB3C4\uC5D0\uC11C \uCC3E\uAE30", state.authorQuery, (v) => {
+      state.authorQuery = v;
+      filterMap();
+    }, { type: "search", placeholder: "\uC5C5\uBB34\uBA85 \xB7 \uD070 \uC5C5\uBB34 \xB7 \uD558\uB294 \uBC29\uBC95 \xB7 \uB2F4\uB2F9 \uC5ED\uD560", maxLength: 300 });
+    map.prepend(el("div", { class: "author-map-search" }, search, el("div", { class: "actions" }, count, button2("\uC9C0\uB3C4 \uAC80\uC0C9 \uC9C0\uC6B0\uAE30", () => {
+      state.authorQuery = "";
+      search.querySelector("input").value = "";
+      filterMap();
+      search.querySelector("input").focus();
+    }, "quiet"))));
+    map.append(noMatch);
+    map.addEventListener("author-map-refresh", filterMap);
+    filterMap();
+  }
   const calendar = calendarFor(doc, editable);
-  section.append(el("div", { class: "map-and-calendar" }, map, calendar));
+  if (editable) section.append(map, disclosure("author-calendar", "\uC77C\uC815 \uD655\uC778\uD558\uAE30", calendar));
+  else section.append(el("div", { class: "map-and-calendar" }, map, calendar));
   return section;
 }
 function calendarFor(doc, editable) {
@@ -62130,7 +62203,6 @@ function focusEditor() {
   queueMicrotask(() => {
     const input = document.querySelector(".selected-editor input");
     input?.focus({ preventScroll: true });
-    document.querySelector(".selected-editor")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   });
 }
 function selectTask(id, editable, date) {
@@ -62158,6 +62230,7 @@ function addGroup() {
     }
     current().groups ??= [];
     current().groups.push({ id: makeId(), title });
+    state.authorQuery = "";
     state.selected = null;
     saved();
     close();
@@ -62269,16 +62342,16 @@ function taskEditor(task) {
   return el(
     "section",
     { class: "editor", "aria-label": "\uC5C5\uBB34 \uC791\uC131" },
-    el("div", { class: "section-heading" }, el("h2", {}, "\uC544\uB294 \uB9CC\uD07C, \uD3B8\uD558\uAC8C \uC801\uC73C\uC138\uC694"), tag("\uAE30\uBCF8 3\uAC00\uC9C0", "green")),
-    select("\uD070 \uC5C5\uBB34 \uC601\uC5ED", task.groupId || "", [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...(current().groups || []).map((g) => [g.id, g.title])], (v) => {
+    el("div", { class: "section-heading" }, el("h2", {}, "\uC5C5\uBB34\uBA85\uACFC \uD558\uB294 \uBC29\uBC95\uBD80\uD130"), tag("\uB098\uBA38\uC9C0\uB294 \uC120\uD0DD", "green")),
+    field2("\uC5C5\uBB34\uBA85", task.title, (v) => updateItem(task, "title", v), { placeholder: "\uC608: \uB9E4\uC6D4 \uC9C0\uCD9C \uC790\uB8CC \uC815\uB9AC", maxLength: 300 }),
+    field2("\uD558\uB294 \uBC29\uBC95", task.method, (v) => updateItem(task, "method", v), { type: "textarea", rows: 8, placeholder: "\uBB34\uC5C7\uC744 \uD558\uB294\uC9C0, \uC5B4\uB5BB\uAC8C \uD558\uB294\uC9C0 \uC544\uB294 \uB9CC\uD07C \uC801\uAC70\uB098 \uAE30\uC874 \uBA54\uBAA8\uB97C \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.", hint: "\uC785\uB825\uD55C \uB0B4\uC6A9\uC740 \uC790\uB3D9 \uC800\uC7A5\uB429\uB2C8\uB2E4. \uC904\uBC14\uAFC8\uACFC \uBD99\uC5EC\uB123\uC740 \uD45C \uD14D\uC2A4\uD2B8\uAC00 \uC720\uC9C0\uB429\uB2C8\uB2E4." }),
+    disclosure(`timing-${task.id}`, "\uC5B8\uC81C \uD558\uB294 \uC5C5\uBB34\uC778\uAC00\uC694? (\uC120\uD0DD)", timingEditor(task)),
+    disclosure(`group-${task.id}`, "\uD070 \uC5C5\uBB34\uBCC4\uB85C \uBB36\uAE30 (\uC120\uD0DD)", select("\uD070 \uC5C5\uBB34 \uC601\uC5ED", task.groupId || "", [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...(current().groups || []).map((g) => [g.id, g.title])], (v) => {
       task.groupId = v;
       saved();
       render();
-    }),
-    field2("\uC5C5\uBB34\uBA85", task.title, (v) => updateItem(task, "title", v), { placeholder: "\uC608: \uB9E4\uC6D4 \uC9C0\uCD9C \uC790\uB8CC \uC815\uB9AC", maxLength: 300 }),
-    timingEditor(task),
-    field2("\uD558\uB294 \uBC29\uBC95", task.method, (v) => updateItem(task, "method", v), { type: "textarea", rows: 8, placeholder: "\uD558\uB358 \uBC29\uC2DD \uADF8\uB300\uB85C \uC801\uAC70\uB098 \uAE30\uC874 \uBA54\uBAA8\uB97C \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.\n\uC608: \uACF5\uC6A9 \uD3F4\uB354\uC5D0\uC11C \uC774\uBC88 \uB2EC \uC790\uB8CC\uB97C \uC5F4\uACE0 \uB204\uB77D\uB41C \uD56D\uBAA9\uC744 \uD655\uC778\uD569\uB2C8\uB2E4.", hint: "\uC904\uBC14\uAFC8\uACFC \uBD99\uC5EC\uB123\uC740 \uD45C \uD14D\uC2A4\uD2B8\uAC00 \uC720\uC9C0\uB429\uB2C8\uB2E4. \uC11C\uC2DD \uD3B8\uC9D1\uAE30\uB294 \uB2E4\uC74C \uAC80\uD1A0 \uBC94\uC704\uC785\uB2C8\uB2E4." }),
-    el("details", { class: "detail-editor" }, el("summary", {}, "\uC870\uAE08 \uB354 \uB0A8\uAE30\uAE30", el("span", { class: "helper" }, "\uBAA9\uC801 \xB7 \uC790\uB8CC \xB7 \uB2E8\uACC4 \xB7 \uC608\uC678 \uB4F1, \uD544\uC694\uD55C \uAC83\uB9CC")), el("div", { class: "detail-body" }, field2("\uC774 \uC5C5\uBB34\uC758 \uBAA9\uC801", task.purpose, (v) => updateItem(task, "purpose", v), { type: "textarea", rows: 2 }), field2("\uC900\uBE44\uC790\uB8CC\uC640 \uC704\uCE58", task.materials, (v) => updateItem(task, "materials", v), { type: "textarea", rows: 3, placeholder: "\uBB38\uC11C\uBA85 \xB7 \uACF5\uC6A9 \uD3F4\uB354 \uACBD\uB85C \xB7 \uC811\uADFC \uAD8C\uD55C\uC744 \uD655\uC778\uD560 \uC5ED\uD560" }), select("\uC790\uB8CC \uC811\uADFC \uD655\uC778", task.accessStatus || (task.accessChecked ? "confirmed" : "unconfirmed"), [["unconfirmed", "\uBBF8\uD655\uC778"], ["confirmed", "\uD655\uC778\uD568"], ["notApplicable", "\uD574\uB2F9 \uC5C6\uC74C"]], (v) => {
+    })),
+    disclosure(`detail-${task.id}`, "\uB2F4\uB2F9\xB7\uC790\uB8CC\xB7\uC790\uC138\uD55C \uC124\uBA85 (\uC120\uD0DD)", el("div", { class: "detail-body" }, field2("\uC774 \uC5C5\uBB34\uC758 \uBAA9\uC801", task.purpose, (v) => updateItem(task, "purpose", v), { type: "textarea", rows: 2 }), field2("\uC900\uBE44\uC790\uB8CC\uC640 \uC704\uCE58", task.materials, (v) => updateItem(task, "materials", v), { type: "textarea", rows: 3, placeholder: "\uBB38\uC11C\uBA85 \xB7 \uACF5\uC6A9 \uD3F4\uB354 \uACBD\uB85C \xB7 \uC811\uADFC \uAD8C\uD55C\uC744 \uD655\uC778\uD560 \uC5ED\uD560" }), select("\uC790\uB8CC \uC811\uADFC \uD655\uC778", task.accessStatus || (task.accessChecked ? "confirmed" : "unconfirmed"), [["unconfirmed", "\uBBF8\uD655\uC778"], ["confirmed", "\uD655\uC778\uD568"], ["notApplicable", "\uD574\uB2F9 \uC5C6\uC74C"]], (v) => {
       task.accessStatus = v;
       task.accessChecked = v === "confirmed";
       saved();
@@ -62387,25 +62460,28 @@ function matches(item, query) {
 }
 function readerView() {
   const doc = current();
-  const shell = el("section", {}, el("div", { class: "reader-intro" }, el("div", {}, el("p", { class: "eyebrow" }, "\uC774\uC5B4\uBC1B\uB294 \uC0AC\uB78C\uC744 \uC704\uD55C \uD654\uBA74"), el("h2", {}, "\uC9C0\uAE08 \uD544\uC694\uD55C \uC77C\uBD80\uD130 \uC0B4\uD3B4\uBCF4\uC138\uC694")), tag("\uC6D0\uBCF8\uACFC \uC218\uD589 \uAE30\uB85D \uBD84\uB9AC", "green")));
+  const shell = el("section", {}, el("div", { class: "reader-intro" }, el("div", {}, el("h2", {}, "\uD544\uC694\uD55C \uC5C5\uBB34\uBD80\uD130 \uC0B4\uD3B4\uBCF4\uC138\uC694"), note(`\uC5C5\uBB34 ${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uC911\uC778 \uAC74 ${doc.cases.filter((c) => c.status !== "done").length}\uAC1C \xB7 \uC5C5\uBB34\uB97C \uB204\uB974\uBA74 \uC124\uBA85\uC774 \uC5F4\uB9BD\uB2C8\uB2E4.`))));
   shell.append(el("div", { class: "search-box" }, field2("\uC5C5\uBB34\uB098 \uC0C1\uD669 \uCC3E\uAE30", state.query, (v) => {
     state.query = v;
     state.limit = 12;
     renderReaderResults();
   }, { type: "search", placeholder: "\uC608: \uC790\uB8CC\uAC00 \uB204\uB77D\uB410\uC744 \uB54C, \uD589\uC0AC, \uC6D4\uB9D0\u2026", maxLength: 300 }), note("\uC5C5\uBB34 \uBC29\uBC95, \uC608\uC678 \uC0C1\uD669, \uC9C4\uD589 \uBA54\uBAA8\uAE4C\uC9C0 \uCC3E\uC2B5\uB2C8\uB2E4.")));
-  const roleOptions = [...new Set(doc.tasks.map((t) => t.ownerRole).filter(Boolean))];
-  if (state.roleQuery && !roleOptions.includes(state.roleQuery)) state.roleQuery = "";
-  if (roleOptions.length) shell.append(el("div", { class: "role-filter" }, select("\uC8FC\uB2F4\uB2F9 \uC5ED\uD560\uB85C \uC5C5\uBB34 \uBCF4\uAE30", state.roleQuery, [["", "\uC804\uCCB4 \uC5ED\uD560"], ...roleOptions.map((r) => [r, r])], (v) => {
-    state.roleQuery = v;
-    state.limit = 12;
-    render();
-  }), note("\uC5C5\uBB34 \uB9E4\uB274\uC5BC\uC5D0\uB9CC \uC801\uC6A9\uD569\uB2C8\uB2E4. \uC790\uB8CC \uC811\uADFC \uAD8C\uD55C\uACFC \uB2F4\uB2F9 \uC5ED\uD560\uC740 \uBCC4\uAC1C\uC785\uB2C8\uB2E4.")));
-  shell.append(el("nav", { class: "reader-nav", "aria-label": "\uC778\uC218\uC790 \uBCF4\uAE30 \uBC94\uC704" }, [["map", "\uC804\uCCB4 \uC5C5\uBB34"], ["week", "\uC774\uBC88 \uC8FC"], ["month", "\uC774\uBC88 \uB2EC"], ["situations", "\uC0C1\uD669\uBCC4"], ["cases", "\uC9C4\uD589 \uAC74"], ["start", "\uCCAB\uB0A0 \xB7 \uCCAB \uC8FC"], ["check", "\uD655\uC778 \uD544\uC694"]].map(([v, t]) => button2(t, () => {
+  const tab = (v, t) => button2(t, () => {
     state.readerTab = v;
     state.query = "";
     state.limit = 12;
     render();
-  }, state.readerTab === v ? "pill selected" : "pill", { "aria-pressed": state.readerTab === v }))));
+  }, state.readerTab === v ? "pill selected" : "pill", { "aria-pressed": state.readerTab === v });
+  const more = disclosure("reader-options", "\uB2E4\uB978 \uAE30\uC900\uC73C\uB85C \uBCF4\uAE30", el("div", { class: "actions" }, ...[["month", "\uC774\uBC88 \uB2EC"], ["situations", "\uC0C1\uD669\uBCC4"], ["start", "\uCCAB\uB0A0 \xB7 \uCCAB \uC8FC"], ["check", "\uD655\uC778 \uD544\uC694"]].map(([v, t]) => tab(v, t))));
+  const roleOptions = [...new Set(doc.tasks.map((t) => t.ownerRole).filter(Boolean))];
+  if (state.roleQuery && !roleOptions.includes(state.roleQuery)) state.roleQuery = "";
+  if (roleOptions.length) more.append(el("div", { class: "role-filter" }, select("\uC8FC\uB2F4\uB2F9 \uC5ED\uD560\uB85C \uC5C5\uBB34 \uBCF4\uAE30", state.roleQuery, [["", "\uC804\uCCB4 \uC5ED\uD560"], ...roleOptions.map((r) => [r, r])], (v) => {
+    state.roleQuery = v;
+    state.limit = 12;
+    render();
+  }), note("\uC5C5\uBB34 \uB9E4\uB274\uC5BC\uC5D0\uB9CC \uC801\uC6A9\uD569\uB2C8\uB2E4. \uC790\uB8CC \uC811\uADFC \uAD8C\uD55C\uACFC \uB2F4\uB2F9 \uC5ED\uD560\uC740 \uBCC4\uAC1C\uC785\uB2C8\uB2E4.")));
+  if (state.roleQuery || !["map", "week", "cases"].includes(state.readerTab)) more.open = true;
+  shell.append(el("nav", { class: "reader-nav", "aria-label": "\uC778\uC218\uC790 \uBCF4\uAE30 \uBC94\uC704" }, tab("map", "\uC804\uCCB4 \uC5C5\uBB34"), tab("week", "\uC774\uBC88 \uC8FC"), tab("cases", "\uC9C4\uD589 \uC911\uC778 \uC77C"), more));
   if (state.progressError) shell.append(el("div", { class: "callout warning", role: "alert" }, state.progressError, button2("\uC218\uD589 \uAE30\uB85D \uC6D0\uBCF8 \uB0B4\uB824\uBC1B\uAE30", () => download(storage.getItem(PROGRESS_KEY), "\uC218\uD589\uAE30\uB85D-\uBCF5\uAD6C\uC6D0\uBCF8.txt", "text/plain")), button2("\uC218\uD589 \uAE30\uB85D \uCD08\uAE30\uD654", () => confirmAction("\uC218\uD589 \uAE30\uB85D\uC744 \uCD08\uAE30\uD654\uD560\uAE4C\uC694?", "\uBB38\uC11C \uC6D0\uBCF8\uC740 \uC720\uC9C0\uB429\uB2C8\uB2E4. \uBA3C\uC800 \uAE30\uB85D \uC6D0\uBCF8\uC744 \uBCF4\uAD00\uD574 \uC8FC\uC138\uC694.", () => {
     storage.removeItem(PROGRESS_KEY);
     state.progress = {};
@@ -62427,7 +62503,7 @@ function renderReaderResults() {
     const tasks = doc.tasks.filter((t) => matches(t, state.query));
     const cases = doc.cases.filter((t) => matches(t, state.query));
     const combined = [...tasks.map((t) => ({ task: t })), ...cases.map((c) => ({ case: c }))];
-    root.append(el("div", { class: "section-heading" }, el("h2", {}, `\uAC80\uC0C9 \uACB0\uACFC ${combined.length}\uAC1C`), el("span", { role: "status", class: "helper" }, `${state.query} \uAC80\uC0C9`)), combined.length ? el("div", { class: "read-list" }, combined.slice(0, state.limit).map((x2) => x2.task ? taskCard(x2.task) : caseCard(x2.case))) : empty("\uD574\uB2F9\uD558\uB294 \uC5C5\uBB34\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694", "\uB354 \uC9E7\uC740 \uB9D0\uC774\uB098 \uB2E4\uB978 \uC0C1\uD669\uC73C\uB85C \uCC3E\uC544\uBCF4\uC138\uC694."));
+    root.append(el("div", { class: "section-heading" }, el("h2", {}, `\uAC80\uC0C9 \uACB0\uACFC ${combined.length}\uAC1C`), el("span", { role: "status", class: "helper" }, `${state.query} \uAC80\uC0C9`)), note(state.roleQuery ? "\uAE30\uAC04\uACFC \uAD00\uACC4\uC5C6\uC774 \uC120\uD0DD\uD55C \uC8FC\uB2F4\uB2F9 \uC5ED\uD560\uC758 \uC5C5\uBB34\uC640 \uBAA8\uB4E0 \uC9C4\uD589 \uAC74\uC5D0\uC11C \uCC3E\uC2B5\uB2C8\uB2E4." : "\uC120\uD0DD\uD55C \uC8FC\xB7\uC6D4\uACFC \uAD00\uACC4\uC5C6\uC774 \uC804\uCCB4 \uC5C5\uBB34\uC640 \uC9C4\uD589 \uAC74\uC5D0\uC11C \uCC3E\uC2B5\uB2C8\uB2E4."), combined.length ? el("div", { class: "read-list" }, combined.slice(0, state.limit).map((x2) => x2.task ? taskCard(x2.task) : caseCard(x2.case))) : empty("\uD574\uB2F9\uD558\uB294 \uC5C5\uBB34\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694", "\uB354 \uC9E7\uC740 \uB9D0\uC774\uB098 \uB2E4\uB978 \uC0C1\uD669\uC73C\uB85C \uCC3E\uC544\uBCF4\uC138\uC694."));
     if (combined.length > state.limit) root.append(button2("\uACB0\uACFC \uB354 \uBCF4\uAE30", () => {
       state.limit += 12;
       renderReaderResults();
@@ -62509,7 +62585,7 @@ function progressBox(item, date) {
   }, { disabled: state.progressBlocked }), !date ? note("\uB0A0\uC9DC \uC5C6\uB294 \uCCB4\uD06C\uB294 \uC790\uB3D9 \uCD08\uAE30\uD654\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC218\uD589 \uB54C \uC9C1\uC811 \uD574\uC81C\uD574 \uC8FC\uC138\uC694.") : null);
 }
 function taskCard(task, date) {
-  const details = el("details", { class: "read-card" }, el("summary", {}, el("div", { class: "read-summary" }, el("div", { class: "read-title" }, tag(date || timingLabel(task.timing), date && date < today() ? "amber" : ""), el("h3", {}, task.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"), el("p", {}, short(task.method) || "\uD558\uB294 \uBC29\uBC95\uC774 \uC544\uC9C1 \uC791\uC131\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694.")), el("span", { class: "expand-hint" }, "\uBC29\uBC95 \uD3BC\uCE58\uAE30"))));
+  const details = el("details", { class: "read-card" }, el("summary", {}, el("div", { class: "read-summary" }, el("div", { class: "read-title" }, date || task.timing.kind !== "event" || task.timing.trigger ? tag(date || timingLabel(task.timing), date && date < today() ? "amber" : "") : null, el("h3", {}, task.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"), el("p", {}, short(task.method) || "\uD558\uB294 \uBC29\uBC95\uC774 \uC544\uC9C1 \uC791\uC131\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694.")), el("span", { class: "expand-hint" }, "\uC5C5\uBB34 \uC124\uBA85 \uBCF4\uAE30"))));
   details.append(el("div", { class: "read-content" }, task.timing.startRule ? readBlock("\uC900\uBE44 \uC2DC\uC791", task.timing.startRule) : null, readBlock("\uD558\uB294 \uBC29\uBC95", task.method || "\uC544\uC9C1 \uC791\uC131\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694."), [["\uC8FC\uB2F4\uB2F9 \uC5ED\uD560", "ownerRole"], ["\uC9C0\uC6D0 \uC5ED\uD560", "supportRole"], ["\uBAA9\uC801", "purpose"], ["\uC900\uBE44\uC790\uB8CC", "materials"], ["\uB2E8\uACC4", "steps"], ["\uC5F0\uB77D\uD560 \uC5ED\uD560", "contacts"], ["\uACB0\uC7AC\xB7\uD655\uC778", "approval"], ["\uC608\uC678 \uC0C1\uD669", "exceptions"], ["\uC644\uB8CC \uC870\uAC74", "doneWhen"], ["\uADFC\uAC70", "evidence"]].map(([label, key]) => task[key] ? readBlock(label, task[key]) : null), task.verifiedAt ? note("\uCD5C\uC885 \uD655\uC778\uC77C " + task.verifiedAt) : null, sourceInfo(task), progressBox(task, date)));
   return details;
 }
@@ -62521,7 +62597,7 @@ function caseCard(item) {
 }
 function issuesPanel() {
   const doc = current(), issues = issuesFor(doc);
-  const section = el("section", { class: "issues-panel" }, el("h2", {}, "\uD55C \uBC88 \uB354 \uD655\uC778\uD558\uBA74 \uC88B\uC740 \uB0B4\uC6A9"), note("\uC785\uB825 \uB0B4\uC6A9\uC5D0\uC11C \uCC3E\uC740 \uADDC\uCE59 \uAE30\uBC18 \uC54C\uB9BC\uC785\uB2C8\uB2E4. \uBB38\uC11C\uC758 \uC644\uC804\uC131\uC774\uB098 \uC5C5\uBB34 \uC219\uB828\uB3C4\uB97C \uD3C9\uAC00\uD558\uC9C0 \uC54A\uC544\uC694."));
+  const section = el("section", { class: "issues-panel" }, el("h2", {}, "\uD55C \uBC88 \uB354 \uD655\uC778\uD558\uBA74 \uC88B\uC740 \uB0B4\uC6A9"), note("\uC785\uB825\uD55C \uB0B4\uC6A9 \uC911 \uD655\uC778\uD560 \uBD80\uBD84\uC744 \uBAA8\uC558\uC2B5\uB2C8\uB2E4. \uBB38\uC11C\uC758 \uC644\uC804\uC131\uC774\uB098 \uC5C5\uBB34 \uC219\uB828\uB3C4\uB97C \uD3C9\uAC00\uD558\uC9C0 \uC54A\uC544\uC694."));
   if (!issues.length) section.append(empty("\uD604\uC7AC \uADDC\uCE59\uC5D0\uC11C \uCC3E\uC740 \uD655\uC778 \uC0AC\uD56D\uC774 \uC5C6\uC5B4\uC694", "\uC2E4\uC81C \uC790\uB8CC \uC811\uADFC, \uD604\uC7A5 \uC608\uC678, \uCD5C\uC2E0 \uC808\uCC28\uB294 \uC778\uACC4\uC790\uC640 \uD568\uAED8 \uD655\uC778\uD574 \uC8FC\uC138\uC694."));
   else section.append(el("ul", { class: "issues-list" }, issues.map((issue) => {
     const item = [...doc.tasks, ...doc.cases].find((i2) => i2.id === issue.itemId);
@@ -62546,10 +62622,10 @@ function issuesPanel() {
   return section;
 }
 function jsonImport() {
-  const body = el("div", {}, note("JSON\uC740 \uC554\uD638\uD654\uB41C \uD30C\uC77C\uC774 \uC544\uB2D9\uB2C8\uB2E4. \uBE44\uBC00\uBC88\uD638\xB7\uC778\uC99D\uD0A4\uAC00 \uB4E4\uC5B4 \uC788\uC9C0 \uC54A\uC740\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), note("\uCD5C\uB300 5 MiB \xB7 \uC2A4\uD0A4\uB9C8 \uBC84\uC804 1 \xB7 \uAC80\uC99D \uD6C4 \uC0C8 \uC0AC\uBCF8\uC73C\uB85C \uBD88\uB7EC\uC635\uB2C8\uB2E4."));
+  const body = el("div", {}, note("\uC774 \uC571\uC5D0\uC11C \uC804\uB2EC\uBC1B\uC740 .json \uD30C\uC77C\uC744 \uC120\uD0DD\uD558\uC138\uC694. \uD30C\uC77C\uC740 \uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC73C\uBBC0\uB85C \uBE44\uBC00\uBC88\uD638\xB7\uC778\uC99D\uD0A4\uAC00 \uB4E4\uC5B4 \uC788\uC9C0 \uC54A\uC740\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), note("\uCD5C\uB300 5 MiB \xB7 \uB0B4\uC6A9\uC744 \uD655\uC778\uD55C \uB4A4 \uBCC4\uB3C4 \uC0AC\uBCF8\uC73C\uB85C \uC5FD\uB2C8\uB2E4. \uAE30\uC874 \uBB38\uC11C\uB294 \uC720\uC9C0\uB429\uB2C8\uB2E4."));
   const output = el("div", { class: "import-preview", role: "status" });
   let parsed = null, sourceName = "", requestId = 0;
-  body.append(field2("\uC778\uC218\uC778\uACC4 JSON \uD30C\uC77C \uC120\uD0DD", "", () => {
+  body.append(field2("\uBC1B\uC740 \uD30C\uC77C \uC120\uD0DD", "", () => {
   }, { type: "file", accept: ".json,application/json", maxLength: null, onchange: async (e) => {
     const thisRequest = ++requestId;
     parsed = null;
@@ -62569,9 +62645,9 @@ function jsonImport() {
       output.append(el("p", { class: "error", role: "alert" }, error.message));
     }
   } }), output);
-  const handle = modal("\uC804\uB2EC\uBC1B\uC740 JSON \uD655\uC778\uD558\uAE30", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC0C8 \uC0AC\uBCF8\uC73C\uB85C \uBD88\uB7EC\uC624\uAE30", () => {
+  const handle = modal("\uBC1B\uC740 \uC778\uC218\uC778\uACC4\uC11C \uC5F4\uAE30", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC774 \uC778\uC218\uC778\uACC4\uC11C \uBCF4\uAE30", () => {
     if (!parsed) {
-      notice("\uBA3C\uC800 \uAC80\uC99D\uC744 \uD1B5\uACFC\uD55C JSON \uD30C\uC77C\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
+      notice("\uBA3C\uC800 \uC774 \uC571\uC5D0\uC11C \uC804\uB2EC\uBC1B\uC740 \uD30C\uC77C\uC744 \uC120\uD0DD\uD574 \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
       return;
     }
     try {
@@ -62640,7 +62716,9 @@ function reviewBlocks(result, name, targetId) {
   const targetDoc = () => state.documents.find((d) => d.id === targetId);
   const original = result.blocks.map((b) => `[${b.source}]
 ${b.text}`).join("\n\n");
-  let groupId = "";
+  let groupId = "", draftQuery = "";
+  const expanded = /* @__PURE__ */ new Set();
+  let shownDrafts = [];
   let drafts = result.blocks.filter((b) => b.text.trim()).map((b) => ({ ...b, id: makeId(), selected: true, title: short(b.text.split("\n").find((l) => l.trim()) || "", 80), source: b.source }));
   const body = el(
     "div",
@@ -62652,37 +62730,101 @@ ${b.text}`).join("\n\n");
   const groups = targetDoc()?.groups || [];
   if (groups.length) body.append(select("\uCD94\uAC00\uD560 \uD070 \uC5C5\uBB34 \uC601\uC5ED (\uC120\uD0DD)", groupId, [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...groups.map((g) => [g.id, g.title || "\uC774\uB984 \uC5C6\uB294 \uC601\uC5ED"])], (v) => groupId = v), note("\uC120\uD0DD\uD55C \uCD08\uC548\uC5D0\uB9CC \uAC19\uC740 \uC601\uC5ED\uC744 \uC801\uC6A9\uD569\uB2C8\uB2E4. \uAE30\uC874 \uC5C5\uBB34\uC758 \uBD84\uB958\uB294 \uBC14\uB00C\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."));
   const list = el("div", { class: "draft-list" });
-  body.append(list);
-  const counter = el("p", { class: "helper", role: "status" });
-  body.append(counter);
+  const counter = el("p", { class: "helper", role: "status", "data-draft-count": "" });
+  const updateCount = () => {
+    const total = drafts.filter((d) => d.selected).length;
+    const visible = shownDrafts.filter((d) => d.selected).length;
+    counter.textContent = `\uC804\uCCB4 ${drafts.length}\uAC1C \xB7 \uAC80\uC0C9 \uACB0\uACFC ${shownDrafts.length}\uAC1C \xB7 \uC120\uD0DD ${total}\uAC1C (\uAC80\uC0C9 \uBC16 \uC120\uD0DD ${total - visible}\uAC1C)`;
+  };
+  const search = field2("\uCD08\uC548\uC5D0\uC11C \uCC3E\uAE30", "", (v) => {
+    draftQuery = v;
+    redraw();
+  }, { type: "search", placeholder: "\uC5C5\uBB34\uBA85 \xB7 \uCD94\uCD9C\uD55C \uB0B4\uC6A9 \xB7 \uCD9C\uCC98 \uC704\uCE58", maxLength: 300 });
+  const selectShown = (value) => {
+    shownDrafts.forEach((d) => d.selected = value);
+    redraw();
+  };
+  const selectAll = button2("\uAC80\uC0C9 \uACB0\uACFC \uBAA8\uB450 \uC120\uD0DD", () => selectShown(true), "quiet");
+  const clearShown = button2("\uAC80\uC0C9 \uACB0\uACFC \uC120\uD0DD \uD574\uC81C", () => selectShown(false), "quiet");
+  body.append(el("div", { class: "draft-toolbar" }, search, el("div", { class: "actions" }, selectAll, clearShown, button2("\uCD08\uC548 \uAC80\uC0C9 \uC9C0\uC6B0\uAE30", () => {
+    draftQuery = "";
+    search.querySelector("input").value = "";
+    redraw();
+    search.querySelector("input").focus();
+  }, "quiet")), counter, note("\uC811\uAC70\uB098 \uAC80\uC0C9\uC73C\uB85C \uC228\uACA8\uB3C4 \uAC80\uD1A0\uAC00 \uB05D\uB09C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4. \uAC80\uC0C9 \uBC16\uC5D0\uC11C \uC120\uD0DD\uD55C \uCD08\uC548\uB3C4 \uD568\uAED8 \uCD94\uAC00\uB429\uB2C8\uB2E4. \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uD14D\uC2A4\uD2B8\uB3C4 \uCD9C\uCC98 \uC6D0\uBB38\uC5D0 \uBCF4\uC874\uD569\uB2C8\uB2E4.", "warning-text")), list);
   const redraw = () => {
+    shownDrafts = drafts.filter((d) => !draftQuery.trim() || matches({ title: d.title, text: d.text, source: d.source }, draftQuery));
+    const shownIds = new Set(shownDrafts.map((d) => d.id));
     list.replaceChildren();
-    counter.textContent = `${drafts.filter((d) => d.selected).length}/${drafts.length}\uAC1C \uC120\uD0DD \xB7 \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uD14D\uC2A4\uD2B8\uB3C4 \uCD9C\uCC98 \uC6D0\uBB38\uC5D0 \uBCF4\uC874\uD569\uB2C8\uB2E4.`;
+    updateCount();
+    selectAll.disabled = !shownDrafts.length;
+    clearShown.disabled = !shownDrafts.length;
     if (!drafts.length) list.append(empty("\uCD94\uCD9C\uB41C \uBCF8\uBB38\uC774 \uC5C6\uC5B4\uC694", "\uC2A4\uCE94\xB7\uC774\uBBF8\uC9C0 \uBB38\uC11C\uB294 \uC6D0\uBCF8 \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uD655\uC778\uD574 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694."));
-    drafts.forEach((draft, index) => {
+    else if (!shownDrafts.length) list.append(empty("\uC77C\uCE58\uD558\uB294 \uCD08\uC548\uC774 \uC5C6\uC5B4\uC694", "\uAC80\uC0C9\uC5B4\uB97C \uC9C0\uC6B0\uBA74 \uC804\uCCB4 \uCD08\uC548\uACFC \uAE30\uC874 \uC120\uD0DD\uC744 \uB2E4\uC2DC \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4."));
+    shownDrafts.forEach((draft) => {
+      const index = drafts.indexOf(draft);
+      const next = drafts[index + 1];
+      const title = el("strong", {}, draft.title || "\uC774\uB984 \uC5C6\uB294 \uCD08\uC548");
+      const preview = el("span", { class: "draft-summary-preview" }, short(draft.text.split("\n").filter((s) => s.trim()).slice(1).join(" ") || draft.text, 120));
+      const updateSummary = () => {
+        title.textContent = draft.title || "\uC774\uB984 \uC5C6\uB294 \uCD08\uC548";
+        preview.textContent = short(draft.text.split("\n").filter((s) => s.trim()).slice(1).join(" ") || draft.text, 120);
+      };
+      const details = el(
+        "details",
+        { class: "draft-detail", open: expanded.has(draft.id) },
+        el("summary", {}, title, preview, el("span", { class: "helper" }, "\uB0B4\uC6A9 \uAC80\uD1A0\xB7\uD3B8\uC9D1")),
+        field2("\uC5C5\uBB34\uBA85", draft.title, (v) => {
+          draft.title = v;
+          updateSummary();
+        }, { maxLength: 300 }),
+        field2("\uCD94\uCD9C\uD55C \uB0B4\uC6A9", draft.text, (v) => {
+          draft.text = v;
+          updateSummary();
+        }, { type: "textarea", rows: 5, maxLength: 1e5 }),
+        el(
+          "div",
+          { class: "actions" },
+          button2("\uBE48 \uC904\uB85C \uB098\uB204\uAE30", () => {
+            const parts = draft.text.split(/\n\s*\n/).filter((v) => v.trim());
+            if (parts.length < 2) {
+              notice("\uB098\uB20C \uC704\uCE58\uC5D0 \uBE48 \uC904\uC744 \uB123\uC5B4 \uC8FC\uC138\uC694.");
+              return;
+            }
+            const divided = parts.map((text) => ({ ...draft, id: makeId(), text, title: short(text.split("\n")[0], 80) }));
+            drafts.splice(index, 1, ...divided);
+            expanded.delete(draft.id);
+            divided.forEach((d) => expanded.add(d.id));
+            redraw();
+          }, "quiet"),
+          button2("\uB2E4\uC74C \uCD08\uC548\uACFC \uD569\uCE58\uAE30", () => {
+            const adjacent = drafts[index + 1];
+            if (!adjacent || !shownIds.has(adjacent.id)) return;
+            draft.text += "\n\n" + adjacent.text;
+            draft.source += " / " + adjacent.source;
+            drafts.splice(index + 1, 1);
+            expanded.add(draft.id);
+            expanded.delete(adjacent.id);
+            redraw();
+          }, "quiet", { disabled: !next || !shownIds.has(next.id) })
+        ),
+        next && !shownIds.has(next.id) ? note("\uC6D0\uBB38 \uC21C\uC11C\uC758 \uB2E4\uC74C \uCD08\uC548\uC774 \uAC80\uC0C9 \uBC16\uC5D0 \uC788\uC2B5\uB2C8\uB2E4. \uAC80\uC0C9\uC744 \uC9C0\uC6B4 \uB4A4 \uD569\uCE60 \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.") : null
+      );
+      details.addEventListener("toggle", () => {
+        if (details.isConnected) {
+          if (details.open) expanded.add(draft.id);
+          else expanded.delete(draft.id);
+        }
+      });
       const box = el("article", { class: "draft-block" }, el("div", { class: "section-heading" }, check3(`\uCD08\uC548 ${index + 1} \uC120\uD0DD`, draft.selected, (v) => {
         draft.selected = v;
-        counter.textContent = `${drafts.filter((d) => d.selected).length}/${drafts.length}\uAC1C \uC120\uD0DD`;
-      }), tag(draft.source)), field2("\uC5C5\uBB34\uBA85", draft.title, (v) => draft.title = v, { maxLength: 300 }), field2("\uCD94\uCD9C\uD55C \uB0B4\uC6A9", draft.text, (v) => draft.text = v, { type: "textarea", rows: 5, maxLength: 1e5 }), el("div", { class: "actions" }, button2("\uBE48 \uC904\uB85C \uB098\uB204\uAE30", () => {
-        const parts = draft.text.split(/\n\s*\n/).filter((v) => v.trim());
-        if (parts.length < 2) {
-          notice("\uB098\uB20C \uC704\uCE58\uC5D0 \uBE48 \uC904\uC744 \uB123\uC5B4 \uC8FC\uC138\uC694.");
-          return;
-        }
-        drafts.splice(index, 1, ...parts.map((text) => ({ ...draft, id: makeId(), text, title: short(text.split("\n")[0], 80) })));
-        redraw();
-      }, "quiet"), button2("\uB2E4\uC74C \uCD08\uC548\uACFC \uD569\uCE58\uAE30", () => {
-        const next = drafts[index + 1];
-        draft.text += "\n\n" + next.text;
-        draft.source += " / " + next.source;
-        drafts.splice(index + 1, 1);
-        redraw();
-      }, "quiet", { disabled: index === drafts.length - 1 })));
+        updateCount();
+      }), tag(draft.source)), details);
       list.append(box);
     });
   };
   redraw();
-  modal("\uCD94\uCD9C\uD55C \uB0B4\uC6A9\uC744 \uC5C5\uBB34\uB85C \uB2E4\uB4EC\uAE30", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2(targetDoc() ? "\uD604\uC7AC \uBB38\uC11C\uC5D0 \uC5C5\uBB34 \uCD94\uAC00" : "\uC0C8 \uC778\uC218\uC778\uACC4\uB85C \uB9CC\uB4E4\uAE30", () => {
+  const handle = modal("\uCD94\uCD9C\uD55C \uB0B4\uC6A9\uC744 \uC5C5\uBB34\uB85C \uB2E4\uB4EC\uAE30", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2(targetDoc() ? "\uD604\uC7AC \uBB38\uC11C\uC5D0 \uC5C5\uBB34 \uCD94\uAC00" : "\uC0C8 \uC778\uC218\uC778\uACC4\uB85C \uB9CC\uB4E4\uAE30", () => {
     const selected = drafts.filter((d) => d.selected);
     if (!selected.length) {
       notice("\uCD94\uAC00\uD560 \uCD08\uC548\uC744 \uD558\uB098 \uC774\uC0C1 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
@@ -62708,12 +62850,14 @@ ${b.text}`).join("\n\n");
       state.current = doc.id;
       state.view = "author";
       state.authorSection = "tasks";
+      state.authorQuery = "";
       state.selected = doc.tasks[doc.tasks.length - selected.length].id;
       saved();
       render(true);
     } else activate(doc);
     notice(`${selected.length}\uAC1C \uC5C5\uBB34 \uCD08\uC548\uC744 \uCD94\uAC00\uD588\uC2B5\uB2C8\uB2E4. \uC218\uD589 \uC2DC\uC810\uACFC \uB204\uB77D\uB41C \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.`);
   }, "primary")]);
+  handle.dialog.classList.add("import-review");
 }
 function exportSelection(doc) {
   if (!state.exportSelections.has(doc.id)) state.exportSelections.set(doc.id, { taskIds: doc.tasks.map((t) => t.id), caseIds: doc.cases.map((c) => c.id) });
@@ -62727,8 +62871,20 @@ function exportView() {
   const selection = exportSelection(doc);
   let includeContacts = false, includeMaterials = false, includeEvidence = false;
   const body = el("section", { class: "export-layout" });
-  const panel = el("div", { class: "editor" }, el("h2", {}, "\uD544\uC694\uD55C \uD615\uD0DC\uB85C \uAC74\uB124\uC138\uC694"), note("JSON\uC740 \uB2E4\uC2DC \uD3B8\uC9D1\uD558\uACE0 \uC7AC\uC804\uB2EC\uD560 \uB54C, DOCX\uB294 \uC81C\uCD9C\xB7\uC678\uBD80 \uD3B8\uC9D1\uD560 \uB54C \uC0AC\uC6A9\uD569\uB2C8\uB2E4."));
-  panel.append(el("div", { class: "callout" }, el("strong", {}, "\uD30C\uC77C \uBC31\uC5C5\uC740 JSON\uC73C\uB85C"), el("p", {}, "\uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\xB7\uCD9C\uCC98 \uC6D0\uBB38\uC774 \uD568\uAED8 \uC800\uC7A5\uB429\uB2C8\uB2E4. \uC218\uD589 \uCCB4\uD06C\uB294 \uBCC4\uB3C4\uC785\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), button2("\uC804\uCCB4 JSON \uB0B4\uB824\uBC1B\uAE30", backup, "primary")));
+  const panel = el("div", { class: "editor" }, el("h2", {}, "\uC804\uB2EC\uD558\uAC70\uB098 \uBB38\uC11C\uB85C \uC800\uC7A5\uD558\uC138\uC694"));
+  panel.append(el(
+    "div",
+    { class: "delivery-actions" },
+    el("div", { class: "callout" }, el("h3", {}, "\uB2E4\uC74C \uB2F4\uB2F9\uC790\uC5D0\uAC8C \uC804\uB2EC\uD558\uAE30"), el("p", {}, "\uC774 \uC571\uC5D0\uC11C \uB2E4\uC2DC \uC5F4\uACE0 \uACE0\uCE60 \uC218 \uC788\uB294 \uD30C\uC77C\uC785\uB2C8\uB2E4. \uBC31\uC5C5\uD560 \uB54C\uB3C4 \uC0AC\uC6A9\uD558\uC138\uC694."), button2("\uC804\uB2EC\xB7\uBC31\uC5C5 \uD30C\uC77C \uBC1B\uAE30 (.json)", backup, "primary"), note("\uBAA8\uB4E0 \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\xB7\uCD9C\uCC98 \uC6D0\uBB38\uC774 \uD3EC\uD568\uB429\uB2C8\uB2E4. \uC218\uD589 \uCCB4\uD06C\uB294 \uBCC4\uB3C4\uC785\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC73C\uBBC0\uB85C \uBBFC\uAC10\uD55C \uB0B4\uC6A9\uC774 \uC5C6\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694.", "warning-text")),
+    el("div", { class: "callout" }, el("h3", {}, "\uC81C\uCD9C\uD558\uAC70\uB098 \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uAE30"), el("p", {}, "\uC778\uC218\uC778\uACC4 \uC804\uCCB4 \uB0B4\uC6A9\uC744 \uD3B8\uC9D1 \uAC00\uB2A5\uD55C \uBB38\uC11C\uB85C \uBC1B\uC2B5\uB2C8\uB2E4."), button2("\uC804\uCCB4 \uBB38\uC11C \uBC1B\uAE30 (.docx)", async () => {
+      try {
+        download(await exportDocx(doc), `${safeName(doc.title)}-\uC804\uCCB4.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      } catch (error) {
+        notice(error.message);
+      }
+    }, "secondary"), note("\uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uACE0\uCE5C \uB0B4\uC6A9\uC740 \uC774 \uC571\uC5D0 \uC790\uB3D9 \uBC18\uC601\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uAC00\uC838\uC624\uBA74 \uBCC4\uB3C4 \uAC80\uD1A0\uC6A9 \uCD08\uC548\uC774 \uB429\uB2C8\uB2E4."))
+  ));
+  const scope = disclosure("export-scope", "\uCD9C\uB825\uD560 \uC5C5\uBB34 \uC120\uD0DD \xB7 \uC778\uC1C4");
   const selectionCount = el("p", { class: "helper", role: "status", "data-export-selection-count": "" });
   const updateCount = () => {
     selectionCount.textContent = `\uC120\uD0DD: \uC5C5\uBB34 ${selection.taskIds.length}/${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${selection.caseIds.length}/${doc.cases.length}\uAC1C`;
@@ -62739,7 +62895,7 @@ function exportView() {
     else if (!checked && index !== -1) ids.splice(index, 1);
     updateCount();
   };
-  panel.append(el("h3", {}, "DOCX \xB7 \uC778\uC1C4 \xB7 AI\uC5D0 \uB2F4\uC744 \uD56D\uBAA9"), el("div", { class: "actions" }, button2("\uBAA8\uB450 \uC120\uD0DD", () => {
+  scope.append(note("\uC544\uB798 \uC120\uD0DD\uC740 \uC120\uD0DD\uD55C \uC5C5\uBB34 \uBB38\uC11C\xB7\uC778\uC1C4\xB7AI\uC6A9 \uB0B4\uC6A9\uC5D0\uB9CC \uC801\uC6A9\uB429\uB2C8\uB2E4. \uC804\uCCB4 \uD30C\uC77C\uC740 \uBAA8\uB4E0 \uB0B4\uC6A9\uC744 \uB2F4\uC2B5\uB2C8\uB2E4."), el("div", { class: "actions" }, button2("\uBAA8\uB450 \uC120\uD0DD", () => {
     selection.taskIds = doc.tasks.map((t) => t.id);
     selection.caseIds = doc.cases.map((t) => t.id);
     redraw();
@@ -62754,8 +62910,8 @@ function exportView() {
     updateCount();
   };
   redraw();
-  panel.append(selectionCount, selectList, note("\uC120\uD0DD\uC740 \uC774 \uBB38\uC11C\uC5D0\uC11C \uD654\uBA74\uC744 \uC624\uAC00\uB294 \uB3D9\uC548 \uC720\uC9C0\uB429\uB2C8\uB2E4. \uC0C8\uB85C \uCD94\uAC00\uD55C \uD56D\uBAA9\uC740 \uC9C1\uC811 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694."));
-  panel.append(el("div", { class: "actions" }, button2("\uC120\uD0DD \uD56D\uBAA9 DOCX", async (e) => {
+  scope.append(selectionCount, selectList, note("\uC120\uD0DD\uC740 \uC774 \uBB38\uC11C\uC5D0\uC11C \uD654\uBA74\uC744 \uC624\uAC00\uB294 \uB3D9\uC548 \uC720\uC9C0\uB429\uB2C8\uB2E4. \uC0C8\uB85C \uCD94\uAC00\uD55C \uD56D\uBAA9\uC740 \uC9C1\uC811 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694."));
+  scope.append(el("div", { class: "actions" }, button2("\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uBB38\uC11C\uB85C \uBC1B\uAE30", async (e) => {
     if (!selection.taskIds.length && !selection.caseIds.length) {
       notice("\uB0B4\uBCF4\uB0BC \uD56D\uBAA9\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
       return;
@@ -62766,30 +62922,27 @@ function exportView() {
     try {
       const bytes = await exportDocx(doc, selection);
       download(bytes, `${safeName(doc.title)}-${today()}.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-      notice("DOCX \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC5C8\uC2B5\uB2C8\uB2E4. \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uC5B4 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      notice("\uBB38\uC11C \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC5C8\uC2B5\uB2C8\uB2E4. \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uC5B4 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
     } catch (error) {
-      notice("DOCX \uC0DD\uC131 \uC2E4\uD328: " + error.message);
+      notice("\uBB38\uC11C \uC0DD\uC131 \uC2E4\uD328: " + error.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = "\uC120\uD0DD \uD56D\uBAA9 DOCX";
+      btn.textContent = "\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uBB38\uC11C\uB85C \uBC1B\uAE30";
     }
-  }, "primary"), button2("\uC804\uCCB4 DOCX", async () => {
-    try {
-      download(await exportDocx(doc), `${safeName(doc.title)}-\uC804\uCCB4.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    } catch (error) {
-      notice(error.message);
-    }
-  }), button2("\uC778\uC1C4 \uBCF4\uAE30", () => {
+  }, "primary"), button2("\uC778\uC1C4 \uBCF4\uAE30", () => {
     state.printSelection = structuredClone(selection);
     switchView("print");
-  })), note("DOCX\uC5D0\uC11C \uACE0\uCE5C \uB0B4\uC6A9\uC740 JSON\uC5D0 \uC790\uB3D9\uC73C\uB85C \uBC18\uC601\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uAC00\uC838\uC624\uBA74 \uBCC4\uB3C4 \uAC80\uD1A0\uC6A9 \uCD08\uC548\uC774 \uB429\uB2C8\uB2E4."));
-  const aside = el(
-    "aside",
+  })));
+  panel.append(scope);
+  const extras = disclosure("export-extras", "\uCD94\uAC00 \uAE30\uB2A5 \xB7 AI \uB3C4\uC6C0 \xB7 \uC218\uD589 \uAE30\uB85D");
+  extras.append(el(
+    "div",
     { class: "export-aside" },
-    el("div", { class: "panel" }, el("p", { class: "eyebrow" }, "\uC120\uD0DD \uAE30\uB2A5"), el("h3", {}, "\uB0B4 AI\uC5D0\uAC8C \uB3C4\uC6C0 \uC694\uCCAD\uD558\uAE30"), el("p", {}, "\uD504\uB86C\uD504\uD2B8\uC640 \uC120\uD0DD \uB0B4\uC6A9\uC744 \uC9C1\uC811 \uD655\uC778\uD55C \uB4A4, \uC0AC\uC6A9\uD558\uB294 AI\uC5D0 \uBD99\uC5EC\uB123\uC73C\uC138\uC694. \uC774 \uC571\uC740 AI\uC5D0 \uC811\uC18D\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), check3("\uC5F0\uB77D\uD560 \uC5ED\uD560\xB7\uD68C\uC2E0 \uB300\uAE30 \uD3EC\uD568", false, (v) => includeContacts = v), check3("\uC900\uBE44\uC790\uB8CC \uD3EC\uD568", false, (v) => includeMaterials = v), check3("\uADFC\uAC70 \uD3EC\uD568", false, (v) => includeEvidence = v), note("\uBBFC\uAC10 \uD56D\uBAA9\uC740 \uAE30\uBCF8 \uC81C\uC678\uD569\uB2C8\uB2E4. \uBC29\uBC95\xB7\uBA54\uBAA8 \uC548\uC5D0 \uC11E\uC778 \uC815\uBCF4\uB294 \uC790\uB3D9\uC73C\uB85C \uCC3E\uC544\uB0B4\uC9C0 \uBABB\uD558\uBBC0\uB85C \uC9C1\uC811 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), button2("AI\uC6A9 \uB0B4\uC6A9 \uBBF8\uB9AC\uBCF4\uAE30", () => aiPreview(selection, { includeContacts, includeMaterials, includeEvidence }), "secondary full")),
-    el("div", { class: "panel" }, el("h3", {}, "\uB0B4 \uC218\uD589 \uAE30\uB85D"), el("p", {}, "\uC774 \uAE30\uAE30\uC5D0\uC11C \uCCB4\uD06C\uD55C \uAE30\uB85D\uB9CC \uB530\uB85C \uBCF4\uAD00\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC778\uACC4 \uC6D0\uBCF8 JSON\uC5D0\uB294 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), button2("\uC218\uD589 \uAE30\uB85D \uB0B4\uB824\uBC1B\uAE30", () => download(JSON.stringify({ schemaVersion: 1, kind: "handover-progress", documentId: doc.id, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), records: state.progress[doc.id] || {} }, null, 2), `${safeName(doc.title)}-\uC218\uD589\uAE30\uB85D.json`)), note("\uC774\uBC88 \uAC80\uD1A0\uBCF8\uC740 \uC218\uD589 \uAE30\uB85D\uC758 \uC7AC\uAC00\uC838\uC624\uAE30\uB97C \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."))
-  );
-  body.append(panel, aside);
+    el("div", { class: "panel" }, el("h3", {}, "\uB0B4 AI\uC5D0\uAC8C \uB3C4\uC6C0 \uC694\uCCAD\uD558\uAE30"), el("p", {}, "\uC704\uC5D0\uC11C \uC120\uD0DD\uD55C \uC5C5\uBB34\uC640 \uD504\uB86C\uD504\uD2B8\uB97C \uC9C1\uC811 \uD655\uC778\uD55C \uB4A4, \uC0AC\uC6A9\uD558\uB294 AI\uC5D0 \uBD99\uC5EC\uB123\uC73C\uC138\uC694. \uC774 \uC571\uC740 AI\uC5D0 \uC811\uC18D\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), check3("\uC5F0\uB77D\uD560 \uC5ED\uD560\xB7\uD68C\uC2E0 \uB300\uAE30 \uD3EC\uD568", false, (v) => includeContacts = v), check3("\uC900\uBE44\uC790\uB8CC \uD3EC\uD568", false, (v) => includeMaterials = v), check3("\uADFC\uAC70 \uD3EC\uD568", false, (v) => includeEvidence = v), note("\uBBFC\uAC10 \uD56D\uBAA9\uC740 \uAE30\uBCF8 \uC81C\uC678\uD569\uB2C8\uB2E4. \uBC29\uBC95\xB7\uBA54\uBAA8 \uC548\uC5D0 \uC11E\uC778 \uC815\uBCF4\uB294 \uC790\uB3D9\uC73C\uB85C \uCC3E\uC544\uB0B4\uC9C0 \uBABB\uD558\uBBC0\uB85C \uC9C1\uC811 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), button2("AI\uC6A9 \uB0B4\uC6A9 \uBBF8\uB9AC\uBCF4\uAE30", () => aiPreview(selection, { includeContacts, includeMaterials, includeEvidence }), "secondary full")),
+    el("div", { class: "panel" }, el("h3", {}, "\uB0B4 \uC218\uD589 \uAE30\uB85D"), el("p", {}, "\uC774 \uAE30\uAE30\uC5D0\uC11C \uCCB4\uD06C\uD55C \uAE30\uB85D\uB9CC \uB530\uB85C \uBCF4\uAD00\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC804\uB2EC\xB7\uBC31\uC5C5 \uD30C\uC77C\uC5D0\uB294 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), button2("\uC218\uD589 \uAE30\uB85D \uB0B4\uB824\uBC1B\uAE30", () => download(JSON.stringify({ schemaVersion: 1, kind: "handover-progress", documentId: doc.id, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), records: state.progress[doc.id] || {} }, null, 2), `${safeName(doc.title)}-\uC218\uD589\uAE30\uB85D.json`)), note("\uC218\uD589 \uAE30\uB85D\uC740 \uB2E4\uC2DC \uAC00\uC838\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."))
+  ));
+  panel.append(extras);
+  body.append(panel);
   return body;
 }
 function aiPreview(selection, options, initialPurpose = "write") {
