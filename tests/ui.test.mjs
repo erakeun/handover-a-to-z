@@ -89,10 +89,17 @@ function button(name, root = ui.document, { includes = false } = {}) {
   return matches[0];
 }
 
+async function reveal(node) {
+  const ancestors=[];for(let parent=node.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')ancestors.push(parent);
+  for(const details of ancestors.reverse())if(!details.open){details.open=true;details.dispatchEvent(new ui.Event('toggle'));}
+  await settle();
+}
+
 async function click(name, root = ui.document, options) {
   const target = typeof name === 'string' ? button(name, root, options) : name;
   assert.ok(target);
   assert.equal(target.disabled, false, 'target must be enabled');
+  await reveal(target);
   target.focus();
   target.click();
   await settle();
@@ -108,6 +115,7 @@ function control(label, root = ui.document) {
 
 async function fill(label, value, root = ui.document) {
   const input = control(label, root);
+  await reveal(input);
   input.focus();
   input.value = value;
   input.dispatchEvent(new ui.Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
@@ -130,7 +138,7 @@ function savedDocument() {
 }
 
 async function startNew() {
-  const card = [...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === '새로 작성');
+  const card = [...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === '인수인계서 만들기');
   await click(card);
 }
 
@@ -173,9 +181,9 @@ async function createThreeGroups() {
 }
 
 async function importJsonThroughUI(text) {
-  const card = [...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === 'JSON 불러오기');
+  const card = [...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === '받은 인수인계서 보기');
   await click(card);
-  const input = control('인수인계 JSON 파일 선택');
+  const input = control('받은 파일 선택');
   const transfer = new ui.DataTransfer();
   transfer.items.add(new ui.File([text], '가상-전달자료.json', { type: 'application/json' }));
   input.files = transfer.files;
@@ -183,12 +191,12 @@ async function importJsonThroughUI(text) {
   await settle();
   assert.equal(ui.document.querySelector('.import-preview .error'), null);
   assert.match(ui.document.querySelector('.import-preview').textContent, /기존 문서를 덮어쓰지 않습니다/);
-  await click('새 사본으로 불러오기', ui.document.querySelector('dialog'));
+  await click('이 인수인계서 보기', ui.document.querySelector('dialog'));
   return savedDocument();
 }
 
 async function backupText() {
-  await click('JSON 백업');
+  await click('파일로 저장');
   const download = downloads.at(-1);
   assert.match(download.filename, /\.json$/);
   return download.blob.text();
@@ -244,7 +252,7 @@ test('export renders selectable controls and preserves one-item scope through pr
   assert.match(ui.document.querySelector('[data-export-selection-count]').textContent, /업무 1\/2개 · 진행 건 0\/1개/);
 
   const previousDownloads = downloads.length;
-  await click('선택 항목 DOCX');
+  await click('선택한 업무만 문서로 받기');
   for (let attempt = 0; attempt < 100 && downloads.length === previousDownloads; attempt++) {
     await new Promise(resolve => originalSetTimeout(resolve, 10));
   }
@@ -307,9 +315,9 @@ test('an established export scope removes deleted tasks and does not silently se
 test('JSON import preview renders validation warnings as actual warning nodes', async () => {
   await mount();
   const doc = createDocument({ tasks: [createTask({ title: '', method: '이름을 아직 정하지 않은 방법' })] });
-  const card = [...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === 'JSON 불러오기');
+  const card = [...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === '받은 인수인계서 보기');
   await click(card);
-  const input = control('인수인계 JSON 파일 선택');
+  const input = control('받은 파일 선택');
   const transfer = new ui.DataTransfer();
   transfer.items.add(new ui.File([stringifyDocument(doc)], '검증-경고.json', { type: 'application/json' }));
   input.files = transfer.files;
@@ -533,7 +541,7 @@ test('corrupt local storage is surfaced without replacing the stored original', 
   assert.ok(ui.document.querySelector('[role=alert]'));
   assert.match(ui.document.body.textContent, /저장 원본/);
   assert.equal(ui.localStorage.getItem(DATA_KEY), raw);
-  for (const card of ui.document.querySelectorAll('.start-card')) assert.equal(card.disabled, true);
+  for (const card of ui.document.querySelectorAll('.start-card, .home-secondary button')) assert.equal(card.disabled, true);
 });
 
 test('the explicitly labelled owner-role filter works consistently in map and week views', async () => {
@@ -672,9 +680,351 @@ test('review splits and merges editable drafts while preserving extracted source
 
 test('starting a document import from home creates a new document instead of appending to the previously selected one',async()=>{
  await mount();await startNew();await addGroup('다른 문서에 노출하지 않을 영역');const originalId=savedDocument().id;await click(ui.document.querySelector('.brand-button'));
- const card=[...ui.document.querySelectorAll('.start-card')].find(n=>n.querySelector('strong')?.textContent==='기존 문서로 시작');await click(card);
+ await click('기존 문서로 시작');
  await click('직접 붙여넣기',ui.document.querySelector('dialog'));await fill('붙여넣을 내용','새 문서의 업무\n새 문서의 방법');await click('초안 검토',ui.document.querySelector('dialog'));
  assert.ok(!ui.document.querySelector('dialog').textContent.includes('추가할 큰 업무 영역'));
  await click('새 인수인계로 만들기',ui.document.querySelector('dialog'));
  const docs=loadDocuments(ui.localStorage);assert.equal(docs.length,2);assert.equal(docs.find(d=>d.id===originalId).tasks.length,0);assert.notEqual(savedDocument().id,originalId);assert.equal(savedDocument().tasks.length,1);
+});
+
+test('72 synthetic drafts stay compact and retain hidden selections, edits and full source during filtered bulk selection', async () => {
+  await mount();
+  await startNew();
+  await addGroup('합성 검토 영역');
+  const groupId = savedDocument().groups[0].id;
+  const blocks = Array.from({ length: 72 }, (_, index) => `반복 분류 제목\n${index < 8 ? '검토대상' : '기타'} 합성 업무 ${index + 1}\n각 업무의 원문 방법 ${index + 1}\n반복 푸터`);
+  await click('메모 붙여넣기');
+  await fill('붙여넣을 내용', blocks.join('\n\n'));
+  await click('초안 검토', ui.document.querySelector('dialog'));
+  const review = ui.document.querySelector('dialog');
+  assert.equal(review.querySelectorAll('.draft-block').length, 72);
+  assert.equal(review.querySelectorAll('.draft-detail[open]').length, 0, 'full bodies start collapsed');
+  assert.ok(review.querySelector('.draft-summary-preview').textContent.includes('합성 업무 1'));
+  assert.match(review.querySelector('[data-draft-count]').textContent, /전체 72개 · 검색 결과 72개 · 선택 72개 \(검색 밖 선택 0개\)/);
+  await fill('추가할 큰 업무 영역 (선택)', groupId, review);
+
+  const first = review.querySelector('.draft-block');
+  first.querySelector('details').open = true;
+  first.querySelector('details').dispatchEvent(new ui.Event('toggle'));
+  await fill('업무명', '직접 고친 합성 업무명', first);
+  await fill('추출한 내용', `${blocks[0]}\n사용자가 검토한 추가 메모`, first);
+  assert.equal(first.querySelector('summary strong').textContent, '직접 고친 합성 업무명');
+  assert.ok(first.querySelector('.draft-summary-preview').textContent.includes('사용자가 검토한 추가 메모'));
+  const searchInput = control('초안에서 찾기', review);
+  await fill('초안에서 찾기', '검토대상', review);
+  assert.equal(control('초안에서 찾기', review), searchInput, 'filtering does not replace the typing control');
+  assert.equal(ui.document.activeElement, searchInput);
+  assert.equal(review.querySelectorAll('.draft-block').length, 8);
+  assert.match(review.querySelector('[data-draft-count]').textContent, /선택 72개 \(검색 밖 선택 64개\)/);
+  await click('검색 결과 선택 해제', review);
+  assert.match(review.querySelector('[data-draft-count]').textContent, /선택 64개 \(검색 밖 선택 64개\)/);
+  await click('초안 검색 지우기', review);
+  assert.equal(review.querySelectorAll('.draft-block input[type=checkbox]:checked').length, 64);
+  assert.equal(control('업무명', review.querySelector('.draft-block')).value, '직접 고친 합성 업무명');
+  assert.equal(control('추가할 큰 업무 영역 (선택)', review).value, groupId);
+  await click('검색 결과 선택 해제', review);
+  await fill('초안에서 찾기', '검토대상', review);
+  await click('검색 결과 모두 선택', review);
+  await fill('초안에서 찾기', '일치하지않는검색어', review);
+  assert.equal(review.querySelectorAll('.draft-block').length, 0);
+  assert.equal(button('검색 결과 모두 선택', review).disabled, true);
+  assert.equal(button('검색 결과 선택 해제', review).disabled, true);
+  assert.match(review.querySelector('[data-draft-count]').textContent, /선택 8개 \(검색 밖 선택 8개\)/);
+  assert.match(review.textContent, /검색 밖에서 선택한 초안도 함께 추가/);
+  assert.equal(savedDocument().tasks.length, 0);
+  await click('현재 문서에 업무 추가', review);
+  const result = savedDocument();
+  assert.equal(result.tasks.length, 8);
+  assert.ok(result.tasks.every(task => task.groupId === groupId));
+  assert.equal(result.tasks[0].title, '직접 고친 합성 업무명');
+  assert.ok(result.tasks[0].method.includes('사용자가 검토한 추가 메모'));
+  for (const block of blocks) assert.ok(result.sourceFiles[0].excerpt.includes(block), 'every original draft remains in source');
+  assert.ok(!result.sourceFiles[0].excerpt.includes('사용자가 검토한 추가 메모'), 'editing a draft does not rewrite its original source');
+  assert.ok(result.tasks.every(task => task.timing.kind === 'event' && task.timing.trigger === '' && task.ownerRole === ''));
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('filtered draft review cannot merge across a hidden adjacent source block', async () => {
+  await mount();
+  await startNew();
+  await click('메모 붙여넣기');
+  await fill('붙여넣을 내용', '표시 A\n첫 원문\n\n숨김 B\n중간 원문\n\n표시 C\n마지막 원문');
+  await click('초안 검토', ui.document.querySelector('dialog'));
+  const review = ui.document.querySelector('dialog');
+  await fill('초안에서 찾기', '표시', review);
+  assert.equal(review.querySelectorAll('.draft-block').length, 2);
+  let first = review.querySelector('.draft-block');
+  first.querySelector('details').open = true;
+  first.querySelector('details').dispatchEvent(new ui.Event('toggle'));
+  assert.equal(button('다음 초안과 합치기', first).disabled, true);
+  assert.match(first.textContent, /원문 순서의 다음 초안이 검색 밖/);
+  await click('초안 검색 지우기', review);
+  first = review.querySelector('.draft-block');
+  assert.equal(first.querySelector('details').open, true);
+  await click('다음 초안과 합치기', first);
+  assert.equal(review.querySelectorAll('.draft-block').length, 2);
+  first = review.querySelector('.draft-block');
+  assert.match(control('추출한 내용', first).value, /표시 A[\s\S]*숨김 B/);
+  assert.ok(!control('추출한 내용', first).value.includes('표시 C'));
+  await click('현재 문서에 업무 추가', review);
+  const result = savedDocument();
+  assert.equal(result.tasks.length, 2);
+  assert.match(result.tasks[0].method, /첫 원문[\s\S]*중간 원문/);
+  assert.equal(result.tasks[1].title, '표시 C');
+  assert.match(result.sourceFiles[0].excerpt, /표시 A[\s\S]*숨김 B[\s\S]*표시 C/);
+});
+
+test('40-task author map search keeps the selected editor, source document, order and full calendar unchanged', async () => {
+  const groups = ['구역가', '구역나', '구역다', '구역라'].map(name => ({ id: makeId(), title: `합성 큰 업무 ${name}` }));
+  const tasks = Array.from({ length: 40 }, (_, index) => createTask({
+    title: `합성 업무 ${String(index + 1).padStart(2, '0')}`,
+    method: index === 27 ? '고유 절차 키워드로 찾을 방법' : `반복 업무의 방법 ${index + 1}`,
+    ownerRole: index < 10 ? '합성담당가' : '합성담당나',
+    groupId: groups[Math.floor(index / 10)].id,
+    timing: { kind: 'date', date: dateISO() },
+  }));
+  const doc = createDocument({ groups, tasks });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성', ui.document.querySelector('.document-card'));
+  const allIds = () => [...ui.document.querySelectorAll('.map-task')].map(node => node.dataset.taskId);
+  const visibleIds = () => [...ui.document.querySelectorAll('.map-task')].filter(node => !node.closest('li').hidden && !node.closest('.group-card').hidden).map(node => node.dataset.taskId);
+  const sourceBefore = ui.localStorage.getItem(DATA_KEY);
+  await click(ui.document.querySelector(`.map-task[data-task-id="${tasks[27].id}"]`));
+  const calendarNode = ui.document.querySelector('.map-calendar');
+  const calendarBefore = calendarNode.innerHTML;
+  const editorBefore = ui.document.querySelector('.selected-editor');
+  const inputBefore = control('업무 지도에서 찾기');
+  await fill('업무 지도에서 찾기', '고유 절차');
+  assert.equal(control('업무 지도에서 찾기'), inputBefore);
+  assert.equal(ui.document.activeElement, inputBefore);
+  assert.deepEqual(visibleIds(), [tasks[27].id]);
+  assert.equal(ui.document.querySelector('.selected-editor'), editorBefore);
+  assert.equal(control('업무명', editorBefore).value, tasks[27].title);
+  assert.match(ui.document.querySelector('[data-author-map-count]').textContent, /1\/40개/);
+  await fill('업무 지도에서 찾기', '합성 큰 업무 구역나');
+  assert.deepEqual(visibleIds(), tasks.slice(10, 20).map(task => task.id));
+  await fill('업무 지도에서 찾기', '합성담당가');
+  assert.deepEqual(visibleIds(), tasks.slice(0, 10).map(task => task.id));
+  await fill('업무 지도에서 찾기', '결과없는합성어');
+  assert.deepEqual(visibleIds(), []);
+  assert.match(ui.document.querySelector('.work-map').textContent, /일치하는 업무가 없어요/);
+  await click('지도 검색 지우기');
+  assert.deepEqual(visibleIds(), tasks.map(task => task.id));
+  assert.deepEqual(allIds(), tasks.map(task => task.id));
+  assert.equal(ui.document.querySelector('.map-calendar'), calendarNode);
+  assert.equal(ui.document.querySelector('.map-calendar').innerHTML, calendarBefore);
+  assert.equal(ui.localStorage.getItem(DATA_KEY), sourceBefore);
+  await fill('업무 지도에서 찾기', tasks[27].title);
+  assert.deepEqual(visibleIds(), [tasks[27].id]);
+  await fill('업무명', '직접 수정한 업무명', editorBefore);
+  assert.deepEqual(visibleIds(), [], 'editing a searchable field immediately updates the map results');
+  assert.match(ui.document.querySelector('[data-author-map-count]').textContent, /0\/40개/);
+  assert.equal(ui.document.querySelector('.selected-editor'), editorBefore);
+  await addGroup('검색 중 새로 만든 영역');
+  assert.equal(control('업무 지도에서 찾기').value, '');
+  assert.equal(groupCard('검색 중 새로 만든 영역').hidden, false);
+  assert.deepEqual(visibleIds(), tasks.map(task => task.id));
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('deleting a selected task during author search raises no window error and updates the remaining count', async () => {
+  const group = { id: makeId(), title: '합성 삭제 검증 영역' };
+  const removed = createTask({ title: '검색공통 삭제할 업무', groupId: group.id, method: '삭제 대상의 방법' });
+  const remaining = createTask({ title: '검색공통 남길 업무', groupId: group.id, method: '유지할 방법' });
+  const outside = createTask({ title: '무관한 보관 업무', groupId: group.id, method: '검색 밖에서 유지할 방법' });
+  const doc = createDocument({ groups: [group], tasks: [removed, remaining, outside] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  const windowErrors = [];
+  ui.addEventListener('error', event => windowErrors.push(event.message));
+  await click('이어서 작성', ui.document.querySelector('.document-card'));
+  await fill('업무 지도에서 찾기', '검색공통');
+  await click(ui.document.querySelector(`.map-task[data-task-id="${removed.id}"]`));
+  assert.match(ui.document.querySelector('[data-author-map-count]').textContent, /2\/3개/);
+  await click('삭제', ui.document.querySelector('.selected-editor'));
+  await click('확인', ui.document.querySelector('dialog'));
+  assert.deepEqual(windowErrors, [], 'refreshing stale DOM rows after deletion must not throw');
+  assert.deepEqual(savedDocument().tasks, [remaining, outside]);
+  assert.equal(control('업무 지도에서 찾기').value, '검색공통');
+  assert.match(ui.document.querySelector('[data-author-map-count]').textContent, /1\/2개/);
+  assert.equal(ui.document.querySelector('.selected-editor .editor'), null);
+  const visible = [...ui.document.querySelectorAll('.map-task')].filter(node => !node.closest('li').hidden && !node.closest('.group-card').hidden);
+  assert.deepEqual(visible.map(node => node.dataset.taskId), [remaining.id]);
+  await click('지도 검색 지우기');
+  assert.match(ui.document.querySelector('[data-author-map-count]').textContent, /2\/2개/);
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('home presents two purpose-based starts and does not expose a saved document navigation before choosing it', async () => {
+  const doc = createDocument({ tasks: [createTask({ title: '보관된 합성 업무', method: '보관된 방법' })] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  const before = ui.localStorage.getItem(DATA_KEY);
+  assert.deepEqual([...ui.document.querySelectorAll('.start-card strong')].map(node => node.textContent), ['인수인계서 만들기', '받은 인수인계서 보기']);
+  assert.equal(ui.document.querySelector('.top-nav'), null);
+  assert.equal(ui.document.querySelector('.hero-preview'), null);
+  await click('받은 인수인계서 보기', ui.document.querySelector('.start-grid'), { includes: true });
+  assert.match(ui.document.querySelector('dialog').textContent, /이 앱에서 전달받은 .json 파일/);
+  assert.match(ui.document.querySelector('dialog').textContent, /암호화되지/);
+  assert.equal(ui.localStorage.getItem(DATA_KEY), before);
+});
+
+test('first task needs only name and method, saves once without replacing composing inputs, and retains the same data on handoff', async () => {
+  await mount();
+  await startNew();
+  const editor = ui.document.querySelector('.first-task-editor');
+  const name = control('업무명');
+  const method = control('하는 방법');
+  assert.deepEqual([...editor.querySelectorAll('input,textarea,select')], [name, method]);
+  assert.equal(savedDocument().tasks.length, 0, 'opening the editor creates no empty task');
+  await fill('업무명', ' ');
+  assert.equal(savedDocument().tasks.length, 0, 'whitespace is not a new task');
+  name.focus();
+  name.dispatchEvent(new ui.Event('compositionstart', { bubbles: true }));
+  for (const value of ['ㅎ', '한', '한글로 적는 업무']) {
+    name.value=value;
+    name.dispatchEvent(new ui.Event('input', { bubbles: true }));
+    await settle();
+    assert.equal(control('업무명'), name, 'composition retains the actual input node');
+    assert.equal(ui.document.activeElement, name);
+    assert.equal(ui.document.querySelector('.first-task-editor'), editor);
+    assert.equal(savedDocument().tasks.length, 1);
+  }
+  name.dispatchEvent(new ui.Event('compositionend', { bubbles: true }));
+  const taskId = savedDocument().tasks[0].id;
+  await fill('하는 방법', '무엇을 하는지 기록합니다.\n방법은 원문 그대로\t보존합니다.');
+  assert.equal(control('하는 방법'), method);
+  const doc = savedDocument();
+  assert.equal(doc.tasks[0].id, taskId);
+  assert.equal(doc.groups.length, 0);
+  assert.equal(doc.tasks[0].timing.kind, 'event');
+  assert.equal(doc.tasks[0].timing.trigger, '');
+  assert.equal(doc.tasks[0].ownerRole, '');
+  assert.equal(ui.document.querySelector('.map-task').dataset.taskId, taskId);
+  assert.equal(ui.document.querySelector('.map-calendar').closest('details').open, false);
+  assert.match(ui.document.querySelector('[data-save-status]').textContent, /자동 저장됨/);
+  const json = await backupText();
+  assert.deepEqual(parseImport(json).document.tasks, doc.tasks);
+  await click('받는 사람 화면 확인');
+  await click(ui.document.querySelector('.map-task'));
+  assert.ok(ui.document.querySelector('dialog').textContent.includes(doc.tasks[0].method));
+  assert.equal(savedDocument().tasks[0].id, taskId);
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('selected task keeps the overview alongside two initial inputs and retains optional timing after each change', async () => {
+  const task = createTask({ title: '합성 선택 업무', method: '간단한 방법' });
+  const doc = createDocument({ tasks: [task] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성');
+  await click(ui.document.querySelector('.map-task'));
+  const workspace = ui.document.querySelector('.author-workspace');
+  assert.ok(workspace.querySelector(':scope > .map-workspace'));
+  assert.ok(workspace.querySelector(':scope > .selected-editor'));
+  const editor = ui.document.querySelector('.selected-editor .editor');
+  const initiallyShown = [...editor.querySelectorAll('input,select,textarea')].filter(node => !node.closest('details:not([open])'));
+  assert.deepEqual(initiallyShown.map(node => node.labels[0].textContent), ['업무명', '하는 방법']);
+  assert.equal(ui.document.querySelector('.map-calendar').closest('details').open, false);
+  await fill('주담당 역할', '검증 담당');
+  await fill('수행 시점', 'regular');
+  assert.equal(control('주담당 역할').closest('details').open, true);
+  assert.equal(control('수행 시점').closest('details').open, true);
+  await fill('반복 주기', 'monthly');
+  assert.equal(control('반복 주기').closest('details').open, true);
+  await fill('월 안에서 언제 하나요?', 'monthEnd');
+  assert.equal(control('월 안에서 언제 하나요?').closest('details').open, true);
+  assert.equal(savedDocument().tasks[0].timing.dayRule, 'monthEnd');
+  assert.equal(savedDocument().tasks[0].method, task.method);
+  assert.equal(savedDocument().tasks[0].id, task.id);
+});
+
+test('reader starts with every undated task and keeps an active optional role filter visible without changing the handoff data', async () => {
+  const tasks = [createTask({ title: '날짜 없이도 보이는 업무', method: '필요한 때 찾아볼 설명', ownerRole: '담당 A' }), createTask({ title: '다른 역할의 업무', method: '다른 설명', ownerRole: '담당 B' })];
+  const doc = createDocument({ tasks });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('인수자 보기', ui.document.querySelector('.document-card'));
+  const before = ui.localStorage.getItem(DATA_KEY);
+  assert.deepEqual([...ui.document.querySelectorAll('.reader-nav > button')].map(node => node.textContent), ['전체 업무', '이번 주', '진행 중인 일']);
+  assert.equal(ui.document.querySelectorAll('.work-map .map-task').length, 2);
+  assert.equal(control('주담당 역할로 업무 보기').closest('details').open, false);
+  await fill('주담당 역할로 업무 보기', '담당 A');
+  assert.equal(control('주담당 역할로 업무 보기').closest('details').open, true);
+  assert.equal(ui.document.querySelectorAll('.work-map .map-task').length, 1);
+  await click('이번 주', ui.document.querySelector('.reader-nav'));
+  assert.equal(control('주담당 역할로 업무 보기').closest('details').open, true);
+  await fill('업무나 상황 찾기', '날짜 없이도');
+  assert.match(ui.document.querySelector('#reader-results').textContent, /기간과 관계없이 선택한 주담당 역할/);
+  assert.ok(ui.document.querySelector('#reader-results').textContent.includes(tasks[0].title));
+  await click('상황별', ui.document.querySelector('.reader-nav'));
+  assert.equal(button('상황별', ui.document.querySelector('.reader-nav')).closest('details').open, true);
+  assert.equal(ui.document.querySelector('.read-card').open, false);
+  assert.match(ui.document.querySelector('.read-card summary').textContent, /업무 설명 보기/);
+  const progress = control('이번 수행 완료', ui.document.querySelector('.read-card'));
+  await reveal(progress);
+  progress.checked=true;progress.dispatchEvent(new ui.Event('change', { bubbles: true }));
+  await settle();
+  assert.ok(ui.localStorage.getItem(PROGRESS_KEY));
+  assert.equal(ui.localStorage.getItem(DATA_KEY), before);
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('full document download stays complete after a partial choice while advanced export tools start closed', async () => {
+  const tasks = [createTask({ title: '선택한 전체출력 업무', method: '남길 방법' }), createTask({ title: '선택하지 않은 전체출력 업무', method: '전체 문서에는 포함될 방법' })];
+  const item = createCase({ title: '전체출력 진행 건', nextAction: '전체에 포함될 다음 행동' });
+  const doc = createDocument({ tasks, cases: [item] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성');
+  await click('내보내기', ui.document.querySelector('.top-nav'));
+  assert.equal(ui.document.querySelector('.export-selection').closest('details').open, false);
+  assert.equal(button('AI용 내용 미리보기').closest('details').open, false);
+  assert.equal(button('전체 문서 받기 (.docx)').closest('details'), null);
+  assert.match(button('전달·백업 파일 받기 (.json)').closest('.callout').textContent, /출처 원문[\s\S]*암호화되지/);
+  await click('선택 해제');
+  const selected=control(tasks[0].title, ui.document.querySelector('.export-selection'));
+  selected.checked=true;selected.dispatchEvent(new ui.Event('change', { bubbles: true }));
+  await settle();
+  await click('전체 문서 받기 (.docx)');
+  for(let attempt=0;attempt<100&&!downloads.length;attempt++)await new Promise(resolve=>originalSetTimeout(resolve,10));
+  assert.equal(downloads.length,1);
+  const bytes=new Uint8Array(await downloads.at(-1).blob.arrayBuffer());
+  const xml=strFromU8(unzipSync(bytes)['word/document.xml']);
+  assert.ok(xml.includes(tasks[0].title));
+  assert.ok(xml.includes(tasks[1].title));
+  assert.ok(xml.includes(item.title));
+  assert.match(ui.document.querySelector('[data-export-selection-count]').textContent, /업무 1\/2개 · 진행 건 0\/1개/);
+  assert.equal(control('연락할 역할·회신 대기 포함').checked, false);
+  assert.equal(control('준비자료 포함').checked, false);
+  assert.equal(control('근거 포함').checked, false);
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('counted UI paths take 3 actions for an ungrouped first draft and 13 for the same three-groups-first workflow', async () => {
+  const run=async groupFirst=>{
+    await mount();
+    let actions=0;
+    const press=async(name,root)=>{actions++;await click(name,root);};
+    const enter=async(label,value)=>{actions++;await fill(label,value);};
+    await press([...ui.document.querySelectorAll('.start-card')].find(node=>node.querySelector('strong')?.textContent==='인수인계서 만들기'));
+    if(groupFirst){
+      for(const title of ['정기 운영','행사 지원','자료 관리']){
+        await press('＋ 큰 업무 영역');
+        await enter('큰 업무 이름',title);
+        await press('영역 만들기',ui.document.querySelector('dialog'));
+      }
+      await press('＋ 세부 업무',groupCard('정기 운영'));
+    }
+    await enter('업무명','합성 행동수 확인 업무');
+    await enter('하는 방법','아는 업무의 방법을 먼저 적습니다.');
+    const doc=savedDocument();
+    assert.equal(doc.tasks.length,1);
+    assert.equal(doc.tasks[0].title,'합성 행동수 확인 업무');
+    assert.equal(doc.tasks[0].method,'아는 업무의 방법을 먼저 적습니다.');
+    assert.equal(doc.groups.length,groupFirst?3:0);
+    assert.equal(doc.tasks[0].groupId,groupFirst?doc.groups[0].id:'');
+    assert.equal(doc.tasks[0].timing.trigger,'');
+    return actions;
+  };
+  const firstDraft=await run(false);
+  const threeGroupsFirst=await run(true);
+  assert.equal(firstDraft,3);
+  assert.equal(threeGroupsFirst,13);
+  console.info(`DOM action count (one click or one whole-field fill): first draft=${firstDraft}, three groups then one task=${threeGroupsFirst}; grouping outcomes differ.`);
 });

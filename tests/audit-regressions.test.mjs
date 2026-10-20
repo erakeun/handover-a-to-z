@@ -86,7 +86,7 @@ test("overlapping JSON reads use the most recent selection and closing import di
   await turn();
   assert.match(document.querySelector(".import-preview").textContent, /가상 문서 B/);
   assert.doesNotMatch(document.querySelector(".import-preview").textContent, /가상 문서 A/);
-  click(document, "새 사본으로 불러오기");
+  click(document, "이 인수인계서 보기");
   assert.equal(api.state.documents.length, 1);
   assert.equal(api.state.documents[0].title, "가상 문서 B");
   assert.match(document.querySelector("#notice").textContent, /B\.json/);
