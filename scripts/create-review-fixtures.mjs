@@ -1,0 +1,13 @@
+import {mkdir,writeFile} from 'node:fs/promises';
+import {exampleDocument,stringifyDocument,importAsCopy,parseImport} from '../src/model.js';
+import {exportDocx,exportAIText} from '../src/exporters.js';
+await mkdir('fixtures/review',{recursive:true});
+const doc=exampleDocument('2026-10-20');
+await writeFile('fixtures/review/가상-인수인계.json',stringifyDocument(doc));
+await writeFile('fixtures/review/가상-인수인계-전체.docx',await exportDocx(doc));
+await writeFile('fixtures/review/가상-인수인계-선택.docx',await exportDocx(doc,{taskIds:[doc.tasks[2].id],caseIds:[doc.cases[0].id]}));
+await writeFile('fixtures/review/가상-AI-미리보기.txt',exportAIText(doc,{taskIds:doc.tasks.slice(0,3).map(t=>t.id),caseIds:[]}));
+const copied=importAsCopy(parseImport(stringifyDocument(doc)).document);
+await writeFile('fixtures/review/가상-JSON-새사본.json',stringifyDocument(copied));
+await writeFile('fixtures/review/가상-AI-구조화초안.json',JSON.stringify({kind:'handover-ai-draft',groups:[{title:'가상 정기 운영',tasks:[{title:'가상 월말 집계',when:'매월 말일',method:'1. 가상 기록을 모읍니다.\n2. 합계를 확인하고 검토 역할에게 전달합니다.'}]},{title:'가상 행사 지원',tasks:[{title:'가상 행사 준비',when:'행사일 확정 후',method:'장소와 안내문을 확인합니다. 확정하지 못한 정보는 질문으로 남깁니다.'}]},{title:'가상 자료 관리',tasks:[{title:'가상 자료 정리',when:'새 자료 접수 시',method:'자료명과 위치를 기록하고 본인 권한으로 열리는지 확인합니다.'}]}]},null,2));
+console.log('가상 검토 JSON·DOCX 전체/선택·AI 텍스트·AI 초안 생성 완료');
