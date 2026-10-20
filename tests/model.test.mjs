@@ -158,7 +158,7 @@ test("group references, duplicate group IDs and optional role/access fields are 
 test("schema rejects unsupported versions, missing fields, wrong types and unknown fields without stripping them", () => {
   for (const edit of [
     (doc) => { doc.schemaVersion = "1"; },
-    (doc) => { doc.schemaVersion = 2; },
+    (doc) => { doc.schemaVersion = 3; },
     (doc) => { delete doc.onboarding; },
     (doc) => { doc.tasks[0].accessChecked = "true"; },
     (doc) => { doc.cases[0].status = "unknown"; },

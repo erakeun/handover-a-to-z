@@ -579,9 +579,15 @@ async function readPdf(bytes, state) {
       }
       const text = parts.join('').replace(/[ \t]+\n/gu, '\n').trim();
       if (!text) warn(state, `PDF ${pageNumber}쪽에서 텍스트를 읽지 못했습니다. 스캔·이미지 또는 빈 페이지일 수 있으며 OCR은 실행하지 않습니다.`);
+      else if (/^(?:[-–—]\s*)?(?:page\s*)?\d{1,4}(?:\s*\/\s*\d{1,4})?(?:\s*[-–—])?$/iu.test(text)) {
+        // Some image/table pages still have a text-layer page number. Retain it
+        // verbatim, but do not present it as evidence that the body was extracted.
+        // This text-only heuristic does not inspect or decode PDF image streams.
+        warn(state, `PDF ${pageNumber}쪽은 쪽번호로 보이는 짧은 글만 읽었습니다. 이미지·표 안의 본문이 빠졌을 수 있으므로 원본을 확인하세요. 사진은 자동 첨부하지 않으며 OCR은 실행하지 않습니다.`);
+      }
       addBlock(state, text, `${state.name} · ${pageNumber}쪽`, 'page');
     }
-    warn(state, 'PDF의 텍스트 레이어만 페이지별로 읽었습니다. 표·다단 편집·읽기 순서·줄바꿈은 원본과 다를 수 있고, 이미지 글자와 주석은 포함하지 않습니다. 일부 문자·폰트는 누락될 수 있습니다.');
+    warn(state, 'PDF의 텍스트 레이어만 페이지별로 읽었습니다. 표·다단 편집·읽기 순서·줄바꿈은 원본과 다를 수 있고, 사진·화면 캡처·이미지 안의 글자와 주석은 포함하지 않습니다. 사진은 업무에 자동으로 연결되지 않습니다. 일부 문자·폰트는 누락될 수 있습니다.');
   } catch (error) {
     if (error.name === 'PasswordException') fail('암호가 걸린 PDF는 읽을 수 없습니다. 로컬 프로그램에서 암호를 해제한 사본을 사용하세요.');
     throw new Error(`PDF를 읽지 못했습니다: ${error.message}`);
