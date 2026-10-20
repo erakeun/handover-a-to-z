@@ -143,6 +143,65 @@ test('DOCX preserves complete long Korean text, empty lines, spaces, CRLF and ta
   assert.ok(output.dom.getElementsByTagNameNS(NS, 'tab').length > 0);
 });
 
+test('35-task DOCX consolidates 245 missing fields without changing entered content or JSON', async () => {
+  const document = fixture();
+  const missingFields = [
+    ['materials', '준비 자료·접근 경로'], ['steps', '수행 절차'],
+    ['supportRole', '지원 역할'], ['contacts', '문의 역할'],
+    ['approval', '검토·승인'], ['doneWhen', '완료 기준'], ['verifiedAt', '최종 확인일'],
+  ];
+  document.groups = Array.from({ length: 8 }, (_, i) => ({ id: `group-${i}`, title: `가상 큰 업무 ${i}` }));
+  document.tasks = Array.from({ length: 35 }, (_, i) => {
+    const item = task(`scale-task-${i}`, `가상 세부 업무 ${i}`);
+    item.groupId = document.groups[i % document.groups.length].id;
+    item.method = `원문 ${i}\n  한글 본문의 줄바꿈과 공백  \n항목\t설명\n` + '긴 본문 보존. '.repeat(100);
+    item.timing.startRule = `시작 기준 ${i}\n둘째 줄도 보존`;
+    item.purpose = i === 0 ? ' \t  ' : `입력한 목적 ${i}`;
+    for (const [key] of missingFields) item[key] = '';
+    return item;
+  });
+  document.cases = [];
+  const originalJSON = JSON.stringify(document);
+  const output = await reopen(document);
+  assert.equal(JSON.stringify(document), originalJSON, 'DOCX export must not mutate the input document');
+  const missingParagraphs = output.paragraphs.filter(text => text.startsWith('미입력 항목: '));
+  assert.equal(missingParagraphs.length, 35);
+  for (const text of missingParagraphs) {
+    assert.equal(text, `미입력 항목: ${missingFields.map(([, label]) => label).join(', ')}`);
+  }
+  for (const item of document.tasks) {
+    for (const key of ['method', 'purpose', 'ownerRole', 'exceptions', 'evidence']) {
+      assert.ok(output.paragraphs.includes(item[key]), `entered ${key} remains a complete literal paragraph`);
+    }
+    assert.ok(output.paragraphs.some(text => text.includes(item.timing.startRule)));
+  }
+  for (const source of document.sourceFiles) {
+    assert.ok(output.paragraphs.includes(source.excerpt));
+    for (const warning of source.warnings) assert.ok(output.text.includes(warning));
+  }
+  const populated = structuredClone(document);
+  for (const item of populated.tasks) {
+    for (const [key] of missingFields) item[key] = key === 'verifiedAt' ? '2026-10-20' : `가상 입력 ${key}`;
+  }
+  const populatedOutput = await reopen(populated);
+  assert.equal(populatedOutput.paragraphs.length - output.paragraphs.length, 245 * 2 - 35);
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 8);
+});
+
+test('summary omits start rules while detailed DOCX and AI exports preserve them', async () => {
+  const document = fixture();
+  document.tasks[0].timing.startRule = '시작기준 고유내용\n두 번째 줄 <literal> & 보존';
+  const before = JSON.stringify(document);
+  const output = await reopen(document);
+  const tableText = Array.from(output.dom.getElementsByTagNameNS(NS, 'tbl')).map(visibleText).join('\n');
+  assert.ok(!tableText.includes('시작·산정 기준:'));
+  assert.ok(!tableText.includes(document.tasks[0].timing.startRule));
+  assert.ok(tableText.includes('정기 업무: 매월 10일'));
+  assert.equal(output.paragraphs.filter(text => text.includes(document.tasks[0].timing.startRule)).length, 1);
+  assert.ok(exportAIText(document).includes(document.tasks[0].timing.startRule));
+  assert.equal(JSON.stringify(document), before);
+});
+
 test('DOCX selection applies to summary/detail and excludes source excerpts in partial exports', async () => {
   const document = fixture();
   const output = await reopen(document, { taskIds: ['task-1', 'task-1', 'unknown'], caseIds: ['case-1'] });

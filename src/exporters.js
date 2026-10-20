@@ -86,7 +86,7 @@ function field(children, label, value) {
 
 const filled = value => value !== '' && value !== null && value !== undefined;
 
-function timingText(timing) {
+function timingText(timing, includeStartRule = true) {
   const lines = [];
   const used = new Set(['kind', 'startRule']);
   if (timing.dayRule === 'dayOfMonth') used.add('dayRule');
@@ -136,7 +136,7 @@ function timingText(timing) {
   } else {
     lines.push('시점 미정');
   }
-  if (filled(timing.startRule)) lines.push(`시작·산정 기준: ${timing.startRule}`);
+  if (includeStartRule && filled(timing.startRule)) lines.push(`시작·산정 기준: ${timing.startRule}`);
   // Preserve values left by an earlier timing mode without presenting them as
   // active conditions (for example, a saved day must not turn "daily" into "day 10").
   const saved = [
@@ -195,7 +195,7 @@ function summaryTable(tasks, numbers) {
     },
     rows: [
       row(['번호', '업무명', '언제 하나요'], true),
-      ...tasks.map((task, index) => row([String(numbers?.get(task.id) ?? index + 1), task.title, timingText(task.timing)])),
+      ...tasks.map((task, index) => row([String(numbers?.get(task.id) ?? index + 1), task.title, timingText(task.timing, false)])),
     ],
   });
 }
@@ -204,14 +204,22 @@ function addTask(children, task, index, document, level = HeadingLevel.HEADING_2
   children.push(heading(`${index + 1}. ${task.title}`, level));
   field(children, '업무 ID', task.id);
   field(children, '언제 하나요', timingText(task.timing));
+  field(children, '어떤 방식으로 하나요', task.method);
+  const missing = [];
   for (const [label, key] of [
-    ['어떤 방식으로 하나요', 'method'], ['업무 목적', 'purpose'],
+    ['업무 목적', 'purpose'],
     ['준비 자료·접근 경로', 'materials'], ['수행 절차', 'steps'],
     ['주담당 역할', 'ownerRole'], ['지원 역할', 'supportRole'],
     ['문의 역할', 'contacts'], ['검토·승인', 'approval'],
     ['예외 상황과 대응', 'exceptions'], ['완료 기준', 'doneWhen'],
     ['증빙·결과물', 'evidence'], ['최종 확인일', 'verifiedAt'],
-  ]) field(children, label, task[key]);
+  ]) {
+    // Preserve every entered value verbatim, including intentional whitespace.
+    // Empty optional fields remain explicit without consuming two paragraphs each.
+    if (filled(task[key])) field(children, label, task[key]);
+    else missing.push(label);
+  }
+  if (missing.length) children.push(paragraph(`미입력 항목: ${missing.join(', ')}`));
   field(children, '접근 권한 확인', task.accessStatus === 'notApplicable'
     ? '해당 없음'
     : task.accessStatus ? (task.accessStatus === 'confirmed' ? '확인함' : '미확인')
