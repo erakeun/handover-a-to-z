@@ -1,4 +1,5 @@
 import { IMAGE_LIMITS, validateImage } from "./image-data.js";
+import { EXAMPLE_IMAGES } from "./example-images.js";
 
 /**
  * Portable v1/v2 data model. All dates are Gregorian civil dates, not UTC instants.
@@ -651,6 +652,7 @@ export function exampleDocument(todayISO = dateISO()) {
     return value ? civilString(value) : todayISO;
   };
   const document = createDocument({
+    schemaVersion: 2,
     title: "[가상 예시] 해솔 학습지원팀 업무 인수인계",
     onboarding: {
       dayOne: "이 문서는 기능 체험용 가상 예시입니다. 실제 기관의 규정·연락처·계정이 아닙니다.\n1. 전임자와 진행 중인 3건의 다음 행동을 함께 읽습니다.\n2. 본인 계정으로 예시 자료실의 열람 권한을 확인합니다. 비밀번호를 전달받지 않습니다.\n3. 오늘 일정과 긴급 문의 전달 경로를 확인하고 체크합니다.",
@@ -679,11 +681,21 @@ export function exampleDocument(todayISO = dateISO()) {
   document.tasks = [
     task("매일 접수함 확인", { kind: "regular", cadence: "daily", startRule: "업무 시작 후 접수함을 확인한다." }, {
       method: "새 접수 내용을 분류하고 담당 역할에 연결합니다.", materials: "가상 접수함, 문의 분류표",
+      images: [{
+        id: makeId(), section: "method",
+        caption: "[가상 예시] 접수 분류 설명에 붙이는 가로 그림입니다. 색 도형과 예시 글자로 만든 연습 자료이며 실제 접수함 화면이 아닙니다.",
+        ...EXAMPLE_IMAGES.landscape,
+      }],
       steps: "1. 새 접수와 미처리 건을 읽습니다.\n2. 중복·긴급 여부를 확인합니다.\n3. 담당 역할과 다음 확인 시각을 기록합니다.",
       doneWhen: "모든 새 접수에 담당 역할과 다음 행동이 기록되어 있습니다.", evidence: "개인정보를 가린 접수 처리 기록", firstDay: true,
     }),
     task("주간 회의 준비", { kind: "regular", cadence: "weekly", weekday: 1, startRule: "회의 전 영업일에 안건을 모은다." }, {
       method: "미해결 안건과 이번 주 일정을 한 페이지로 정리합니다.", materials: "가상 회의 안건 양식, 지난 회의 기록",
+      images: [{
+        id: makeId(), section: "steps",
+        caption: "[가상 예시] 회의 준비 순서에 붙이는 세로 그림입니다. 색 도형과 예시 글자로 만든 연습 자료이며 실제 회의 자료가 아닙니다.",
+        ...EXAMPLE_IMAGES.portrait,
+      }],
       steps: "1. 지난 회의의 미완료 항목을 옮깁니다.\n2. 결정이 필요한 사항을 적습니다.\n3. 검토 후 회의 자료를 공유합니다.",
       doneWhen: "모든 안건에 결정 요청 또는 다음 행동이 있습니다.", evidence: "검토된 안건 문서와 회의 후 결정 기록", firstWeek: true,
     }),
