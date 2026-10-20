@@ -61711,7 +61711,7 @@ ${validation.errors.join("\n")}`);
 // src/app.js
 var app = document.querySelector("#app");
 var modalRoot = document.querySelector("#modal-root");
-var state = { documents: [], current: null, view: "home", authorSection: "tasks", selected: null, readerTab: "map", calendarMode: "month", calendarAnchor: dateISO(), calendarSelected: "", mobilePane: "map", roleQuery: "", query: "", limit: 12, progress: {}, saveMessage: "\uAE30\uAE30\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB429\uB2C8\uB2E4", storageBlocked: false, storageConflict: false, progressBlocked: false, storageError: "", progressError: "" };
+var state = { documents: [], current: null, view: "home", authorSection: "tasks", selected: null, readerTab: "map", calendarMode: "month", calendarAnchor: dateISO(), calendarSelected: "", mobilePane: "map", roleQuery: "", query: "", limit: 12, progress: {}, exportSelections: /* @__PURE__ */ new Map(), saveMessage: "\uAE30\uAE30\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB429\uB2C8\uB2E4", storageBlocked: false, storageConflict: false, progressBlocked: false, storageError: "", progressError: "" };
 var storage;
 var lastDocumentsRaw = null;
 try {
@@ -62558,7 +62558,7 @@ function jsonImport() {
       if (thisRequest !== requestId || !handle.dialog.isConnected) return;
       parsed = result;
       const doc = parsed.document;
-      output.append(el("h3", {}, doc.title || "\uC774\uB984 \uC5C6\uB294 \uC778\uC218\uC778\uACC4"), note(`\uC5C5\uBB34 ${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C \xB7 \uCD9C\uCC98 ${doc.sourceFiles.length}\uAC1C`), el("ul", {}, doc.tasks.slice(0, 5).map((t) => el("li", {}, t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"))), parsed.warnings?.map((w) => note(w, "warning-text")), note("\uAE30\uC874 \uBB38\uC11C\uB97C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC218\uD589 \uCCB4\uD06C\uB294 \uAC00\uC838\uC624\uC9C0 \uC54A\uC544\uC694."));
+      output.append(el("h3", {}, doc.title || "\uC774\uB984 \uC5C6\uB294 \uC778\uC218\uC778\uACC4"), note(`\uC5C5\uBB34 ${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C \xB7 \uCD9C\uCC98 ${doc.sourceFiles.length}\uAC1C`), el("ul", {}, doc.tasks.slice(0, 5).map((t) => el("li", {}, t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"))), ...(parsed.warnings || []).map((w) => note(w, "warning-text")), note("\uAE30\uC874 \uBB38\uC11C\uB97C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC218\uD589 \uCCB4\uD06C\uB294 \uAC00\uC838\uC624\uC9C0 \uC54A\uC544\uC694."));
     } catch (error) {
       if (thisRequest !== requestId || !handle.dialog.isConnected) return;
       output.append(el("p", { class: "error", role: "alert" }, error.message));
@@ -62635,6 +62635,7 @@ function reviewBlocks(result, name, targetId) {
   const targetDoc = () => state.documents.find((d) => d.id === targetId);
   const original = result.blocks.map((b) => `[${b.source}]
 ${b.text}`).join("\n\n");
+  let groupId = "";
   let drafts = result.blocks.filter((b) => b.text.trim()).map((b) => ({ ...b, id: makeId(), selected: true, title: short(b.text.split("\n").find((l) => l.trim()) || "", 80), source: b.source }));
   const body = el(
     "div",
@@ -62643,6 +62644,8 @@ ${b.text}`).join("\n\n");
     el("details", { class: "import-warnings", open: true }, el("summary", {}, `\uCD94\uCD9C \uBC94\uC704\uC640 \uC8FC\uC758\uC0AC\uD56D ${result.warnings.length}\uAC1C`), el("ul", {}, result.warnings.map((w) => el("li", {}, w)))),
     el("p", {}, `${name} \xB7 ${result.format.toUpperCase()}`)
   );
+  const groups = targetDoc()?.groups || [];
+  if (groups.length) body.append(select("\uCD94\uAC00\uD560 \uD070 \uC5C5\uBB34 \uC601\uC5ED (\uC120\uD0DD)", groupId, [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...groups.map((g) => [g.id, g.title || "\uC774\uB984 \uC5C6\uB294 \uC601\uC5ED"])], (v) => groupId = v), note("\uC120\uD0DD\uD55C \uCD08\uC548\uC5D0\uB9CC \uAC19\uC740 \uC601\uC5ED\uC744 \uC801\uC6A9\uD569\uB2C8\uB2E4. \uAE30\uC874 \uC5C5\uBB34\uC758 \uBD84\uB958\uB294 \uBC14\uB00C\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."));
   const list = el("div", { class: "draft-list" });
   body.append(list);
   const counter = el("p", { class: "helper", role: "status" });
@@ -62682,9 +62685,13 @@ ${b.text}`).join("\n\n");
     }
     const doc = targetDoc() ? structuredClone(targetDoc()) : createDocument();
     if (!targetDoc()) doc.title = name.replace(/\.[^.]+$/, "") + " \uC778\uC218\uC778\uACC4";
+    if (groupId && !doc.groups?.some((g) => g.id === groupId)) {
+      notice("\uC120\uD0DD\uD55C \uD070 \uC5C5\uBB34 \uC601\uC5ED\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uCD08\uC548 \uAC80\uD1A0\uB97C \uB2E4\uC2DC \uC5F4\uC5B4 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      return;
+    }
     const source = { id: makeId(), name, format: result.format, importedAt: (/* @__PURE__ */ new Date()).toISOString(), excerpt: original, warnings: result.warnings };
     doc.sourceFiles.push(source);
-    doc.tasks.push(...selected.map((d) => createTask({ title: d.title, method: d.text, sourceRefs: [source.id] })));
+    doc.tasks.push(...selected.map((d) => createTask({ title: d.title, method: d.text, groupId, sourceRefs: [source.id] })));
     const validation = validateDocument(doc);
     if (!validation.ok) {
       notice("\uCD94\uCD9C\uD55C \uC591\uC774 \uC800\uC7A5 \uBC94\uC704\uB97C \uB118\uAC70\uB098 \uAC80\uC99D\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB354 \uC791\uC740 \uBB38\uC11C\uB85C \uB098\uB220 \uC8FC\uC138\uC694. " + validation.errors.slice(0, 2).join(" "));
@@ -62703,16 +62710,29 @@ ${b.text}`).join("\n\n");
     notice(`${selected.length}\uAC1C \uC5C5\uBB34 \uCD08\uC548\uC744 \uCD94\uAC00\uD588\uC2B5\uB2C8\uB2E4. \uC218\uD589 \uC2DC\uC810\uACFC \uB204\uB77D\uB41C \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.`);
   }, "primary")]);
 }
+function exportSelection(doc) {
+  if (!state.exportSelections.has(doc.id)) state.exportSelections.set(doc.id, { taskIds: doc.tasks.map((t) => t.id), caseIds: doc.cases.map((c) => c.id) });
+  const selection = state.exportSelections.get(doc.id);
+  selection.taskIds = selection.taskIds.filter((id) => doc.tasks.some((t) => t.id === id));
+  selection.caseIds = selection.caseIds.filter((id) => doc.cases.some((c) => c.id === id));
+  return selection;
+}
 function exportView() {
   const doc = current();
-  const selection = { taskIds: doc.tasks.map((t) => t.id), caseIds: doc.cases.map((c) => c.id) };
+  const selection = exportSelection(doc);
   let includeContacts = false, includeMaterials = false, includeEvidence = false;
   const body = el("section", { class: "export-layout" });
   const panel = el("div", { class: "editor" }, el("h2", {}, "\uD544\uC694\uD55C \uD615\uD0DC\uB85C \uAC74\uB124\uC138\uC694"), note("JSON\uC740 \uB2E4\uC2DC \uD3B8\uC9D1\uD558\uACE0 \uC7AC\uC804\uB2EC\uD560 \uB54C, DOCX\uB294 \uC81C\uCD9C\xB7\uC678\uBD80 \uD3B8\uC9D1\uD560 \uB54C \uC0AC\uC6A9\uD569\uB2C8\uB2E4."));
   panel.append(el("div", { class: "callout" }, el("strong", {}, "\uD30C\uC77C \uBC31\uC5C5\uC740 JSON\uC73C\uB85C"), el("p", {}, "\uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\xB7\uCD9C\uCC98 \uC6D0\uBB38\uC774 \uD568\uAED8 \uC800\uC7A5\uB429\uB2C8\uB2E4. \uC218\uD589 \uCCB4\uD06C\uB294 \uBCC4\uB3C4\uC785\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), button2("\uC804\uCCB4 JSON \uB0B4\uB824\uBC1B\uAE30", backup, "primary")));
+  const selectionCount = el("p", { class: "helper", role: "status", "data-export-selection-count": "" });
+  const updateCount = () => {
+    selectionCount.textContent = `\uC120\uD0DD: \uC5C5\uBB34 ${selection.taskIds.length}/${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${selection.caseIds.length}/${doc.cases.length}\uAC1C`;
+  };
   const toggle = (ids, id, checked) => {
-    if (checked && !ids.includes(id)) ids.push(id);
-    else if (!checked) ids.splice(ids.indexOf(id), 1);
+    const index = ids.indexOf(id);
+    if (checked && index === -1) ids.push(id);
+    else if (!checked && index !== -1) ids.splice(index, 1);
+    updateCount();
   };
   panel.append(el("h3", {}, "DOCX \xB7 \uC778\uC1C4 \xB7 AI\uC5D0 \uB2F4\uC744 \uD56D\uBAA9"), el("div", { class: "actions" }, button2("\uBAA8\uB450 \uC120\uD0DD", () => {
     selection.taskIds = doc.tasks.map((t) => t.id);
@@ -62724,9 +62744,12 @@ function exportView() {
     redraw();
   }, "quiet")));
   const selectList = el("div", { class: "export-selection" });
-  const redraw = () => selectList.replaceChildren(el("h4", {}, `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}\uAC1C`), doc.tasks.map((t) => check3(t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34", selection.taskIds.includes(t.id), (v) => toggle(selection.taskIds, t.id, v))), el("h4", {}, `\uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C`), doc.cases.map((c) => check3(c.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74", selection.caseIds.includes(c.id), (v) => toggle(selection.caseIds, c.id, v))));
+  const redraw = () => {
+    selectList.replaceChildren(el("h4", {}, `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}\uAC1C`), ...doc.tasks.map((t) => check3(t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34", selection.taskIds.includes(t.id), (v) => toggle(selection.taskIds, t.id, v))), el("h4", {}, `\uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C`), ...doc.cases.map((c) => check3(c.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74", selection.caseIds.includes(c.id), (v) => toggle(selection.caseIds, c.id, v))));
+    updateCount();
+  };
   redraw();
-  panel.append(selectList);
+  panel.append(selectionCount, selectList, note("\uC120\uD0DD\uC740 \uC774 \uBB38\uC11C\uC5D0\uC11C \uD654\uBA74\uC744 \uC624\uAC00\uB294 \uB3D9\uC548 \uC720\uC9C0\uB429\uB2C8\uB2E4. \uC0C8\uB85C \uCD94\uAC00\uD55C \uD56D\uBAA9\uC740 \uC9C1\uC811 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694."));
   panel.append(el("div", { class: "actions" }, button2("\uC120\uD0DD \uD56D\uBAA9 DOCX", async (e) => {
     if (!selection.taskIds.length && !selection.caseIds.length) {
       notice("\uB0B4\uBCF4\uB0BC \uD56D\uBAA9\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");

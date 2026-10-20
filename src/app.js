@@ -7,7 +7,7 @@ import {AUTHOR_PROMPT,parseAIDraft,applyAIDraft} from './ai-draft.js';
 
 const app=document.querySelector('#app');
 const modalRoot=document.querySelector('#modal-root');
-const state={documents:[],current:null,view:'home',authorSection:'tasks',selected:null,readerTab:'map',calendarMode:'month',calendarAnchor:dateISO(),calendarSelected:'',mobilePane:'map',roleQuery:'',query:'',limit:12,progress:{},saveMessage:'기기에 임시저장됩니다',storageBlocked:false,storageConflict:false,progressBlocked:false,storageError:'',progressError:''};
+const state={documents:[],current:null,view:'home',authorSection:'tasks',selected:null,readerTab:'map',calendarMode:'month',calendarAnchor:dateISO(),calendarSelected:'',mobilePane:'map',roleQuery:'',query:'',limit:12,progress:{},exportSelections:new Map(),saveMessage:'기기에 임시저장됩니다',storageBlocked:false,storageConflict:false,progressBlocked:false,storageError:'',progressError:''};
 let storage;let lastDocumentsRaw=null;
 try{storage=window.localStorage;state.documents=loadDocuments(storage);lastDocumentsRaw=storage.getItem(DATA_KEY);state.current=storage.getItem(CURRENT_KEY);}
 catch(e){state.storageError=e.message;try{state.storageBlocked=!!storage?.getItem(DATA_KEY);}catch{}}
@@ -268,7 +268,7 @@ function jsonImport(){
  const output=el('div',{class:'import-preview',role:'status'});let parsed=null,sourceName='',requestId=0;
  body.append(field('인수인계 JSON 파일 선택','',()=>{},{type:'file',accept:'.json,application/json',maxLength:null,onchange:async e=>{
   const thisRequest=++requestId;parsed=null;output.replaceChildren();const file=e.target.files?.[0];if(!file)return;sourceName=file.name;
-  try{if(file.size>5*1024*1024)throw new Error('파일이 5 MiB를 넘습니다. 더 작은 인수인계 파일로 나눠 주세요.');const result=parseImport(await file.text());if(thisRequest!==requestId||!handle.dialog.isConnected)return;parsed=result;const doc=parsed.document;output.append(el('h3',{},doc.title||'이름 없는 인수인계'),note(`업무 ${doc.tasks.length}개 · 진행 건 ${doc.cases.length}개 · 출처 ${doc.sourceFiles.length}개`),el('ul',{},doc.tasks.slice(0,5).map(t=>el('li',{},t.title||'이름 없는 업무'))),parsed.warnings?.map(w=>note(w,'warning-text')),note('기존 문서를 덮어쓰지 않습니다. 수행 체크는 가져오지 않아요.'));}
+  try{if(file.size>5*1024*1024)throw new Error('파일이 5 MiB를 넘습니다. 더 작은 인수인계 파일로 나눠 주세요.');const result=parseImport(await file.text());if(thisRequest!==requestId||!handle.dialog.isConnected)return;parsed=result;const doc=parsed.document;output.append(el('h3',{},doc.title||'이름 없는 인수인계'),note(`업무 ${doc.tasks.length}개 · 진행 건 ${doc.cases.length}개 · 출처 ${doc.sourceFiles.length}개`),el('ul',{},doc.tasks.slice(0,5).map(t=>el('li',{},t.title||'이름 없는 업무'))),...(parsed.warnings||[]).map(w=>note(w,'warning-text')),note('기존 문서를 덮어쓰지 않습니다. 수행 체크는 가져오지 않아요.'));}
   catch(error){if(thisRequest!==requestId||!handle.dialog.isConnected)return;output.append(el('p',{class:'error',role:'alert'},error.message));}
  }}),output);
  const handle=modal('전달받은 JSON 확인하기',body,[close=>button('취소',close),close=>button('새 사본으로 불러오기',()=>{if(!parsed){notice('먼저 검증을 통과한 JSON 파일을 선택해 주세요.');return;}try{const doc=importAsCopy(parsed.document);close();activate(doc,'reader');notice(`${sourceName}을 새 사본으로 불러왔습니다.`);}catch(e){notice(e.message);}},'primary')]);
@@ -293,9 +293,12 @@ function pasteImport(){
 function reviewBlocks(result,name,targetId){
  const targetDoc=()=>state.documents.find(d=>d.id===targetId);
  const original=result.blocks.map(b=>`[${b.source}]\n${b.text}`).join('\n\n');
+ let groupId='';
  let drafts=result.blocks.filter(b=>b.text.trim()).map(b=>({...b,id:makeId(),selected:true,title:short(b.text.split('\n').find(l=>l.trim())||'',80),source:b.source}));
  const body=el('div',{},el('div',{class:'callout'},el('strong',{},'규칙으로 나눈 초안이에요. 의미를 자동으로 해석하지 않습니다.'),el('p',{},'원문과 비교하고 업무 단위로 나누거나 합쳐 주세요. 선택한 항목만 업무로 추가됩니다.')),
  el('details',{class:'import-warnings',open:true},el('summary',{},`추출 범위와 주의사항 ${result.warnings.length}개`),el('ul',{},result.warnings.map(w=>el('li',{},w)))),el('p',{},`${name} · ${result.format.toUpperCase()}`));
+ const groups=targetDoc()?.groups||[];
+ if(groups.length)body.append(select('추가할 큰 업무 영역 (선택)',groupId,[['','아직 분류하지 않음'],...groups.map(g=>[g.id,g.title||'이름 없는 영역'])],v=>groupId=v),note('선택한 초안에만 같은 영역을 적용합니다. 기존 업무의 분류는 바뀌지 않습니다.'));
  const list=el('div',{class:'draft-list'});body.append(list);const counter=el('p',{class:'helper',role:'status'});body.append(counter);
  const redraw=()=>{list.replaceChildren();counter.textContent=`${drafts.filter(d=>d.selected).length}/${drafts.length}개 선택 · 선택하지 않은 텍스트도 출처 원문에 보존합니다.`;
   if(!drafts.length)list.append(empty('추출된 본문이 없어요','스캔·이미지 문서는 원본 프로그램에서 텍스트를 확인해 붙여넣어 주세요.'));
@@ -307,20 +310,32 @@ function reviewBlocks(result,name,targetId){
  modal('추출한 내용을 업무로 다듬기',body,[close=>button('취소',close),close=>button(targetDoc()?'현재 문서에 업무 추가':'새 인수인계로 만들기',()=>{
   const selected=drafts.filter(d=>d.selected);if(!selected.length){notice('추가할 초안을 하나 이상 선택해 주세요.');return;}
   const doc=targetDoc()?structuredClone(targetDoc()):createDocument();if(!targetDoc())doc.title=name.replace(/\.[^.]+$/,'')+' 인수인계';
+  if(groupId&&!doc.groups?.some(g=>g.id===groupId)){notice('선택한 큰 업무 영역을 찾을 수 없습니다. 초안 검토를 다시 열어 확인해 주세요.');return;}
   const source={id:makeId(),name,format:result.format,importedAt:new Date().toISOString(),excerpt:original,warnings:result.warnings};doc.sourceFiles.push(source);
-  doc.tasks.push(...selected.map(d=>createTask({title:d.title,method:d.text,sourceRefs:[source.id]})));
+  doc.tasks.push(...selected.map(d=>createTask({title:d.title,method:d.text,groupId,sourceRefs:[source.id]})));
   const validation=validateDocument(doc);if(!validation.ok){notice('추출한 양이 저장 범위를 넘거나 검증에 실패했습니다. 더 작은 문서로 나눠 주세요. '+validation.errors.slice(0,2).join(' '));return;}
   close();if(targetDoc()){state.documents[state.documents.findIndex(d=>d.id===doc.id)]=doc;state.current=doc.id;state.view='author';state.authorSection='tasks';state.selected=doc.tasks[doc.tasks.length-selected.length].id;saved();render(true);}else activate(doc);
   notice(`${selected.length}개 업무 초안을 추가했습니다. 수행 시점과 누락된 내용을 확인해 주세요.`);
  },'primary')]);
 }
+function exportSelection(doc){
+ // Keep each document's choice while navigating this session; newly added items
+ // remain unselected until the user includes them.
+ if(!state.exportSelections.has(doc.id))state.exportSelections.set(doc.id,{taskIds:doc.tasks.map(t=>t.id),caseIds:doc.cases.map(c=>c.id)});
+ const selection=state.exportSelections.get(doc.id);
+ selection.taskIds=selection.taskIds.filter(id=>doc.tasks.some(t=>t.id===id));
+ selection.caseIds=selection.caseIds.filter(id=>doc.cases.some(c=>c.id===id));
+ return selection;
+}
 function exportView(){
- const doc=current();const selection={taskIds:doc.tasks.map(t=>t.id),caseIds:doc.cases.map(c=>c.id)};let includeContacts=false,includeMaterials=false,includeEvidence=false;
+ const doc=current();const selection=exportSelection(doc);let includeContacts=false,includeMaterials=false,includeEvidence=false;
  const body=el('section',{class:'export-layout'});const panel=el('div',{class:'editor'},el('h2',{},'필요한 형태로 건네세요'),note('JSON은 다시 편집하고 재전달할 때, DOCX는 제출·외부 편집할 때 사용합니다.'));
  panel.append(el('div',{class:'callout'},el('strong',{},'파일 백업은 JSON으로'),el('p',{},'업무·진행 건·출처 원문이 함께 저장됩니다. 수행 체크는 별도입니다. 파일은 암호화되지 않습니다.'),button('전체 JSON 내려받기',backup,'primary')));
- const toggle=(ids,id,checked)=>{if(checked&&!ids.includes(id))ids.push(id);else if(!checked)ids.splice(ids.indexOf(id),1);};
+ const selectionCount=el('p',{class:'helper',role:'status','data-export-selection-count':''});
+ const updateCount=()=>{selectionCount.textContent=`선택: 업무 ${selection.taskIds.length}/${doc.tasks.length}개 · 진행 건 ${selection.caseIds.length}/${doc.cases.length}개`;};
+ const toggle=(ids,id,checked)=>{const index=ids.indexOf(id);if(checked&&index===-1)ids.push(id);else if(!checked&&index!==-1)ids.splice(index,1);updateCount();};
  panel.append(el('h3',{},'DOCX · 인쇄 · AI에 담을 항목'),el('div',{class:'actions'},button('모두 선택',()=>{selection.taskIds=doc.tasks.map(t=>t.id);selection.caseIds=doc.cases.map(t=>t.id);redraw();},'quiet'),button('선택 해제',()=>{selection.taskIds=[];selection.caseIds=[];redraw();},'quiet')));
- const selectList=el('div',{class:'export-selection'});const redraw=()=>selectList.replaceChildren(el('h4',{},`업무 매뉴얼 ${doc.tasks.length}개`),doc.tasks.map(t=>check(t.title||'이름 없는 업무',selection.taskIds.includes(t.id),v=>toggle(selection.taskIds,t.id,v))),el('h4',{},`진행 건 ${doc.cases.length}개`),doc.cases.map(c=>check(c.title||'이름 없는 진행 건',selection.caseIds.includes(c.id),v=>toggle(selection.caseIds,c.id,v))));redraw();panel.append(selectList);
+ const selectList=el('div',{class:'export-selection'});const redraw=()=>{selectList.replaceChildren(el('h4',{},`업무 매뉴얼 ${doc.tasks.length}개`),...doc.tasks.map(t=>check(t.title||'이름 없는 업무',selection.taskIds.includes(t.id),v=>toggle(selection.taskIds,t.id,v))),el('h4',{},`진행 건 ${doc.cases.length}개`),...doc.cases.map(c=>check(c.title||'이름 없는 진행 건',selection.caseIds.includes(c.id),v=>toggle(selection.caseIds,c.id,v))));updateCount();};redraw();panel.append(selectionCount,selectList,note('선택은 이 문서에서 화면을 오가는 동안 유지됩니다. 새로 추가한 항목은 직접 선택해 주세요.'));
  panel.append(el('div',{class:'actions'},button('선택 항목 DOCX',async e=>{
   if(!selection.taskIds.length&&!selection.caseIds.length){notice('내보낼 항목을 선택해 주세요.');return;}
   const btn=e.currentTarget;btn.disabled=true;btn.textContent='문서 만드는 중…';try{const bytes=await exportDocx(doc,selection);download(bytes,`${safeName(doc.title)}-${today()}.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');notice('DOCX 파일을 만들었습니다. 문서 프로그램에서 열어 확인해 주세요.');}catch(error){notice('DOCX 생성 실패: '+error.message);}finally{btn.disabled=false;btn.textContent='선택 항목 DOCX';}
