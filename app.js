@@ -62650,7 +62650,7 @@ function distinctInstructions(task) {
 function taskReadiness(task) {
   if (firstActionText(task)) return "\uCCAB \uD589\uB3D9 \uC548\uB0B4 \uC788\uC74C";
   if (distinctInstructions(task).length) return "\uBCF8\uBB38 \uC548\uB0B4 \uC788\uC74C";
-  return task?.sourceRefs?.length ? "\uC6D0\uBB38\uC73C\uB85C \uBCF4\uAE30" : "\uC77D\uAE30 \uD655\uC778 \uD544\uC694";
+  return task?.sourceRefs?.length ? "\uCC38\uACE0\uC790\uB8CC \uC788\uC74C" : "\uC77D\uAE30 \uD655\uC778 \uD544\uC694";
 }
 
 // src/exporters.js
@@ -62705,10 +62705,14 @@ function checkedInput(document2, options) {
     partial: options.taskIds !== void 0 || options.caseIds !== void 0
   };
 }
-function checkedEvidencePages(document2, tasks, cases, value = []) {
+function checkedEvidencePages(document2, tasks, cases, value = [], wholeSourceIds = []) {
   if (!Array.isArray(value) || value.length > 20) throw new Error("\uD568\uAED8 \uC804\uB2EC\uD560 \uADFC\uAC70 \uCABD\uC740 20\uCABD \uC774\uB0B4\uB85C \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
   const used = new Set([...tasks, ...cases].flatMap((item) => item.sourceRefs));
   const sources = document2.sourceFiles.filter((source) => used.has(source.id) && source.pdf);
+  if (!Array.isArray(wholeSourceIds) || wholeSourceIds.some((id) => typeof id !== "string") || new Set(wholeSourceIds).size !== wholeSourceIds.length || wholeSourceIds.some((id) => !sources.some((source) => source.id === id))) {
+    throw new Error("\uC6D0\uBB38 \uBD80\uB85D\uC740 \uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uC5D0 \uC5F0\uACB0\uB41C PDF\uB9CC \uC911\uBCF5 \uC5C6\uC774 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
+  }
+  const wholeSources = new Set(wholeSourceIds);
   const pages = [];
   let totalBytes = 0;
   for (const page of value) {
@@ -62730,36 +62734,52 @@ function checkedEvidencePages(document2, tasks, cases, value = []) {
     }
     totalBytes += bytes.length;
     if (totalBytes > 32 * 1024 * 1024) throw new Error("\uADFC\uAC70 \uCABD \uC774\uBBF8\uC9C0 \uD569\uACC4\uAC00 32 MiB\uB97C \uB118\uC2B5\uB2C8\uB2E4. \uD544\uC694\uD55C \uCABD\uC744 \uB098\uB204\uC5B4 \uCD9C\uB825\uD574 \uC8FC\uC138\uC694.");
-    pages.push({ ...page, source, bytes, anchor: `handover_evidence_${pages.length + 1}` });
+    pages.push({ ...page, source, bytes, wholeSource: wholeSources.has(source.id), anchor: `handover_evidence_${pages.length + 1}` });
   }
   for (const source of sources) {
     const included = pages.filter((page) => page.sourceId === source.id).map((page) => page.pageNumber);
     if (!included.length) {
       throw new Error(`${source.name}: \uD568\uAED8 \uC804\uB2EC\uD560 \uADFC\uAC70 \uCABD\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694. \uD544\uC694\uD55C \uD45C\xB7\uC0AC\uC9C4\uC774 \uBE60\uC9C4 \uBB38\uC11C\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.`);
     }
+    if (wholeSources.has(source.id) && (included.length !== source.pdf.pageCount || Array.from({ length: source.pdf.pageCount }, (_, index) => index + 1).some((number) => !included.includes(number)))) {
+      throw new Error(`${source.name}: \uC6D0\uBB38 \uBD80\uB85D\uC758 \uCABD\uC774 \uBE60\uC838 \uBB38\uC11C\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uC804\uCCB4 ${source.pdf.pageCount}\uCABD\uC744 \uD568\uAED8 \uC804\uB2EC\uD574 \uC8FC\uC138\uC694.`);
+    }
     for (const item of [...tasks, ...cases].filter((item2) => item2.sourceRefs.includes(source.id))) {
       const saved2 = item.sourcePages?.find((reference) => reference.sourceId === source.id);
+      if (!saved2 && source.pdf.pageCount > 1 && !wholeSources.has(source.id)) {
+        throw new Error(`${item.title}: \uD544\uC694\uD55C \uADFC\uAC70 \uCABD\uC774 \uC544\uC9C1 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uC6D0\uBB38 \uC804\uCCB4\uB97C \uBD80\uB85D\uC73C\uB85C \uD568\uAED8 \uC804\uB2EC\uD558\uAC70\uB098 \uD544\uC694\uD55C \uCABD\uC744 \uC9C1\uC811 \uC5F0\uACB0\uD574 \uC8FC\uC138\uC694.`);
+      }
       const required = saved2?.pages || (source.pdf.pageCount === 1 ? [1] : []);
       if (required.some((pageNumber) => !included.includes(pageNumber))) {
         throw new Error(`${item.title}: \uC5F0\uACB0\uD55C \uADFC\uAC70 \uCABD\uC774 \uBE60\uC838 \uBB38\uC11C\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. ${source.name}\uC758 ${required.join(", ")}\uCABD\uC744 \uD568\uAED8 \uC804\uB2EC\uD574 \uC8FC\uC138\uC694.`);
       }
     }
   }
+  pages.sort((a, b) => sources.indexOf(a.source) - sources.indexOf(b.source) || a.pageNumber - b.pageNumber);
+  pages.forEach((page, index) => {
+    page.anchor = `handover_evidence_${index + 1}`;
+  });
   return pages;
 }
 function refersToPage(item, page) {
   if (!item.sourceRefs.includes(page.sourceId)) return false;
   const saved2 = item.sourcePages?.find((reference) => reference.sourceId === page.sourceId);
-  return saved2 ? saved2.pages.includes(page.pageNumber) : page.source.pdf.pageCount === 1 ? page.pageNumber === 1 : true;
+  return saved2 ? saved2.pages.includes(page.pageNumber) : page.source.pdf.pageCount === 1 && page.pageNumber === 1;
 }
 function evidenceLinks(children2, item, pages) {
   for (const page of pages.filter((page2) => refersToPage(item, page2))) {
     children2.push(linkedParagraph(`\uADFC\uAC70 \uCABD: ${page.source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`, page.anchor));
   }
+  const linked = /* @__PURE__ */ new Set();
+  for (const page of pages) {
+    if (!page.wholeSource || !item.sourceRefs.includes(page.sourceId) || item.sourcePages?.some((reference) => reference.sourceId === page.sourceId) || linked.has(page.sourceId)) continue;
+    linked.add(page.sourceId);
+    children2.push(linkedParagraph(`\uCC38\uACE0 \uC6D0\uBB38 \uBD80\uB85D: ${page.source.name} (\uC5C5\uBB34\uBCC4 \uCABD \uBBF8\uC9C0\uC815)`, page.anchor));
+  }
 }
 function addEvidencePages(children2, pages, tasks, numbers) {
   if (!pages.length) return;
-  children2.push(heading("\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD"));
+  children2.push(heading(pages.some((page) => page.wholeSource) ? "\uADFC\uAC70 \uCABD \xB7 \uCC38\uACE0 \uC6D0\uBB38 \uBD80\uB85D" : "\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD"));
   pages.forEach((page, index) => {
     children2.push(bookmarkedHeading(`${index + 1}. ${page.source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD / \uCD1D ${page.source.pdf.pageCount}\uCABD`, page.anchor, HeadingLevel.HEADING_2));
     const ratio = Math.min(1, IMAGE_WIDTH / page.width, 760 / page.height);
@@ -62777,10 +62797,11 @@ function addEvidencePages(children2, pages, tasks, numbers) {
         }
       })]
     }));
-    children2.push(paragraph("\uC120\uD0DD\uD55C \uC6D0\uBB38 \uCABD\uC744 \uADF8\uB300\uB85C \uB2F4\uC740 \uC774\uBBF8\uC9C0\uC785\uB2C8\uB2E4. \uD45C\xB7\uC0AC\uC9C4\uACFC \uC2E4\uD589 \uC548\uB0B4\uB97C \uD568\uAED8 \uD655\uC778\uD558\uC138\uC694.", {}, { size: 18, color: "475569" }));
+    children2.push(paragraph(page.wholeSource ? "\uC6D0\uBB38 \uC804\uCCB4\uB97C \uD55C \uBC88\uC529 \uB2F4\uC740 \uCC38\uACE0 \uBD80\uB85D\uC785\uB2C8\uB2E4. \uC5C5\uBB34\uBCC4 \uCABD \uAD00\uACC4\uAC00 \uBBF8\uC9C0\uC815\uC778 \uC548\uB0B4\uB294 \uC774 \uC790\uB8CC\uC5D0\uC11C \uC9C1\uC811 \uD655\uC778\uD558\uC138\uC694." : "\uC120\uD0DD\uD55C \uC6D0\uBB38 \uCABD\uC744 \uADF8\uB300\uB85C \uB2F4\uC740 \uC774\uBBF8\uC9C0\uC785\uB2C8\uB2E4. \uD45C\xB7\uC0AC\uC9C4\uACFC \uC2E4\uD589 \uC548\uB0B4\uB97C \uD568\uAED8 \uD655\uC778\uD558\uC138\uC694.", {}, { size: 18, color: "475569" }));
     for (const task of tasks.filter((task2) => refersToPage(task2, page))) {
       children2.push(linkedParagraph(`\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30: ${task.title}`, `handover_task_${numbers.get(task.id)}`));
     }
+    if (page.wholeSource) children2.push(linkedParagraph("\uC5C5\uBB34 \uC9C0\uB3C4\uB85C \uB3CC\uC544\uAC00\uAE30", "handover_map"));
   });
 }
 function textRuns(value, properties2 = {}) {
@@ -63028,7 +63049,7 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
   if (task.firstDay || task.firstWeek) {
     field(children2, "\uCC98\uC74C \uD655\uC778\uD560 \uB54C", [task.firstDay ? "\uCCAB\uB0A0 \uD655\uC778" : "", task.firstWeek ? "\uCCAB \uC8FC \uD655\uC778" : ""].filter(Boolean).join(" / "));
   }
-  const otherSources = task.sourceRefs.filter((sourceId) => !evidencePages.some((page) => page.sourceId === sourceId && refersToPage(task, page)));
+  const otherSources = task.sourceRefs.filter((sourceId) => !evidencePages.some((page) => page.sourceId === sourceId && (refersToPage(task, page) || page.wholeSource)));
   if (otherSources.length || !task.sourceRefs.length) field(children2, "\uADFC\uAC70 \uCD9C\uCC98", sourceText(otherSources, document2));
   children2.push(linkedParagraph("\uC5C5\uBB34 \uC9C0\uB3C4\uB85C \uB3CC\uC544\uAC00\uAE30", "handover_map"));
 }
@@ -63065,7 +63086,7 @@ function taskGroups(document2, tasks, partial) {
 }
 async function exportDocx(document2, options = {}) {
   const { tasks, cases, partial } = checkedInput(document2, options);
-  const evidencePages = checkedEvidencePages(document2, tasks, cases, options.evidencePages);
+  const evidencePages = checkedEvidencePages(document2, tasks, cases, options.evidencePages, options.wholeSourceIds);
   const groups = taskGroups(document2, tasks, partial);
   const numbers = new Map(groups.flatMap((group) => group.tasks).map((task, index) => [task.id, index + 1]));
   const usedSources = new Set([...tasks, ...cases].flatMap((item) => item.sourceRefs));
@@ -63118,14 +63139,15 @@ async function exportDocx(document2, options = {}) {
     if (filled(document2.onboarding.firstWeek)) field(children2, "\uCCAB \uC8FC \uD655\uC778\uD560 \uC77C", document2.onboarding.firstWeek);
   }
   children2.push(heading("\uCD9C\uCC98\uC640 \uD655\uC778 \uC0AC\uD56D"));
-  children2.push(paragraph(`\uC5C5\uBB34 \uC548\uB0B4\xB7\uC0AC\uC9C4\uACFC \uC120\uD0DD\uD55C \uADFC\uAC70 \uCABD\uC744 \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC804\uCCB4 \uC6D0\uBB38\xB7\uBCF5\uC0AC \uC774\uB825\uC740 JSON\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.${partial ? " \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uB0B4\uC6A9\uC774 \uC11E\uC77C \uC218 \uC788\uC5B4 \uC0DD\uB7B5\uD55C \uC6D0\uBB38 \uBC1C\uCDCC\uB3C4 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4." : ""}`, {}, { size: 20, color: "475569" }));
+  children2.push(paragraph(`\uC5C5\uBB34 \uC548\uB0B4\xB7\uC0AC\uC9C4\uACFC \uC120\uD0DD\uD55C \uADFC\uAC70 \uCABD${evidencePages.some((page) => page.wholeSource) ? "\xB7\uCC38\uACE0 \uC6D0\uBB38 \uBD80\uB85D" : ""}\uC744 \uB2F4\uC558\uC2B5\uB2C8\uB2E4. ${evidencePages.some((page) => page.wholeSource) ? "\uC6D0\uBCF8 \uD30C\uC77C" : "\uC804\uCCB4 \uC6D0\uBB38"}\xB7\uBCF5\uC0AC \uC774\uB825\uC740 JSON\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.${partial ? " \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uB0B4\uC6A9\uC774 \uC11E\uC77C \uC218 \uC788\uC5B4 \uC0DD\uB7B5\uD55C \uC6D0\uBB38 \uBC1C\uCDCC\uB3C4 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4." : ""}`, {}, { size: 20, color: "475569" }));
   children2.push(paragraph("\uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC740 \uD3C9\uBB38\uC785\uB2C8\uB2E4. \uACF5\uC720 \uC804 \uAC1C\uC778\uC815\uBCF4\xB7\uBE44\uBC00\uBC88\uD638\xB7\uC778\uC99D\uC815\uBCF4\uB97C \uC9C1\uC811 \uD655\uC778\uD558\uACE0 \uC81C\uAC70\uD558\uC138\uC694. \uC544\uB798 \uCD94\uCD9C \uACBD\uACE0\uC640 \uC2E4\uC81C \uC808\uCC28\uB294 \uC6D0\uBCF8\uACFC \uB300\uC870\uD558\uC138\uC694.", {}, { size: 20, color: "9A3412" }));
   if (!sources.length) children2.push(paragraph("\uD3EC\uD568\uB41C \uCD9C\uCC98 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   sources.forEach((source, index) => {
     children2.push(heading(`${index + 1}. ${source.name}`, HeadingLevel.HEADING_2));
     const linked = usedSources.has(source.id);
     const included = evidencePages.filter((page) => page.sourceId === source.id).map((page) => page.pageNumber).sort((a, b) => a - b);
-    children2.push(paragraph(source.pdf ? included.length ? `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD \uC911 ${included.join(", ")}\uCABD \uD3EC\uD568 \xB7 \uC6D0\uBCF8 PDF\uC640 \uB098\uBA38\uC9C0 \uCABD\uC740 JSON\uC5D0 \uBCF4\uAD00.` : `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD\uC778 \uBCF4\uAD00 PDF\uC785\uB2C8\uB2E4. \uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544 \uC774 DOCX\uC5D0\uB294 \uD398\uC774\uC9C0\uB97C \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.` : `\uCD9C\uCC98 \uC774\uB984\uACFC \uD655\uC778 \uACBD\uACE0\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uBC1C\uCDCC\uB294 JSON\uC5D0 \uBCF4\uAD00.${linked ? "" : " \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}`));
+    const whole = evidencePages.some((page) => page.sourceId === source.id && page.wholeSource);
+    children2.push(paragraph(source.pdf ? included.length ? whole ? `\uC6D0\uBB38 \uC804\uCCB4 ${source.pdf.pageCount}\uCABD\uC744 \uCC38\uACE0 \uBD80\uB85D\uC5D0 \uD55C \uBC88\uC529 \uD3EC\uD568\uD588\uC2B5\uB2C8\uB2E4. \uC5C5\uBB34\uBCC4 \uCABD \uC5F0\uACB0\uC744 \uC0C8\uB85C \uD655\uC815\uD55C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4. \uC6D0\uBCF8 PDF\uB294 JSON\uC5D0 \uBCF4\uAD00\uD569\uB2C8\uB2E4.` : `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD \uC911 ${included.join(", ")}\uCABD \uD3EC\uD568 \xB7 \uC6D0\uBCF8 PDF\uC640 \uB098\uBA38\uC9C0 \uCABD\uC740 JSON\uC5D0 \uBCF4\uAD00.` : `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD\uC778 \uBCF4\uAD00 PDF\uC785\uB2C8\uB2E4. \uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544 \uC774 DOCX\uC5D0\uB294 \uD398\uC774\uC9C0\uB97C \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.` : `\uCD9C\uCC98 \uC774\uB984\uACFC \uD655\uC778 \uACBD\uACE0\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uBC1C\uCDCC\uB294 JSON\uC5D0 \uBCF4\uAD00.${linked ? "" : " \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}`));
     children2.push(paragraph(source.warnings.length ? source.warnings.join("\n") : "\uAE30\uB85D\uB41C \uACBD\uACE0 \uC5C6\uC74C \xB7 \uC6D0\uBCF8\uACFC\uC758 \uC77C\uCE58\uAC00 \uBCF4\uC99D\uB41C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4."));
   });
   addEvidencePages(children2, evidencePages, tasks, numbers);
@@ -65804,6 +65826,21 @@ function storedOutputPages(doc, selection = {}) {
   }
   return Object.fromEntries(choices);
 }
+function fullSourceOutputPlan(doc, selection = {}) {
+  const plan = outputEvidencePlan(doc, selection);
+  const choices = [];
+  const wholeSourceIds = [];
+  let totalPages = 0;
+  for (const { source, records } of plan) {
+    const whole = records.some((record) => record.state === "unconfirmed");
+    const pages = whole ? parseEvidencePages(`1-${source.pdf.pageCount}`, source.pdf.pageCount) : [...new Set(records.flatMap((record) => record.pages))].sort((a, b) => a - b);
+    totalPages += pages.length;
+    check5(totalPages <= OUTPUT_EVIDENCE_LIMITS.pages, "\uC6D0\uBB38\uACFC \uADFC\uAC70 \uCABD\uC740 \uD55C \uBC88\uC5D0 \uCD1D 20\uCABD\uAE4C\uC9C0 \uB123\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC6D0\uBB38\uC740 JSON\uC73C\uB85C \uC804\uB2EC\uD558\uAC70\uB098 \uD544\uC694\uD55C \uCABD\uC744 \uC9C1\uC811 \uC5F0\uACB0\uD574 \uC8FC\uC138\uC694.");
+    choices.push([source.id, pages.join(", ")]);
+    if (whole) wholeSourceIds.push(source.id);
+  }
+  return { pageChoices: Object.fromEntries(choices), wholeSourceIds, totalPages };
+}
 function parseEvidencePages(text, pageCount) {
   check5(Number.isInteger(pageCount) && pageCount >= 1 && pageCount <= 200, "PDF\uC758 \uCABD\uC218\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
   check5(typeof text === "string" && text.trim() && text.length <= 2e3, "\uD568\uAED8 \uB123\uC744 \uADFC\uAC70 \uCABD\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694. \uC608: 1, 3-4");
@@ -66059,6 +66096,7 @@ var fieldCount = 0;
 var dialogCount = 0;
 var openSections = /* @__PURE__ */ new Set();
 var readerContexts = /* @__PURE__ */ new Map();
+var wholeSourceChoices = /* @__PURE__ */ new Map();
 function readerContextKey(tab = state.readerTab) {
   return JSON.stringify([state.current, state.query, state.roleQuery, tab]);
 }
@@ -66821,7 +66859,8 @@ function taskEditor(task) {
     el("div", { class: "section-heading" }, el("h2", {}, "\uC5C5\uBB34\uBA85\uACFC \uD558\uB294 \uBC29\uBC95\uBD80\uD130"), tag2("\uB098\uBA38\uC9C0\uB294 \uC120\uD0DD", "green")),
     field2("\uC5C5\uBB34\uBA85", task.title, (v) => updateItem(task, "title", v), { placeholder: "\uC608: \uB9E4\uC6D4 \uC9C0\uCD9C \uC790\uB8CC \uC815\uB9AC", maxLength: 300 }),
     photos.decorate(field2("\uD558\uB294 \uBC29\uBC95", task.method, (v) => updateItem(task, "method", v), { type: "textarea", rows: 8, placeholder: "\uBB34\uC5C7\uC744 \uD558\uB294\uC9C0, \uC5B4\uB5BB\uAC8C \uD558\uB294\uC9C0 \uC544\uB294 \uB9CC\uD07C \uC801\uAC70\uB098 \uAE30\uC874 \uBA54\uBAA8\uB97C \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.", hint: "\uC785\uB825\uD55C \uB0B4\uC6A9\uC740 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB429\uB2C8\uB2E4. \uD45C\uB294 \uAE00\uC790\uB85C \uB0A8\uC73C\uB2C8 \uC5F4 \uBC30\uCE58\uB294 \uC6D0\uBB38\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694." }), { doc: current3(), task, section: "method" }),
-    disclosure(`action-${task.id}`, "\uCCAB \uD589\uB3D9\xB7\uADFC\uAC70 \uB367\uBD99\uC774\uAE30 (\uC120\uD0DD)", field2("\uCCAB \uD589\uB3D9 \uD55C \uC904", task.firstAction || "", (v) => updateItem(task, "firstAction", v), { type: "textarea", rows: 2, maxLength: 2e3, placeholder: "\uC9C1\uC811 \uD655\uC778\uD55C \uC2DC\uC791 \uD589\uB3D9\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694. \uBE44\uC6CC \uB450\uC5B4\uB3C4 \uC800\uC7A5\uB429\uB2C8\uB2E4." }), button2("\uC774 \uC5C5\uBB34\uC5D0 PDF \uADFC\uAC70 \uC5F0\uACB0", () => attachPdfToTask(task), "secondary"), sourceInfo(task)),
+    sourceInfo(task),
+    disclosure(`action-${task.id}`, "\uCCAB \uD589\uB3D9\xB7\uADFC\uAC70 \uB367\uBD99\uC774\uAE30 (\uC120\uD0DD)", field2("\uCCAB \uD589\uB3D9 \uD55C \uC904", task.firstAction || "", (v) => updateItem(task, "firstAction", v), { type: "textarea", rows: 2, maxLength: 2e3, placeholder: "\uC9C1\uC811 \uD655\uC778\uD55C \uC2DC\uC791 \uD589\uB3D9\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694. \uBE44\uC6CC \uB450\uC5B4\uB3C4 \uC800\uC7A5\uB429\uB2C8\uB2E4." }), button2("\uC774 \uC5C5\uBB34\uC5D0 PDF \uADFC\uAC70 \uC5F0\uACB0", () => attachPdfToTask(task), "secondary")),
     disclosure(`timing-${task.id}`, "\uC5B8\uC81C \uD558\uB294 \uC5C5\uBB34\uC778\uAC00\uC694? (\uC120\uD0DD)", timingEditor(task)),
     disclosure(`group-${task.id}`, "\uD070 \uC5C5\uBB34\uBCC4\uB85C \uBB36\uAE30 (\uC120\uD0DD)", select("\uD070 \uC5C5\uBB34 \uC601\uC5ED", task.groupId || "", [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...(current3().groups || []).map((g) => [g.id, g.title])], (v) => {
       task.groupId = v;
@@ -66910,15 +66949,15 @@ function legacyCaseNote(item) {
 function sourceInfo(item) {
   if (!item.sourceRefs?.length) return null;
   const sources = current3().sourceFiles.filter((s) => item.sourceRefs.includes(s.id));
-  return el("section", { class: "source-detail evidence-panel" }, el("h4", {}, "\uADFC\uAC70 \uD655\uC778"), sources.map((s) => el("div", { class: "source-item" }, el("strong", {}, s.name), s.pdf ? button2(`PDF \uC6D0\uBB38 \uBCF4\uAE30 \xB7 ${s.pdf.pageCount}\uCABD`, () => openPdfSource(s), "secondary") : note("\uC6D0\uB798 \uD30C\uC77C \uBAA8\uC591\uC740 \uC774 \uC804\uB2EC\uBCF8\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uCD94\uCD9C\uBB38\uACFC \uBCC4\uB3C4 \uC6D0\uBB38\uC744 \uB300\uC870\uD574 \uC8FC\uC138\uC694."), el("details", {}, el("summary", {}, "\uCD94\uCD9C\uBB38\xB7\uD655\uC778\uD560 \uACF3"), s.warnings?.map((w) => note(w, "warning-text")), s.excerpt ? el("pre", {}, s.excerpt) : note("\uCD94\uCD9C\uBB38 \uC5C6\uC74C \xB7 PDF \uCABD\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.")))));
+  return el("section", { class: "source-detail evidence-panel" }, el("h4", {}, "\uCC38\uACE0 \uC6D0\uBB38"), sources.map((s) => el("div", { class: "source-item" }, el("strong", {}, s.name), s.pdf ? button2(`PDF \uC6D0\uBB38 \uBCF4\uAE30 \xB7 ${s.pdf.pageCount}\uCABD`, () => openPdfSource(s, "\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30", item.sourcePages?.find((link) => link.sourceId === s.id)?.pages[0] || 1), "secondary") : note("\uC6D0\uB798 \uD30C\uC77C \uBAA8\uC591\uC740 \uC774 \uC804\uB2EC\uBCF8\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uCD94\uCD9C\uBB38\uACFC \uBCC4\uB3C4 \uC6D0\uBB38\uC744 \uB300\uC870\uD574 \uC8FC\uC138\uC694."), state.view === "author" && s.pdf ? button2("\uC774 \uC6D0\uBB38\uC73C\uB85C \uB2E4\uB978 \uC5C5\uBB34 \uC548\uB0B4", () => newSourceGuidance(s), "quiet") : null, el("details", {}, el("summary", {}, "\uCD94\uCD9C\uBB38\xB7\uD655\uC778\uD560 \uACF3"), s.warnings?.map((w) => note(w, "warning-text")), s.excerpt ? el("pre", {}, s.excerpt) : note("\uCD94\uCD9C\uBB38 \uC5C6\uC74C \xB7 PDF \uCABD\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.")))));
 }
-function openPdfSource(source, returnLabel = "\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30") {
+function openPdfSource(source, returnLabel = "\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30", initialPage = 1) {
   const viewer = el("div", { class: "pdf-evidence-host" });
   let dispose = () => {
   };
   const handle = modal(source.name, el("div", {}, note("JSON \uC548\uC758 PDF\uB97C \uAE30\uAE30\uC5D0\uC11C \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uC18D \uB9C1\uD06C\xB7\uC591\uC2DD\xB7\uC2A4\uD06C\uB9BD\uD2B8\uB294 \uC2E4\uD589\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), viewer), [(close) => button2(returnLabel, close, "primary")], { stack: true, navigation: true, onClose: () => dispose() });
   handle.dialog.classList.add("pdf-dialog");
-  Promise.resolve(createPdfEvidenceViewer(source.pdf, viewer, { isCurrent: () => handle.dialog.isConnected })).then((cleanup) => {
+  Promise.resolve(createPdfEvidenceViewer(source.pdf, viewer, { initialPage, isCurrent: () => handle.dialog.isConnected })).then((cleanup) => {
     if (cleanup) {
       dispose = typeof cleanup === "function" ? cleanup : () => cleanup.destroy?.();
       if (!handle.dialog.isConnected) dispose();
@@ -66926,6 +66965,38 @@ function openPdfSource(source, returnLabel = "\uC5C5\uBB34\uB85C \uB3CC\uC544\uA
   }).catch((error) => {
     if (handle.dialog.isConnected) viewer.replaceChildren(el("p", { class: "error", role: "alert" }, error.message));
   });
+}
+function newSourceGuidance(source) {
+  const doc = current3();
+  let title = "", method = "";
+  const body = el("div", {}, note(`${source.name} \uC6D0\uBB38\uC740 \uADF8\uB300\uB85C \uD568\uAED8 \uAC11\uB2C8\uB2E4. \uB2E4\uC2DC \uC62E\uACA8 \uC4F0\uC9C0 \uC54A\uACE0 \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uC801\uC73C\uC138\uC694.`), field2("\uC0C8 \uC5C5\uBB34\uBA85", "", (value) => title = value, { maxLength: 300, placeholder: "\uC608: \uC694\uCCAD\uC5D0 \uB2F5\uD558\uAE30 \uC804 \uC870\uAC74 \uD655\uC778" }), field2("\uB367\uBD99\uC77C \uC548\uB0B4 (\uC120\uD0DD)", "", (value) => method = value, { type: "textarea", rows: 4, placeholder: "\uC5B4\uB5A4 \uB54C \uC774 \uC790\uB8CC\uB97C \uBCF4\uBA74 \uB418\uB294\uC9C0, \uC9C0\uAE08 \uB2EC\uB77C\uC9C4 \uC810 \uB4F1" }));
+  modal("\uC6D0\uBB38\uC5D0 \uC9E7\uC740 \uC548\uB0B4 \uCD94\uAC00", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC548\uB0B4 \uCD94\uAC00", () => {
+    if (!title.trim()) {
+      notice("\uCC3E\uC544\uBCFC \uC218 \uC788\uB3C4\uB85D \uC5C5\uBB34\uBA85\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694.");
+      return;
+    }
+    if (current3() !== doc || !doc.sourceFiles.includes(source)) {
+      notice("\uBB38\uC11C\uAC00 \uBC14\uB00C\uC5B4 \uCD94\uAC00\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uBB38\uC11C\uC5D0\uC11C \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694.");
+      return;
+    }
+    const task = createTask({ title, method, sourceRefs: [source.id] }), candidate = structuredClone(doc);
+    candidate.schemaVersion = CURRENT_SCHEMA_VERSION;
+    candidate.tasks.push(task);
+    const checked = validateDocument(candidate);
+    if (!checked.ok) {
+      notice(checked.errors.join(" / "));
+      return;
+    }
+    doc.tasks.push(task);
+    state.selected = task.id;
+    state.authorSection = "tasks";
+    state.view = "author";
+    state.authorQuery = "";
+    saved();
+    close();
+    render();
+    notice("\uC6D0\uBB38\uC740 \uD55C \uBC88\uB9CC \uBCF4\uAD00\uD558\uACE0 \uC0C8 \uC548\uB0B4\uC5D0\uC11C \uD568\uAED8 \uBD05\uB2C8\uB2E4.");
+  }, "primary")]);
 }
 function attachPdfToTask(task) {
   const doc = current3();
@@ -66938,6 +67009,26 @@ function attachPdfToTask(task) {
     body.querySelector("input[type=checkbox]").checked = false;
     result.textContent = file ? file.name : "";
   } }), check6("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), result);
+  const stored = doc.sourceFiles.filter((source) => source.pdf && !task.sourceRefs.includes(source.id));
+  if (stored.length) body.prepend(el("section", { class: "stored-source-picker" }, el("h3", {}, "\uC774\uBBF8 \uB2F4\uAE34 \uC6D0\uBB38 \uC0AC\uC6A9"), note("\uB2E4\uC2DC \uD30C\uC77C\uC744 \uACE0\uB974\uAC70\uB098 \uB0B4\uC6A9\uC744 \uC62E\uAE38 \uD544\uC694\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."), stored.map((source) => button2(source.name, () => {
+    if (current3() !== doc || !doc.tasks.includes(task) || !doc.sourceFiles.includes(source)) {
+      result.textContent = "\uBB38\uC11C\uAC00 \uBC14\uB00C\uC5B4 \uD604\uC7AC \uB0B4\uC6A9\uC744 \uC720\uC9C0\uD588\uC2B5\uB2C8\uB2E4.";
+      return;
+    }
+    const candidate = structuredClone(doc);
+    candidate.schemaVersion = CURRENT_SCHEMA_VERSION;
+    candidate.tasks.find((item) => item.id === task.id).sourceRefs.push(source.id);
+    const checked = validateDocument(candidate);
+    if (!checked.ok) {
+      result.textContent = checked.errors.join(" / ");
+      return;
+    }
+    task.sourceRefs.push(source.id);
+    saved();
+    handle.close();
+    render();
+    notice("\uC774\uBBF8 \uB2F4\uAE34 \uC6D0\uBB38\uC744 \uC5F0\uACB0\uD588\uC2B5\uB2C8\uB2E4. \uCABD \uAD00\uACC4\uB294 \uCD94\uCE21\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+  }, "secondary"))));
   const handle = modal("PDF \uADFC\uAC70 \uC5F0\uACB0", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uAC80\uD1A0\uD55C PDF \uC5F0\uACB0", async (e) => {
     if (busy) return;
     if (!file || !reviewed) {
@@ -67154,7 +67245,9 @@ function taskContent(task, date) {
   if (!instructions.some((p) => p.key === "steps")) content.append(...[photos.gallery(task, "steps")].filter(Boolean));
   if (!instructions.length) content.append(note("\uC2E4\uD589 \uC548\uB0B4\uAC00 \uC544\uC9C1 \uC5C6\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0\uB41C \uC6D0\uBB38\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694."));
   if (task.doneWhen) content.append(readBlock("\uC5EC\uAE30\uAE4C\uC9C0 \uD558\uBA74 \uC774 \uAC74\uC758 \uCC98\uB9AC\uAC00 \uB05D\uB0A9\uB2C8\uB2E4", task.doneWhen));
-  content.append(...[sourceInfo(task), el("details", { class: "task-background" }, el("summary", {}, "\uB2F4\uB2F9\xB7\uC900\uBE44\uC790\uB8CC\xB7\uC790\uC138\uD55C \uC124\uBA85"), [["\uC8FC\uB2F4\uB2F9 \uC5ED\uD560", "ownerRole"], ["\uC9C0\uC6D0 \uC5ED\uD560", "supportRole"], ["\uBAA9\uC801", "purpose"], ["\uC900\uBE44\uC790\uB8CC", "materials"], ["\uBB38\uC758\uD560 \uC5ED\uD560", "contacts"], ["\uADFC\uAC70 \uBA54\uBAA8", "evidence"]].map(([label, key]) => task[key] ? readBlock(label, task[key]) : null), note("\uC790\uB8CC \uC811\uADFC: " + (task.accessStatus === "confirmed" || !task.accessStatus && task.accessChecked ? "\uD655\uC778\uB428" : task.accessStatus === "notApplicable" ? "\uD574\uB2F9 \uC5C6\uC74C" : "\uD655\uC778 \uD544\uC694")), task.verifiedAt ? note("\uCD5C\uC885 \uD655\uC778\uC77C " + task.verifiedAt) : null)].filter(Boolean));
+  const sourcePanel = sourceInfo(task);
+  if (sourcePanel) content.append(sourcePanel);
+  content.append(...[el("details", { class: "task-background" }, el("summary", {}, "\uB2F4\uB2F9\xB7\uC900\uBE44\uC790\uB8CC\xB7\uC790\uC138\uD55C \uC124\uBA85"), [["\uC8FC\uB2F4\uB2F9 \uC5ED\uD560", "ownerRole"], ["\uC9C0\uC6D0 \uC5ED\uD560", "supportRole"], ["\uBAA9\uC801", "purpose"], ["\uC900\uBE44\uC790\uB8CC", "materials"], ["\uBB38\uC758\uD560 \uC5ED\uD560", "contacts"], ["\uADFC\uAC70 \uBA54\uBAA8", "evidence"]].map(([label, key]) => task[key] ? readBlock(label, task[key]) : null), note("\uC790\uB8CC \uC811\uADFC: " + (task.accessStatus === "confirmed" || !task.accessStatus && task.accessChecked ? "\uD655\uC778\uB428" : task.accessStatus === "notApplicable" ? "\uD574\uB2F9 \uC5C6\uC74C" : "\uD655\uC778 \uD544\uC694")), task.verifiedAt ? note("\uCD5C\uC885 \uD655\uC778\uC77C " + task.verifiedAt) : null)].filter(Boolean));
   return content;
 }
 function taskCard(task, date) {
@@ -67250,9 +67343,9 @@ function documentImport() {
   const body = el(
     "div",
     {},
-    el("div", { class: "support-grid" }, el("div", {}, el("strong", {}, "\uBCF8\uBB38 \uCD94\uCD9C \uD6C4 \uAC80\uD1A0"), el("p", {}, "DOCX \xB7 PPTX \xB7 HWPX \xB7 \uD14D\uC2A4\uD2B8 PDF")), el("div", {}, el("strong", {}, "\uBCC4\uB3C4 \uBCC0\uD658 \uB610\uB294 \uBD99\uC5EC\uB123\uAE30"), el("p", {}, "HWP \xB7 \uC2A4\uCE94 PDF \xB7 \uC774\uBBF8\uC9C0 \uC548\uC758 \uAE00"))),
-    note("\uC6D0\uBCF8 \uD30C\uC77C\uC744 \uBC14\uAFB8\uC9C0 \uC54A\uACE0 \uAE30\uAE30 \uC548\uC5D0\uC11C \uC77D\uC2B5\uB2C8\uB2E4. \uC11C\uC2DD\uACFC \uC77D\uB294 \uC21C\uC11C\uB294 \uB2EC\uB77C\uC9C8 \uC218 \uC788\uC5B4 \uC6D0\uBB38 \uB300\uC870\uAC00 \uD544\uC694\uD574\uC694. \uCD5C\uB300 20 MiB."),
-    note("\uBCF8\uBB38\uC744 \uAC00\uC838\uC624\uB294 \uAE30\uB2A5\uC785\uB2C8\uB2E4. DOCX\xB7PPTX\xB7HWPX\uB294 \uBCF8\uBB38 \uCD94\uCD9C \uCD08\uC548\uC785\uB2C8\uB2E4. \uC0AC\uC9C4\xB7\uD45C \uBAA8\uC591\uC774 \uBCF4\uC874\uB418\uC5C8\uB2E4\uACE0 \uBCFC \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. PDF\uB294 \uAC80\uD1A0\uD55C \uC6D0\uB798 \uD398\uC774\uC9C0\uB97C \uD55C \uC5C5\uBB34\uC758 \uADFC\uAC70\uB85C \uB2F4\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.", "warning-text"),
+    el("div", { class: "callout" }, el("strong", {}, "\uC6D0\uB798 \uBB38\uC11C\uAC00 \uC788\uC73C\uBA74 PDF \uADF8\uB300\uB85C \uC2DC\uC791\uD558\uC138\uC694"), el("p", {}, "\uD45C\xB7\uC0AC\uC9C4\xB7\uD398\uC774\uC9C0\uB97C \uB2E4\uC2DC \uC870\uB9BD\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC744 \uACE0\uB974\uACE0 \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uB367\uBD99\uC774\uBA74 JSON \uD55C \uD30C\uC77C\uB85C \uC804\uB2EC\uB429\uB2C8\uB2E4. \uC5C5\uBB34\uBCC4 \uCABD \uBC88\uD638\uB294 \uD544\uC218\uAC00 \uC544\uB2D9\uB2C8\uB2E4.")),
+    note("PDF\uB294 10 MiB\xB7200\uCABD\uAE4C\uC9C0 \uC6D0\uBB38 \uC804\uCCB4\uB97C \uBCF4\uAD00\uD569\uB2C8\uB2E4. \uC6D0\uBCF8\uC744 \uBC14\uAFB8\uAC70\uB098 \uC11C\uBC84\uB85C \uBCF4\uB0B4\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."),
+    el("details", {}, el("summary", {}, "\uB2E4\uB978 \uD615\uC2DD\uACFC \uAC00\uC838\uC624\uAE30 \uD55C\uACC4"), note("DOCX\xB7PPTX\xB7HWPX\uB294 \uCD5C\uB300 20 MiB\uC758 \uAE00 \uCD94\uCD9C \uCD08\uC548\uC774\uBA70 \uC6D0\uB798 \uD30C\uC77C \uC804\uCCB4\xB7\uC0AC\uC9C4\xB7\uD45C \uBC30\uCE58\uB97C \uBCF4\uC874\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC6D0\uBB38 \uBAA8\uC2B5\uC774 \uD544\uC694\uD558\uBA74 \uC6D0\uB798 \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C PDF\uB85C \uC800\uC7A5\uD55C \uD30C\uC77C\uC744 \uC0AC\uC6A9\uD558\uC138\uC694. HWP\uB294 \uC9C1\uC811 \uC77D\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. PDF\xB7\uC0AC\uC9C4 \uC18D \uAE00\uC758 OCR\uC774\uB098 \uC790\uB3D9 \uAC80\uC0C9\uC740 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.", "warning-text")),
     field2("\uAE30\uC874 \uBB38\uC11C \uC120\uD0DD", "", () => {
     }, { type: "file", accept: ".docx,.pptx,.hwpx,.pdf,.hwp", maxLength: null, onchange: async (e) => {
       const file = e.target.files?.[0];
@@ -67291,8 +67384,8 @@ function startWithPdf(file, targetId) {
   const target = targetId ? state.documents.find((d) => d.id === targetId) : null;
   let title = file.name.replace(/\.pdf$/i, ""), method = "", reviewed = false, busy = false;
   const result = el("p", { class: "helper", role: "status" });
-  const body = el("div", {}, note("PDF \uC804\uCCB4\uB97C \uC5C5\uBB34 \uC5EC\uB7EC \uAC1C\uB85C \uC790\uB3D9 \uD655\uC815\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uC5C5\uBB34 \uD558\uB098\uC758 \uADFC\uAC70\uB85C \uC5F0\uACB0\uD558\uACE0 \uC6D0\uB798 \uD398\uC774\uC9C0\uB97C \uBCF4\uBA70 \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uB367\uBD99\uC774\uC138\uC694."), field2("\uC5C5\uBB34\uBA85", title, (v) => title = v, { maxLength: 300 }), field2("\uC544\uB294 \uB0B4\uC6A9 (\uC120\uD0DD)", method, (v) => method = v, { type: "textarea", rows: 4 }), check6("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), note("PDF 10 MiB\xB7200\uCABD, \uC804\uCCB4 JSON 24 MiB\uAE4C\uC9C0. \uC6D0\uBCF8 \uD30C\uC77C\uC740 \uBC14\uAFB8\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC758 \uCD5C\uC2E0\uC131\uC774\uB098 \uACF5\uC720 \uAD8C\uD55C\uC744 \uC790\uB3D9\uC73C\uB85C \uD310\uB2E8\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), result);
-  const handle = modal("PDF \uADFC\uAC70\uB85C \uC2DC\uC791", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC5C5\uBB34 \uD558\uB098\uB85C \uC5F0\uACB0", async (e) => {
+  const body = el("div", {}, note("\uC6D0\uBB38 PDF\uB97C \uADF8\uB300\uB85C \uC804\uB2EC\uD569\uB2C8\uB2E4. \uC5C5\uBB34\uBCC4\uB85C \uB2E4\uC2DC \uC791\uC131\uD558\uC9C0 \uC54A\uC544\uB3C4 \uB429\uB2C8\uB2E4. \uCC3E\uAE30 \uC26C\uC6B4 \uC81C\uBAA9\uACFC \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uB0A8\uAE30\uC138\uC694."), field2("\uC5C5\uBB34\uBA85", title, (v) => title = v, { maxLength: 300 }), field2("\uB367\uBD99\uC77C \uC548\uB0B4 (\uC120\uD0DD)", method, (v) => method = v, { type: "textarea", rows: 4 }), check6("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), note("PDF 10 MiB\xB7200\uCABD, \uC804\uCCB4 JSON 24 MiB\uAE4C\uC9C0. \uC6D0\uBCF8 \uD30C\uC77C\uC740 \uBC14\uAFB8\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC758 \uCD5C\uC2E0\uC131\uC774\uB098 \uACF5\uC720 \uAD8C\uD55C\uC744 \uC790\uB3D9\uC73C\uB85C \uD310\uB2E8\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), result);
+  const handle = modal("\uC6D0\uBB38 \uADF8\uB300\uB85C \uC2DC\uC791", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC6D0\uBB38\uACFC \uC548\uB0B4\uB85C \uC2DC\uC791", async (e) => {
     if (busy) return;
     if (!reviewed) {
       result.textContent = "\uC804\uB2EC \uAC00\uB2A5\uD55C \uBC94\uC704\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.";
@@ -67316,7 +67409,7 @@ function startWithPdf(file, targetId) {
         saved();
         render();
       } else activate(candidate, "author");
-      notice("PDF\uB97C \uD55C \uC5C5\uBB34\uC758 \uADFC\uAC70\uB85C \uBCF4\uAD00\uD588\uC2B5\uB2C8\uB2E4. \uC6D0\uBB38\uACFC \uCCAB \uD589\uB3D9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      notice("\uC6D0\uBB38\uC744 \uADF8\uB300\uB85C \uBCF4\uAD00\uD588\uC2B5\uB2C8\uB2E4. \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uB354\uD558\uACE0 \uD30C\uC77C\uB85C \uC804\uB2EC\uD558\uC138\uC694.");
     } catch (error) {
       result.textContent = error.message;
     } finally {
@@ -67327,9 +67420,38 @@ function startWithPdf(file, targetId) {
 }
 function pasteImport() {
   const targetId = state.view === "home" ? null : state.current;
-  let text = "";
-  const body = el("div", {}, note("\uBA54\uBAA8\uB098 \uAE30\uC874 \uBB38\uC11C\uC758 \uAE00\uC744 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694. \uBE48 \uC904\uC744 \uAE30\uC900\uC73C\uB85C \uCD08\uC548\uC744 \uB098\uB204\uACE0, \uB2E4\uC74C \uD654\uBA74\uC5D0\uC11C \uD569\uCE58\uAC70\uB098 \uB2E4\uC2DC \uB098\uB20C \uC218 \uC788\uC5B4\uC694."), field2("\uBD99\uC5EC\uB123\uC744 \uB0B4\uC6A9", "", (v) => text = v, { type: "textarea", rows: 12, maxLength: 1e6, placeholder: "\uC5C5\uBB34 \uC81C\uBAA9\n\uD558\uB294 \uBC29\uBC95\u2026\n\n\uB2E4\uC74C \uC5C5\uBB34 \uC81C\uBAA9\n\uD558\uB294 \uBC29\uBC95\u2026" }));
-  modal("\uBA54\uBAA8 \uBD99\uC5EC\uB123\uAE30", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uCD08\uC548 \uAC80\uD1A0", () => {
+  let text = "", title = "";
+  const body = el("div", {}, note("\uBA54\uBAA8\uB97C \uC21C\uC11C \uADF8\uB300\uB85C \uD55C \uC5C5\uBB34\uB85C \uC804\uB2EC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC5EC\uB7EC \uC5C5\uBB34\uB85C \uB098\uB204\uAE30\uB294 \uD544\uC694\uD560 \uB54C\uB9CC \uC120\uD0DD\uD558\uC138\uC694."), field2("\uBA54\uBAA8 \uC81C\uBAA9 (\uC120\uD0DD)", "", (value) => title = value, { maxLength: 300, placeholder: "\uBE44\uC6CC \uB450\uBA74 \uCCAB \uC904\uC744 \uC81C\uBAA9\uC73C\uB85C \uC501\uB2C8\uB2E4." }), field2("\uBD99\uC5EC\uB123\uC744 \uB0B4\uC6A9", "", (v) => text = v, { type: "textarea", rows: 12, maxLength: 1e6, placeholder: "\uC5C5\uBB34 \uC81C\uBAA9\n\uD558\uB294 \uBC29\uBC95\u2026\n\n\uB2E4\uC74C \uC5C5\uBB34 \uC81C\uBAA9\n\uD558\uB294 \uBC29\uBC95\u2026" }));
+  modal("\uBA54\uBAA8 \uBD99\uC5EC\uB123\uAE30", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC774\uB300\uB85C \uD55C \uC5C5\uBB34\uB85C \uCD94\uAC00", () => {
+    if (!text.trim()) {
+      notice("\uBA3C\uC800 \uB0B4\uC6A9\uC744 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.");
+      return;
+    }
+    const target = targetId ? state.documents.find((doc2) => doc2.id === targetId) : null;
+    if (targetId && (!target || current3() !== target)) {
+      notice("\uBB38\uC11C\uAC00 \uBC14\uB00C\uC5B4 \uD604\uC7AC \uB0B4\uC6A9\uC744 \uC720\uC9C0\uD588\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
+    const task = createTask({ title: title.trim() || text.trim().split(/\r?\n/)[0].slice(0, 300), method: text }), doc = target ? structuredClone(target) : createDocument({ title: title.trim() || "\uBA54\uBAA8 \uC778\uC218\uC778\uACC4" });
+    doc.tasks.push(task);
+    doc.schemaVersion = CURRENT_SCHEMA_VERSION;
+    const checked = validateDocument(doc);
+    if (!checked.ok) {
+      notice("\uBA54\uBAA8\uB97C \uCD94\uAC00\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. " + checked.errors.slice(0, 2).join(" "));
+      return;
+    }
+    close();
+    if (target) {
+      state.documents[state.documents.indexOf(target)] = doc;
+      state.current = doc.id;
+      state.selected = task.id;
+      state.authorSection = "tasks";
+      state.authorQuery = "";
+      saved();
+      render();
+    } else activate(doc);
+    notice("\uBE48 \uC904\uACFC \uB0B4\uC6A9 \uC21C\uC11C\uB97C \uADF8\uB300\uB85C \uBCF4\uAD00\uD588\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uB85C \uC800\uC7A5\uD574 \uC804\uB2EC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+  }, "primary"), (close) => button2("\uCD08\uC548 \uAC80\uD1A0", () => {
     if (!text.trim()) {
       notice("\uBA3C\uC800 \uB0B4\uC6A9\uC744 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.");
       return;
@@ -67337,7 +67459,7 @@ function pasteImport() {
     const blocks = text.split(/\n\s*\n/).filter((s) => s.trim()).map((s, i2) => ({ id: makeId(), text: s, source: `\uBD99\uC5EC\uB123\uAE30 ${i2 + 1}`, kind: "paragraph" }));
     close();
     reviewBlocks({ format: "text", blocks, warnings: ["\uC11C\uC2DD\xB7\uC774\uBBF8\uC9C0\xB7\uC6D0\uB798 \uBB38\uC11C\uC758 \uD45C \uAD6C\uC870\uB294 \uBD99\uC5EC\uB123\uC740 \uD14D\uC2A4\uD2B8\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4."] }, "\uBD99\uC5EC\uB123\uC740 \uBA54\uBAA8", targetId);
-  }, "primary")]);
+  }, "quiet")]);
 }
 function reviewBlocks(result, name, targetId) {
   const targetDoc = () => state.documents.find((d) => d.id === targetId);
@@ -67496,11 +67618,65 @@ function exportSelection(doc) {
   selection.caseIds = selection.caseIds.filter((id) => doc.cases.some((c) => c.id === id));
   return selection;
 }
-async function requestOutput(doc, selection, deliver, review = false) {
+async function requestOutput(doc, selection, deliver, review = false, pageOnly = false) {
   const generation = editGeneration, snapshot = structuredClone(doc), options = structuredClone(selection), sources = linkedPdfSources(snapshot, options);
   const items = [...snapshot.tasks.filter((t) => !options.taskIds || options.taskIds.includes(t.id)), ...snapshot.cases.filter((c) => !options.caseIds || options.caseIds.includes(c.id))];
   const records = items.flatMap((item) => sources.filter((source) => item.sourceRefs.includes(source.id) && source.pdf.pageCount > 1).map((source) => ({ item, source, value: (item.sourcePages?.find((link) => link.sourceId === source.id)?.pages || []).join(", ") })));
   const pending = records.filter((record) => review || !record.value);
+  if (pending.length && !review && !pageOnly) {
+    let plan = null, planError = "";
+    try {
+      plan = fullSourceOutputPlan(snapshot, options);
+    } catch (error) {
+      planError = error.message;
+    }
+    const remembered = wholeSourceChoices.get(doc.id) || /* @__PURE__ */ new Map();
+    const ready = plan && plan.wholeSourceIds.every((id) => {
+      const pdf = sources.find((source) => source.id === id).pdf, last = remembered.get(id);
+      return last?.data === pdf.data && last?.pageCount === pdf.pageCount;
+    });
+    const produce = async (isCurrent) => {
+      const evidencePages = await prepareOutputEvidence(snapshot, options, plan.pageChoices, { dom: document, isCurrent });
+      if (!isCurrent()) throw new Error("\uBB38\uC11C\uAC00 \uBC14\uB00C\uC5B4 \uCD9C\uB825\uC744 \uBA48\uCDC4\uC2B5\uB2C8\uB2E4.");
+      await deliver(snapshot, { ...options, evidencePages, wholeSourceIds: plan.wholeSourceIds });
+      plan.wholeSourceIds.forEach((id) => {
+        const pdf = sources.find((source) => source.id === id).pdf;
+        remembered.set(id, { data: pdf.data, pageCount: pdf.pageCount });
+      });
+      wholeSourceChoices.set(doc.id, remembered);
+    };
+    if (ready) {
+      await produce(() => editGeneration === generation && current3()?.id === doc.id && current3()?.updatedAt === snapshot.updatedAt);
+      return;
+    }
+    const status2 = el("p", { role: "status", class: "helper" });
+    const whole = plan ? plan.wholeSourceIds.map((id) => sources.find((source) => source.id === id)) : sources.filter((source) => pending.some((record) => record.source.id === source.id));
+    const body2 = el("div", {}, note("\uC5C5\uBB34\uBCC4 \uCABD\uC744 \uC815\uD558\uC9C0 \uC54A\uC544\uB3C4 \uC6D0\uBB38\uC744 \uD55C \uBC88\uC529 \uBD80\uB85D\uC5D0 \uB123\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC2E4\uD589 \uC548\uB0B4\uAC00 \uBA3C\uC800, \uC6D0\uBB38\uC740 \uB4A4\uC5D0 \uB098\uC635\uB2C8\uB2E4."), el("ul", {}, whole.map((source) => el("li", {}, `${source.name} \xB7 \uC6D0\uBB38 \uC804\uCCB4 ${source.pdf.pageCount}\uCABD`, button2("\uC6D0\uBB38 \uD655\uC778", () => openPdfSource(source, "\uCD9C\uB825 \uC120\uD0DD\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30"), "quiet")))), note("\uC120\uD0DD\uD55C \uC5C5\uBB34\uC640 \uAD00\uACC4\uC5C6\uB294 \uCABD\uB3C4 \uD568\uAED8 \uB4E4\uC5B4\uAC08 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uBAA8\uB4E0 \uCABD\uC744 \uAC01 \uC5C5\uBB34\uC758 \uD655\uC815 \uADFC\uAC70\uB85C \uC5F0\uACB0\uD558\uAC70\uB098 \uC800\uC7A5\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), plan ? note(`\uC6D0\uBB38 \uC774\uBBF8\uC9C0\uB294 \uD569\uACC4 ${plan.totalPages}\uCABD\uC785\uB2C8\uB2E4. \uC0AC\uC9C4\uACFC \uC2E4\uD589 \uC548\uB0B4 \uCABD\uC740 \uBCC4\uB3C4\uC785\uB2C8\uB2E4. \uAC19\uC740 \uC6D0\uBB38\uC740 \uD55C \uBC88\uB9CC \uB123\uC2B5\uB2C8\uB2E4. \uC774 \uC120\uD0DD\uC740 \uC0C8\uB85C\uACE0\uCE68 \uC804\uAE4C\uC9C0 \uC7AC\uC0AC\uC6A9\uD569\uB2C8\uB2E4.`) : note(planError + " \uCABD \uC120\uD0DD \uC5C6\uC774 \uC804\uB2EC\uD558\uB824\uBA74 JSON\uC744 \uC0AC\uC6A9\uD558\uC138\uC694. \uC6D0\uBB38 \uC804\uCCB4\uAC00 \uC774\uBBF8 \uD568\uAED8 \uB2F4\uAE41\uB2C8\uB2E4.", "warning-text"), status2);
+    let busy2 = false;
+    const actions = [(close) => button2("\uCDE8\uC18C", close)];
+    if (plan) actions.push((close) => button2(`\uC6D0\uBB38 ${plan.totalPages}\uCABD\uC744 \uBD80\uB85D\uC73C\uB85C \uD568\uAED8`, async (e) => {
+      if (busy2) return;
+      busy2 = true;
+      e.currentTarget.disabled = true;
+      status2.textContent = "\uC6D0\uBB38\uC744 \uC900\uBE44\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4\u2026";
+      try {
+        await produce(() => handle2.dialog.isConnected && editGeneration === generation && current3()?.id === doc.id && current3()?.updatedAt === snapshot.updatedAt);
+        close();
+      } catch (error) {
+        status2.setAttribute("role", "alert");
+        status2.textContent = "\uCD9C\uB825\uC744 \uC644\uB8CC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. " + error.message;
+      } finally {
+        busy2 = false;
+        e.currentTarget.disabled = false;
+      }
+    }, "primary"));
+    actions.push((close) => button2("\uD544\uC694\uD55C \uCABD\uB9CC \uC9C1\uC811 \uC5F0\uACB0", () => {
+      close();
+      void requestOutput(doc, selection, deliver, false, true).catch((error) => notice(error.message));
+    }, "secondary"));
+    const handle2 = modal("\uC6D0\uBB38\uC744 \uD568\uAED8 \uC804\uB2EC\uD560\uAE4C\uC694?", body2, actions);
+    return;
+  }
   if (!pending.length) {
     if (review) {
       notice("\uC5F0\uACB0\uB41C PDF\uB294 \uD55C \uCABD\uC774\uAC70\uB098 \uC5C6\uC2B5\uB2C8\uB2E4. \uBCC4\uB3C4 \uCABD \uC120\uD0DD \uC5C6\uC774 \uD568\uAED8 \uCD9C\uB825\uB429\uB2C8\uB2E4.");
@@ -67611,7 +67787,7 @@ function exportView() {
     "div",
     { class: "delivery-actions" },
     el("div", { class: "callout" }, el("h3", {}, "\uB2E4\uC74C \uB2F4\uB2F9\uC790\uC5D0\uAC8C \uC804\uB2EC\uD558\uAE30"), el("p", {}, "\uC774 \uC571\uC5D0\uC11C \uB2E4\uC2DC \uC5F4\uACE0 \uACE0\uCE60 \uC218 \uC788\uB294 \uD30C\uC77C\uC785\uB2C8\uB2E4. \uBC31\uC5C5\uD560 \uB54C\uB3C4 \uC0AC\uC6A9\uD558\uC138\uC694."), button2("\uC804\uB2EC\xB7\uBC31\uC5C5 \uD30C\uC77C \uBC1B\uAE30 (.json)", backup, "primary"), note("\uBAA8\uB4E0 \uC5C5\uBB34\xB7\uC0AC\uC9C4\xB7\uC9C4\uD589 \uAC74\uACFC \uD604\uC7AC \uB2F4\uAE34 \uCD9C\uCC98 \uC6D0\uBB38\xB7PDF \uADFC\uAC70\uAC00 \uB2E8\uC77C JSON\uC5D0 \uD3EC\uD568\uB429\uB2C8\uB2E4. \uD3EC\uD568\uD558\uC9C0 \uC54A\uC740 \uC6D0\uBCF8 \uC804\uCCB4\uAE4C\uC9C0 \uBCF4\uC874\uD55C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4. \uC774\uC804 \uAC1C\uC778 \uC218\uD589 \uCCB4\uD06C\uB294 \uBCC4\uB3C4\uC785\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC73C\uBBC0\uB85C \uBBFC\uAC10\uD55C \uB0B4\uC6A9\uC774 \uC5C6\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694.", "warning-text")),
-    el("div", { class: "callout" }, el("h3", {}, "\uC81C\uCD9C\uD558\uAC70\uB098 \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uAE30"), el("p", {}, "\uC5C5\uBB34\uC9C0\uB3C4\xB7\uC2E4\uD589 \uC548\uB0B4\xB7\uC0AC\uC9C4\uC744 \uBC1B\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0\uB41C PDF\uC758 \uD655\uC778\uD55C \uADFC\uAC70 \uCABD\uC744 \uD568\uAED8 \uB123\uC2B5\uB2C8\uB2E4."), button2("\uC5C5\uBB34 \uC548\uB0B4 \uC804\uCCB4 \uBC1B\uAE30 (.docx)", async () => {
+    el("div", { class: "callout" }, el("h3", {}, "\uC81C\uCD9C\uD558\uAC70\uB098 \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uAE30"), el("p", {}, "\uC5C5\uBB34\uC9C0\uB3C4\xB7\uC2E4\uD589 \uC548\uB0B4\xB7\uC0AC\uC9C4\uC744 \uBC1B\uC2B5\uB2C8\uB2E4. \uD655\uC778\uD55C \uADFC\uAC70 \uCABD\uC744 \uC7AC\uC0AC\uC6A9\uD558\uAC70\uB098, \uC6D0\uBB38\uC744 \uD55C \uBC88\uC529 \uBD80\uB85D\uC73C\uB85C \uD568\uAED8 \uB123\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), button2("\uC5C5\uBB34 \uC548\uB0B4 \uC804\uCCB4 \uBC1B\uAE30 (.docx)", async () => {
       try {
         await requestOutput(doc, {}, async (snapshot, options) => download(await exportDocx(snapshot, options), `${safeName(snapshot.title)}-\uC804\uCCB4.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
       } catch (error) {
@@ -67733,7 +67909,7 @@ function aiPreview(selection, options, initialPurpose = "write") {
 function printView() {
   const doc = state.printDocument || current3(), selection = state.printSelection || { taskIds: doc.tasks.map((t) => t.id), caseIds: doc.cases.map((c) => c.id) };
   const tasks = doc.tasks.filter((t) => selection.taskIds.includes(t.id)), cases = doc.cases.filter((c) => selection.caseIds.includes(c.id));
-  const sheet = el("section", { class: "print-sheet" }, el("div", { class: "actions no-print" }, button2("\uB0B4\uBCF4\uB0B4\uAE30\uB85C \uB3CC\uC544\uAC00\uAE30", () => switchView("export")), button2("\uC778\uC1C4 / PDF \uC800\uC7A5", () => window.print(), "primary")), el("header", { class: "print-heading" }, el("p", { class: "eyebrow" }, "\uC778\uC218\uC778\uACC4 A to Z"), el("h2", {}, doc.title || "\uC778\uC218\uC778\uACC4"), note(`\uCD9C\uB825\uC77C ${today()} \xB7 \uC120\uD0DD \uC5C5\uBB34 ${tasks.length}/${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589\xB7\uD655\uC778 \uAE30\uB85D ${cases.length}/${doc.cases.length}\uAC1C`), note("\uC5C5\uBB34 \uC548\uB0B4\xB7\uC0AC\uC9C4\uACFC \uD655\uC778\uD55C PDF \uADFC\uAC70 \uCABD\uC744 \uCD9C\uB825\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uD30C\uC77C\uACFC \uC804\uCCB4 \uC790\uB8CC\uB294 \uC804\uB2EC JSON\uC5D0 \uBCF4\uC874\uB429\uB2C8\uB2E4.")), renderWorkOverview({ doc, taskIds: selection.taskIds, el, button: button2 }), el("h2", {}, "\uC5C5\uBB34 \uC548\uB0B4"));
+  const sheet = el("section", { class: "print-sheet" }, el("div", { class: "actions no-print" }, button2("\uB0B4\uBCF4\uB0B4\uAE30\uB85C \uB3CC\uC544\uAC00\uAE30", () => switchView("export")), button2("\uC778\uC1C4 / PDF \uC800\uC7A5", () => window.print(), "primary")), el("header", { class: "print-heading" }, el("p", { class: "eyebrow" }, "\uC778\uC218\uC778\uACC4 A to Z"), el("h2", {}, doc.title || "\uC778\uC218\uC778\uACC4"), note(`\uCD9C\uB825\uC77C ${today()} \xB7 \uC120\uD0DD \uC5C5\uBB34 ${tasks.length}/${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589\xB7\uD655\uC778 \uAE30\uB85D ${cases.length}/${doc.cases.length}\uAC1C`), note("\uC5C5\uBB34 \uC548\uB0B4\xB7\uC0AC\uC9C4\uACFC \uC120\uD0DD\uD55C PDF \uC6D0\uBB38\uC744 \uCD9C\uB825\uD569\uB2C8\uB2E4. \uC5C5\uBB34\uBCC4 \uCABD\uC758 \uD655\uC778 \uC5EC\uBD80\uB294 \uC544\uB798\uC5D0 \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uD30C\uC77C\uACFC \uC804\uCCB4 \uC790\uB8CC\uB294 \uC804\uB2EC JSON\uC5D0 \uBCF4\uC874\uB429\uB2C8\uB2E4.")), renderWorkOverview({ doc, taskIds: selection.taskIds, el, button: button2 }), el("h2", {}, "\uC5C5\uBB34 \uC548\uB0B4"));
   tasks.forEach((task, i2) => {
     const item = el("article", { class: "print-item" }, el("h3", {}, `${i2 + 1}. ${task.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"}`), note(timingLabel(task.timing)), firstActionText(task) ? readBlock("\uCCAB \uD589\uB3D9", firstActionText(task)) : null, task.timing.startRule ? readBlock("\uC2DC\uC791\xB7\uC900\uBE44 \uAE30\uC900", task.timing.startRule) : null, task.exceptions ? readBlock("\uB9C9\uD614\uC744 \uB54C \xB7 \uBA3C\uC800 \uD655\uC778", task.exceptions) : null, task.approval ? readBlock("\uC2B9\uC778\xB7\uD655\uC778", task.approval) : null);
     const instructions = distinctInstructions(task);
@@ -67743,7 +67919,10 @@ function printView() {
     for (const source of doc.sourceFiles.filter((s) => task.sourceRefs.includes(s.id))) {
       if (source.pdf) {
         const wanted = task.sourcePages?.find((link) => link.sourceId === source.id)?.pages;
-        for (const [index, page] of (selection.evidencePages || []).entries()) if (page.sourceId === source.id && (!wanted || wanted.includes(page.pageNumber))) item.append(el("p", {}, el("a", { href: `#print-evidence-${index}` }, `\uADFC\uAC70 \uCABD: ${source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`)));
+        if (!wanted && selection.wholeSourceIds?.includes(source.id)) {
+          const index = (selection.evidencePages || []).findIndex((page) => page.sourceId === source.id);
+          if (index >= 0) item.append(el("p", {}, el("a", { href: `#print-evidence-${index}` }, `\uCC38\uACE0 \uC6D0\uBB38 \uBD80\uB85D: ${source.name} \xB7 \uC5C5\uBB34\uBCC4 \uCABD \uBBF8\uC9C0\uC815`)));
+        } else for (const [index, page] of (selection.evidencePages || []).entries()) if (page.sourceId === source.id && (!wanted || wanted.includes(page.pageNumber))) item.append(el("p", {}, el("a", { href: `#print-evidence-${index}` }, `\uADFC\uAC70 \uCABD: ${source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`)));
       } else item.append(note(`\uADFC\uAC70: ${source.name} \xB7 \uC6D0\uBCF8 \uBAA8\uC591 \uBBF8\uD3EC\uD568, \uCD94\uCD9C\uBB38\uC740 JSON\uC5D0\uC11C \uD655\uC778`));
     }
     if (task.verifiedAt) item.append(note("\uCD5C\uC885 \uD655\uC778\uC77C " + task.verifiedAt));
@@ -67755,9 +67934,10 @@ function printView() {
     if (doc.onboarding.dayOne) sheet.append(readBlock("\uCCAB\uB0A0 \uC548\uB0B4", doc.onboarding.dayOne));
     if (doc.onboarding.firstWeek) sheet.append(readBlock("\uCCAB \uC8FC \uC548\uB0B4", doc.onboarding.firstWeek));
   }
+  if (selection.wholeSourceIds?.length) sheet.append(el("h2", {}, "\uCC38\uACE0 \uC6D0\uBB38 \uBD80\uB85D"), note("\uC6D0\uBB38 \uC804\uCCB4\uB97C \uD55C \uBC88\uC529 \uBCF4\uC874\uD569\uB2C8\uB2E4. \uC5C5\uBB34\uBCC4 \uCABD\uC744 \uC9C0\uC815\uD558\uC9C0 \uC54A\uC740 \uAD00\uACC4\uB294 \uD655\uC815\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."));
   (selection.evidencePages || []).forEach((page, index) => {
     const source = doc.sourceFiles.find((s) => s.id === page.sourceId);
-    sheet.append(el("figure", { class: "print-evidence", id: `print-evidence-${index}` }, el("figcaption", {}, `\uADFC\uAC70 \uCABD: ${source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`, el("p", {}, "\uC5F0\uACB0\uB41C \uC548\uB0B4: " + [...tasks, ...cases].filter((item) => item.sourceRefs.includes(source.id) && (!item.sourcePages?.find((link) => link.sourceId === source.id) || item.sourcePages.find((link) => link.sourceId === source.id).pages.includes(page.pageNumber))).map((item) => item.title).join(" \xB7 "))), el("img", { src: `data:image/png;base64,${page.data}`, width: page.width, height: page.height, alt: `${source.name} \uC6D0\uBB38 ${page.pageNumber}\uCABD \u2014 \uD45C\uC640 \uC0AC\uC9C4\uC744 \uD3EC\uD568\uD55C \uC6D0\uBB38 \uC774\uBBF8\uC9C0` })));
+    sheet.append(el("figure", { class: "print-evidence", id: `print-evidence-${index}` }, el("figcaption", {}, `${selection.wholeSourceIds?.includes(source.id) ? "\uCC38\uACE0 \uC6D0\uBB38" : "\uADFC\uAC70 \uCABD"}: ${source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`, el("p", {}, (selection.wholeSourceIds?.includes(source.id) ? "\uC774 \uC6D0\uBB38\uC744 \uCC38\uACE0\uD558\uB294 \uC548\uB0B4 \xB7 \uC5C5\uBB34\uBCC4 \uCABD\uC740 \uB530\uB85C \uD655\uC778: " : "\uC5F0\uACB0\uB41C \uC548\uB0B4: ") + [...tasks, ...cases].filter((item) => item.sourceRefs.includes(source.id) && (!item.sourcePages?.find((link) => link.sourceId === source.id) || item.sourcePages.find((link) => link.sourceId === source.id).pages.includes(page.pageNumber))).map((item) => item.title).join(" \xB7 "))), el("img", { src: `data:image/png;base64,${page.data}`, width: page.width, height: page.height, alt: `${source.name} \uC6D0\uBB38 ${page.pageNumber}\uCABD \u2014 \uD45C\uC640 \uC0AC\uC9C4\uC744 \uD3EC\uD568\uD55C \uC6D0\uBB38 \uC774\uBBF8\uC9C0` })));
   });
   sheet.append(note("\uC124\uBA85 \uC77D\uC74C\uACFC \uC2E4\uC81C \uC9C4\uD589\uAC74 \uC644\uB8CC\uB294 \uB2E4\uB985\uB2C8\uB2E4. \uCD9C\uB825\uBCF8\uC744 \uACE0\uCCD0\uB3C4 \uC804\uB2EC JSON\uC5D0 \uC790\uB3D9 \uBC18\uC601\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."));
   return sheet;
