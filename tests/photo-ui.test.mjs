@@ -153,13 +153,13 @@ async function addPhoto(section = 'method', caption = '') {
   await click('사진 추가', latestDialog());
 }
 function documentWithImage() {
-  return createDocument({ schemaVersion: 2, title: '사진 검증 문서', tasks: [createTask({
+  return createDocument({ schemaVersion: 3, title: '사진 검증 문서', tasks: [createTask({
     title: '가상 화면 확인', method: '첫 줄\n둘째 줄', steps: '1. 화면 확인\n2. 저장',
     images: [{ id: makeId(), section: 'method', caption: '조회 버튼 위치', mime: 'image/png', width: 480, height: 300, data: Buffer.from(png).toString('base64') }],
   })] });
 }
-async function openExisting(doc) {
-  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+async function openExisting(doc, extraSnapshot = {}) {
+  await mount({ ...extraSnapshot, [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
   await click('이어서 작성');
   if (doc.tasks.length) await click(ui.document.querySelector('.map-task'));
 }
@@ -169,16 +169,16 @@ test('photo UI: first photo creates a task only after confirmation, stores bytes
   await chooseFile(photoArea('method').querySelector('input[type=file]'), file());
   assert.equal(localDoc().tasks.length, 0);
   await click('취소', latestDialog());
-  assert.equal(localDoc().schemaVersion, 1);
+  assert.equal(localDoc().schemaVersion, 3);
   assert.equal(localDoc().tasks.length, 0);
   await addPhoto('method', '사진 설명 — 가상 조회 화면');
   const before = localDoc();
-  assert.equal(before.schemaVersion, 2);
+  assert.equal(before.schemaVersion, 3);
   assert.equal(before.tasks.length, 1);
   assert.equal(before.tasks[0].images.length, 1);
   assert.equal(before.tasks[0].images[0].caption, '사진 설명 — 가상 조회 화면');
   assert.equal(before.tasks[0].images[0].data, Buffer.from(png).toString('base64'));
-  assert.match(ui.document.querySelector('[data-save-status]').textContent, /자동 저장됨/);
+  assert.match(ui.document.querySelector('[data-save-status]').textContent, /임시저장됨/);
   await mount(snapshot()); await click('이어서 작성');
   await click(ui.document.querySelector('.map-task'));
   assert.deepEqual(localDoc(), before);
@@ -217,20 +217,24 @@ test('photo UI: simulated image paste/drop attach to the chosen section; ordinar
 
 test('photo UI: JSON download and new-copy import preserve image bytes while progress stays separate', async () => {
   const original = documentWithImage();
-  await openExisting(original);
+  const progress = JSON.stringify({ [original.id]: {
+    [`${original.tasks[0].id}@manual`]: { checked: true, at: '2026-10-20T12:00:00.000Z' },
+  } });
+  await openExisting(original, { [PROGRESS_KEY]: progress });
   await click('인수자 보기');
   await click(ui.document.querySelector('.map-task'));
-  const checkbox = control('이번 수행 완료', latestDialog());
-  checkbox.checked = true; checkbox.dispatchEvent(new ui.Event('change', { bubbles: true })); await settle();
+  assert.equal([...latestDialog().querySelectorAll('label')].some(label => label.textContent.includes('이번 수행 완료')), false,
+    'reading a task cannot mark the entire recurring task complete');
   const before = ui.localStorage.getItem(DATA_KEY);
-  assert.ok(ui.localStorage.getItem(PROGRESS_KEY));
-  await click('닫기', latestDialog().querySelector('.modal-actions'));
+  assert.equal(ui.localStorage.getItem(PROGRESS_KEY), progress, 'legacy personal progress remains intact');
+  await click('목록으로 돌아가기', latestDialog().querySelector('.modal-actions'));
   await click('파일로 저장');
   const received = downloads.findLast(item => item.name?.endsWith('.json'));
   assert.ok(received);
   const text = await received.blob.text();
   assert.deepEqual(parseImport(text).document, original);
   assert.equal(text.includes('handover-progress'), false);
+  assert.equal(ui.localStorage.getItem(PROGRESS_KEY), progress, 'JSON export does not consume or rewrite private progress');
   // A fresh recipient receives only the explicit JSON, not the sender's store.
   await mount();
   const open = [...ui.document.querySelectorAll('.start-card')].find(n => n.querySelector('strong')?.textContent === '받은 인수인계서 보기');
@@ -281,7 +285,7 @@ test('photo UI: reader thumbnail enlarges in a nested dialog and print includes 
   await click('닫기', enlarged.querySelector('.modal-actions'));
   assert.ok(parent.isConnected);
   assert.equal(ui.document.activeElement, thumbnail);
-  await click('닫기', parent.querySelector('.modal-actions'));
+  await click('목록으로 돌아가기', parent.querySelector('.modal-actions'));
   await click('내보내기');
   await click('인쇄 보기');
   assert.equal(ui.document.querySelectorAll('.print-photos img').length, 1);
@@ -404,7 +408,7 @@ test('work overview UI: author jumps to the selected task, returns to its title,
   await click(title);
   assert.match(latestDialog().textContent, /업무표에서 찾아 수정한 설명/);
   assert.equal(ui.document.querySelectorAll('.photo-gallery img').length, 1);
-  await click('닫기', latestDialog().querySelector('.modal-actions'));
+  await click('목록으로 돌아가기', latestDialog().querySelector('.modal-actions'));
   assert.equal(ui.document.activeElement, title);
   assert.ok(ui.document.querySelector('.overview-screen'));
 });
@@ -421,7 +425,7 @@ test('photo UI: invalid caption controls preserve the saved caption and keep pre
     await click('인수자 보기');
     await click(ui.document.querySelector('.map-task'));
     assert.equal(latestDialog().querySelector('.photo-caption').textContent, validCaption);
-    await click('닫기', latestDialog().querySelector('.modal-actions'));
+    await click('목록으로 돌아가기', latestDialog().querySelector('.modal-actions'));
     await click('작성하기');
     assert.equal(control('사진 설명 (선택)', photoArea('method')).value, validCaption);
   }

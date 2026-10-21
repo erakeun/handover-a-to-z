@@ -9,6 +9,9 @@ import { createPhotoUI } from "../src/photo-ui.js";
 import { imageStats } from "../src/image-data.js";
 import { verifyDocumentImages } from "../src/image-browser.js";
 import { renderWorkOverview } from "../src/work-overview.js";
+import * as handoverFlow from "../src/handover-flow.js";
+import * as pdfEvidence from "../src/pdf-evidence.js";
+import { reviewExampleDocument } from "../src/review-example.js";
 
 // Run the actual application functions in a local DOM. Import/extraction/export
 // adapters are deliberately inert; these tests exercise application state only.
@@ -21,7 +24,7 @@ async function mount(t, initialDocuments = []) {
   document.body.innerHTML = '<div id="app"></div><div id="modal-root"></div><div id="notice"></div>';
   if (initialDocuments.length) storage.saveDocuments(window.localStorage, initialDocuments);
   const dependencies = {
-    ...model, ...storage, openDocumentStore, createPhotoUI, imageStats,
+    ...model, ...storage, ...handoverFlow, ...pdfEvidence, reviewExampleDocument, openDocumentStore, createPhotoUI, imageStats,
     verifyDocumentImages, renderWorkOverview, window, document, Node: window.Node,
     setTimeout: window.setTimeout.bind(window), clearTimeout: window.clearTimeout.bind(window),
     renderCalendar: () => document.createElement("section"),

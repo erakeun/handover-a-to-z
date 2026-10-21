@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createDocument, createTask } from '../src/model.js';
 import { encodeBase64 } from '../src/image-data.js';
-import { DATA_KEY, PROGRESS_KEY } from '../src/storage.js';
+import { DATA_KEY, LEGACY_DATA_KEY, MIGRATION_KEY, PROGRESS_KEY } from '../src/storage.js';
 import {
-  openDocumentStore, DATABASE_NAME, DATABASE_VERSION, STORE_NAME, RECORD_KEY,
+  openDocumentStore, DATABASE_NAME, DATABASE_VERSION, STORE_NAME, RECORD_KEY, LEGACY_RECORD_KEY,
 } from '../src/document-store.js';
 
 function memory(raw = null) {
-  const values = new Map(raw === null ? [] : [[DATA_KEY, raw]]);
+  const values = new Map(raw === null ? [] : [[LEGACY_DATA_KEY, raw]]);
   return {
     writes: 0,
     getItem: key => values.get(key) ?? null,
@@ -24,9 +24,10 @@ function namedError(name) {
   return Object.assign(new Error(name), { name });
 }
 
-function fakeIndexedDB(initialRecord) {
+function fakeIndexedDB(initialRecord, previousRecord) {
   const control = {
     record: structuredClone(initialRecord),
+    previousRecord: structuredClone(previousRecord), writtenKeys: [],
     openError: null, blocked: false, heldOpen: false,
     failNextRead: null, failAfterRead: null, failNextPut: null,
     holdNextCommit: false, heldCommits: [], beforeCommit: null,
@@ -34,7 +35,7 @@ function fakeIndexedDB(initialRecord) {
   };
   const queue = [];
   let running = false;
-  let exists = initialRecord !== undefined;
+  let exists = initialRecord !== undefined || previousRecord !== undefined;
   let storeExists = exists;
   function runNext() {
     if (running || !queue.length) return;
@@ -46,6 +47,7 @@ function fakeIndexedDB(initialRecord) {
     let started = false;
     let done = false;
     let staged;
+    let stagedPrevious;
     let wrote = false;
     let readFailure;
     let afterReadFailure;
@@ -63,13 +65,14 @@ function fakeIndexedDB(initialRecord) {
         assert.equal(name, STORE_NAME);
         return {
           get(key) {
-            assert.equal(key, RECORD_KEY);
+            assert.ok([RECORD_KEY, LEGACY_RECORD_KEY].includes(key));
             const request = {};
             operations.push(() => {
               if (readFailure) return fail(request, readFailure);
-              request.result = structuredClone(staged);
+              request.result = structuredClone(key === RECORD_KEY ? staged : stagedPrevious);
               request.onsuccess?.();
-              if (!done && afterReadFailure) {
+              // Both keys form one source snapshot in the v3 transition.
+              if (!done && afterReadFailure && key === RECORD_KEY) {
                 tx.error = afterReadFailure;
                 tx.abort();
               }
@@ -81,6 +84,7 @@ function fakeIndexedDB(initialRecord) {
             const request = {};
             const copy = structuredClone(value);
             control.puts++;
+            control.writtenKeys.push(key);
             operations.push(() => {
               if (putFailure) return fail(request, putFailure);
               staged = copy;
@@ -121,6 +125,7 @@ function fakeIndexedDB(initialRecord) {
     }
     queue.push(() => {
       staged = structuredClone(control.record);
+      stagedPrevious = structuredClone(control.previousRecord);
       readFailure = control.failNextRead;
       afterReadFailure = control.failAfterRead;
       putFailure = control.failNextPut;
@@ -183,12 +188,13 @@ function fakeIndexedDB(initialRecord) {
   return { factory, control };
 }
 
-const record = (raw, legacyRaw = null) => ({ version: 1, raw, legacyRaw });
+const record = (raw, legacyRaw = null) => ({ version: 1, raw, legacyRaw, fallbackRaw: null, previousExists: false, previousRaw: null });
 const flush = async () => { for (let index = 0; index < 12; index++) await Promise.resolve(); };
 const photoBytes = new Uint8Array(await readFile(new URL('../fixtures/images/landscape.png', import.meta.url)));
+const legacyTask = overrides => { const task = createTask(overrides); delete task.firstAction; return task; };
 const photoDocument = () => createDocument({
   schemaVersion: 2, title: '사진과 한글을 함께 보관',
-  tasks: [createTask({
+  tasks: [legacyTask({
     title: '화면 확인', method: '첫째 줄\n둘째 줄',
     images: [{
       id: 'stored-photo', section: 'method', caption: '가상 참고 화면',
@@ -212,7 +218,7 @@ test('IndexedDB plumbing: migration preserves exact old text and independent pro
   assert.deepEqual(control.record, record(legacyRaw, legacyRaw));
   assert.equal(control.commits, 1);
   assert.equal(storage.writes, writesBefore);
-  assert.equal(storage.getItem(DATA_KEY), legacyRaw);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), legacyRaw);
   assert.equal(storage.getItem(PROGRESS_KEY), '{"separate":true}');
 });
 
@@ -291,7 +297,7 @@ test('IndexedDB plumbing: migration quota failure preserves readable legacy docu
   assert.equal(store.raw, legacyRaw);
   assert.deepEqual(store.documents, JSON.parse(legacyRaw));
   assert.equal(control.record, undefined);
-  assert.equal(storage.getItem(DATA_KEY), legacyRaw);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), legacyRaw);
   assert.equal(storage.writes, 0);
   await assert.rejects(store.save([]), { code: 'STORAGE_QUOTA' });
   assert.equal(storage.writes, 0);
@@ -344,14 +350,14 @@ test('IndexedDB plumbing: changed legacy source on reopen exposes both originals
   const newest = await first.save([createDocument({ title: '새 저장소 최신 내용' })], original);
   first.close();
   const changed = JSON.stringify([createDocument({ title: '구버전 창에서 편집' })]);
-  storage.setItem(DATA_KEY, changed);
+  storage.setItem(LEGACY_DATA_KEY, changed);
   const reopened = await openDocumentStore({ storage, indexedDB: factory });
   assert.equal(reopened.kind, 'memory');
   assert.equal(reopened.errorCode, 'STORAGE_LEGACY_CHANGED');
   assert.equal(reopened.raw, newest);
   await assert.rejects(reopened.save([]), { code: 'STORAGE_LEGACY_CHANGED' });
   assert.equal(control.record.raw, newest);
-  assert.equal(storage.getItem(DATA_KEY), changed);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), changed);
   assert.deepEqual(new Map(reopened.recoveryRecords.map(item => [item.source, item.raw])),
     new Map([['localStorage', changed], ['indexedDB', newest]]));
 });
@@ -362,10 +368,10 @@ test('IndexedDB plumbing: an old-version edit during an open session prevents ov
   const { factory, control } = fakeIndexedDB();
   const store = await openDocumentStore({ storage, indexedDB: factory });
   const changed = JSON.stringify([createDocument({ title: '구버전의 동시 변경' })]);
-  storage.setItem(DATA_KEY, changed);
+  storage.setItem(LEGACY_DATA_KEY, changed);
   await assert.rejects(store.save([createDocument()], original), { code: 'STORAGE_LEGACY_CHANGED' });
   assert.equal(control.record.raw, original);
-  assert.equal(storage.getItem(DATA_KEY), changed);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), changed);
   assert.equal(store.readOnly, true);
 });
 
@@ -374,13 +380,13 @@ test('IndexedDB plumbing: legacy changes between request and migration commit ar
   const changed = JSON.stringify([createDocument({ title: '이관 도중 변경된 원본' })]);
   const storage = memory(original);
   const { factory, control } = fakeIndexedDB();
-  control.beforeCommit = () => { storage.setItem(DATA_KEY, changed); };
+  control.beforeCommit = () => { storage.setItem(LEGACY_DATA_KEY, changed); };
   const store = await openDocumentStore({ storage, indexedDB: factory });
   assert.equal(store.errorCode, 'STORAGE_LEGACY_CHANGED');
   assert.equal(store.readOnly, true);
   assert.equal(control.record.raw, original);
   assert.equal(control.record.legacyRaw, original);
-  assert.equal(storage.getItem(DATA_KEY), changed);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), changed);
 });
 
 test('IndexedDB plumbing: absent IndexedDB allows an explicit legacy fallback with conflict and quota checks', async () => {
@@ -473,7 +479,7 @@ test('IndexedDB plumbing: aggregate UTF-8 budget rejects before assembling the w
   const text = '가'.repeat(200_000);
   const documents = Array.from({ length: 4 }, () => createDocument({
     schemaVersion: 2,
-    tasks: Array.from({ length: 32 }, () => createTask({ method: text })),
+    tasks: Array.from({ length: 32 }, () => legacyTask({ method: text })),
   }));
   const untouched = createDocument({ schemaVersion: 99 });
   documents.push(untouched);
@@ -600,4 +606,152 @@ test('IndexedDB plumbing: unavailable legacy access still exposes readable curre
   assert.deepEqual(store.documents, [document]);
   assert.equal(store.readOnly, true);
   assert.equal(control.record.raw, raw);
+});
+
+test('v3 transition copies the latest old IDB text exactly and leaves rollback records untouched', async () => {
+  const first = createDocument({ schemaVersion: 1, title: '이전 v1', tasks: [legacyTask({ method: '보존할 줄\n두 번째 줄' })] });
+  const second = photoDocument();
+  const legacyRaw = JSON.stringify([first]);
+  first.title = 'old IDB에서 더 최근에 고침';
+  const latest = JSON.stringify([first, second], null, 2);
+  const oldRecord = { version: 1, raw: latest, legacyRaw };
+  const storage = memory(legacyRaw);
+  const { factory, control } = fakeIndexedDB(undefined, oldRecord);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.readOnly, false);
+  assert.equal(store.raw, latest);
+  assert.deepEqual(store.documents.map(doc => doc.schemaVersion), [1, 2]);
+  assert.deepEqual(control.previousRecord, oldRecord);
+  assert.equal(control.record.raw, latest);
+  assert.equal(control.record.previousRaw, latest);
+  assert.equal(control.record.previousExists, true);
+  assert.deepEqual(control.writtenKeys, [RECORD_KEY]);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), legacyRaw);
+  assert.equal(storage.getItem(DATA_KEY), null);
+  const documents = store.documents;
+  documents.push(createDocument({ title: '새 v3에서만 작성', tasks: [createTask({ firstAction: '확인된 첫 행동' })] }));
+  const newRaw = await store.save(documents, store.raw);
+  assert.deepEqual(control.previousRecord, oldRecord, 'rolling back still sees exact old current');
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), legacyRaw);
+  assert.equal(control.record.raw, newRaw);
+  assert.equal(JSON.parse(newRaw).at(-1).schemaVersion, 3);
+  const reopened = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(reopened.raw, newRaw);
+  assert.deepEqual(reopened.documents, documents);
+});
+
+test('old IDB edits during a v3 session or rollback cannot overwrite the v3 snapshot', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 1, title: '기존 원본' })]);
+  const oldRecord = { version: 1, raw: original, legacyRaw: null };
+  const { factory, control } = fakeIndexedDB(undefined, oldRecord);
+  const storage = memory();
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  const newRaw = await store.save([createDocument({ title: 'v3에서 새로 작업함' })], original);
+  const changed = JSON.stringify([createDocument({ schemaVersion: 1, title: '구버전에서 작업함' })]);
+  control.previousRecord = { ...oldRecord, raw: changed };
+  await assert.rejects(store.save([], newRaw), { code: 'STORAGE_LEGACY_CHANGED' });
+  assert.equal(store.readOnly, true);
+  assert.equal(control.record.raw, newRaw);
+  assert.equal(control.previousRecord.raw, changed);
+  const reopened = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(reopened.errorCode, 'STORAGE_LEGACY_CHANGED');
+  assert.equal(reopened.raw, newRaw);
+  assert.equal(reopened.documents[0].title, 'v3에서 새로 작업함');
+  assert.equal(reopened.recoveryRecords.find(item => item.source === 'indexedDB-previous').raw, changed);
+  assert.equal(reopened.recoveryRecords.find(item => item.source === 'indexedDB').raw, newRaw);
+});
+
+test('v3 fallback preserves the old key and detects an old-version edit across a restart', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 1, title: '이전 원본' })], null, 2);
+  const storage = memory(original);
+  const store = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(store.raw, original);
+  assert.equal(storage.getItem(DATA_KEY), null);
+  const newRaw = await store.save([createDocument({ title: '새 내용' })], original);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), original);
+  assert.equal(storage.getItem(DATA_KEY), newRaw);
+  assert.match(JSON.parse(storage.getItem(MIGRATION_KEY)).legacyHash, /^[a-f0-9]{64}$/);
+  const reopened = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(reopened.readOnly, false);
+  assert.equal(reopened.raw, newRaw);
+  storage.setItem(LEGACY_DATA_KEY, JSON.stringify([createDocument({ schemaVersion: 1, title: '구버전 수정' })]));
+  const conflict = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(conflict.errorCode, 'STORAGE_LEGACY_CHANGED');
+  assert.equal(conflict.documents[0].title, '새 내용');
+  await assert.rejects(conflict.save([]));
+  assert.equal(storage.getItem(DATA_KEY), newRaw);
+});
+
+test('fallback quota during first data write preserves old data and cannot claim migration succeeded', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 1, title: '반드시 보존' })]);
+  const storage = memory(original), write = storage.setItem.bind(storage);
+  const store = await openDocumentStore({ storage, indexedDB: null });
+  storage.setItem = (key, value) => { if (key === DATA_KEY) throw namedError('QuotaExceededError'); write(key, value); };
+  await assert.rejects(store.save([createDocument()], original), { code: 'STORAGE_QUOTA' });
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), original);
+  assert.equal(storage.getItem(DATA_KEY), null);
+  assert.equal(store.raw, original);
+  assert.ok(storage.getItem(MIGRATION_KEY), 'a prepared small metadata record is harmless without v3 data');
+  const reopened = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(reopened.raw, original);
+  assert.equal(reopened.readOnly, false);
+});
+
+test('a corrupt old IDB record is recoverable and never creates or replaces the v3 record', async () => {
+  const storage = memory(JSON.stringify([createDocument({ schemaVersion: 1 })]));
+  const oldRecord = { version: 1, raw: '{broken', legacyRaw: storage.getItem(LEGACY_DATA_KEY) };
+  const { factory, control } = fakeIndexedDB(undefined, oldRecord);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.errorCode, 'STORAGE_INVALID');
+  assert.equal(control.record, undefined);
+  assert.deepEqual(control.previousRecord, oldRecord);
+  assert.equal(control.puts, 0);
+  assert.equal(store.recoveryRecords.find(item => item.source === 'indexedDB-previous').raw, '{broken');
+});
+
+test('different new fallback and newer old IDB histories stop instead of guessing a winner', async () => {
+  const initial = JSON.stringify([createDocument({ schemaVersion: 1, title: '처음' })]);
+  const oldRaw = JSON.stringify([createDocument({ schemaVersion: 1, title: '구 IDB의 작업' })]);
+  const newRaw = JSON.stringify([createDocument({ title: '새 간이 저장소의 작업' })]);
+  const storage = memory(initial); storage.setItem(DATA_KEY, newRaw);
+  const previous = { version: 1, raw: oldRaw, legacyRaw: initial };
+  const { factory, control } = fakeIndexedDB(undefined, previous);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.errorCode, 'STORAGE_LEGACY_CHANGED');
+  assert.equal(control.record, undefined);
+  assert.deepEqual(control.previousRecord, previous);
+  assert.equal(storage.getItem(DATA_KEY), newRaw);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), initial);
+  assert.equal(control.puts, 0);
+});
+
+test('direct v3 fallback seeding and later IDB migration preserve data and guard subsequent fallback edits', async () => {
+  const newRaw = JSON.stringify([createDocument({ title: 'v3 간이 저장' })], null, 2);
+  const storage = memory(); storage.setItem(DATA_KEY, newRaw);
+  const { factory, control } = fakeIndexedDB();
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.readOnly, false);
+  assert.equal(store.raw, newRaw);
+  assert.equal(control.record.fallbackRaw, newRaw);
+  assert.equal(storage.getItem(DATA_KEY), newRaw);
+  storage.setItem(DATA_KEY, JSON.stringify([createDocument({ title: '다른 창의 간이 저장' })]));
+  await assert.rejects(store.save([], store.raw), { code: 'STORAGE_LEGACY_CHANGED' });
+  assert.equal(control.record.raw, newRaw);
+});
+
+test('simply opening the old app may create an unchanged old record without locking v3 editing', async () => {
+  for (const original of [null, JSON.stringify([createDocument({ schemaVersion: 1, title: '이전 원본' })])]) {
+    const storage = memory(original);
+    const { factory, control } = fakeIndexedDB();
+    const store = await openDocumentStore({ storage, indexedDB: factory });
+    const newRaw = await store.save([createDocument({ title: '새 버전의 작업' })], original);
+    control.previousRecord = { version: 1, raw: original, legacyRaw: original };
+    const reopened = await openDocumentStore({ storage, indexedDB: factory });
+    assert.equal(reopened.readOnly, false);
+    assert.equal(reopened.raw, newRaw);
+    await reopened.save(reopened.documents, newRaw);
+    control.previousRecord.raw = JSON.stringify([createDocument({ schemaVersion: 1, title: '실제 구버전 수정' })]);
+    await assert.rejects(reopened.save([], reopened.raw), { code: 'STORAGE_LEGACY_CHANGED' });
+    assert.equal(control.record.raw, newRaw);
+  }
 });

@@ -98,7 +98,7 @@ async function reveal(node) {
 async function click(name, root = ui.document, options) {
   const target = typeof name === 'string' ? button(name, root, options) : name;
   assert.ok(target);
-  assert.equal(target.disabled, false, 'target must be enabled');
+  assert.notEqual(target.disabled, true, 'target must be enabled');
   await reveal(target);
   target.focus();
   target.click();
@@ -201,6 +201,47 @@ async function backupText() {
   assert.match(download.filename, /\.json$/);
   return download.blob.text();
 }
+
+test('unsupported or damaged transfer files leave current documents and selection untouched', async () => {
+  const existing = createDocument({ title: '보존할 가상 문서', tasks: [createTask({ title: '기존 업무', method: '원래 설명' })] });
+  await mount({ [DATA_KEY]: JSON.stringify([existing]), [CURRENT_KEY]: existing.id });
+  const before = snapshot();
+  const future = { ...structuredClone(existing), schemaVersion: 4 };
+  const mislabeled = { ...structuredClone(existing), schemaVersion: 2 };
+  for (const text of [JSON.stringify(future), JSON.stringify(mislabeled), '{broken']) {
+    await click([...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === '받은 인수인계서 보기'));
+    const transfer = new ui.DataTransfer();
+    transfer.items.add(new ui.File([text], '가상-미지원.json', { type: 'application/json' }));
+    const input = control('받은 파일 선택');
+    input.files = transfer.files;
+    input.dispatchEvent(new ui.Event('change', { bubbles: true }));
+    await settle();
+    assert.ok(ui.document.querySelector('.import-preview .error'));
+    if (text === JSON.stringify(future)) assert.match(ui.document.querySelector('.import-preview .error').textContent, /최신 인수인계 A to Z/);
+    await click('이 인수인계서 보기', ui.document.querySelector('dialog'));
+    assert.deepEqual(snapshot(), before, 'a failed import must not replace or save existing content');
+    await click('취소', ui.document.querySelector('dialog'));
+  }
+  assert.deepEqual(savedDocument(), existing);
+});
+
+test('opening legacy JSON preserves its format; an intentional edit upgrades without losing legacy fields', async () => {
+  const task = createTask({ title: '구 형식 가상 업무', method: '첫 줄\n원래 설명' });
+  delete task.firstAction;
+  const legacy = createDocument({ schemaVersion: 2, title: '구 형식 가상 자료', tasks: [task] });
+  await mount();
+  const opened = await importJsonThroughUI(JSON.stringify(legacy));
+  assert.equal(opened.schemaVersion, 2);
+  assert.equal(Object.hasOwn(opened.tasks[0], 'firstAction'), false);
+  assert.equal(opened.tasks[0].method, legacy.tasks[0].method);
+  await click('작성하기');
+  await fill('첫 행동 한 줄', '접수 내용을 확인하세요.');
+  const edited = savedDocument();
+  assert.equal(edited.schemaVersion, 3);
+  assert.equal(edited.tasks[0].method, legacy.tasks[0].method);
+  assert.equal(edited.tasks[0].firstAction, '접수 내용을 확인하세요.');
+  assert.deepEqual(parseImport(await backupText()).document, edited);
+});
 
 test('MACH main link uses a local logo and leaves the app home action independent', async () => {
   await mount();
@@ -372,13 +413,9 @@ test('reader can find all groups, this-week work and situation text without modi
   await fill('업무나 상황 찾기', '요청한 자료');
   assert.ok(ui.document.querySelector('#reader-results').textContent.includes('검증용 비정기 자료 안내'));
   assert.ok(!ui.document.querySelector('#reader-results').textContent.includes('검증용 월말 보고'));
-  const checkbox = ui.document.querySelector('#reader-results input[type=checkbox]');
-  assert.ok(checkbox);
-  checkbox.checked = true;
-  checkbox.dispatchEvent(new ui.Event('change', { bubbles: true }));
-  await settle();
-  assert.equal(ui.localStorage.getItem(DATA_KEY), before, 'reader checks must not mutate the original document');
-  assert.ok(ui.localStorage.getItem(PROGRESS_KEY));
+  assert.equal(ui.document.querySelector('#reader-results input[type=checkbox]'), null, 'reading a procedure does not offer a permanent completion check');
+  assert.equal(ui.localStorage.getItem(DATA_KEY), before, 'reading must not mutate the handed-over document');
+  assert.equal(ui.localStorage.getItem(PROGRESS_KEY), null);
   assert.equal(networkAttempts.length, 0);
 });
 
@@ -430,7 +467,7 @@ for (const authorUsesAI of [false, true]) {
       if (authorUsesAI) {
         await click('AI로 초안 만들기');
         assert.equal(ui.document.querySelector('[aria-label="인계자 AI 초안 프롬프트"]').value, AUTHOR_PROMPT);
-        await fill('AI의 구조화 결과', aiDraftRaw);
+        await fill('AI의 답글', aiDraftRaw);
         await click('가져오기 전 검토', ui.document.querySelector('dialog'));
         assert.match(ui.document.querySelector('dialog').textContent, /1개 큰 업무 · 1개 세부 업무/);
         assert.equal(savedDocument().tasks.length, 0);
@@ -528,7 +565,7 @@ test('controls have labels and valid pressed state; navigation, editor, modal cl
   assert.equal(validateDocument(parseImport(await downloads.at(-1).blob.text()).document).ok, true);
   await click('인수자 보기', ui.document.querySelector('.top-nav'));
   assert.equal(ui.document.activeElement.id, 'main');
-  assert.equal(ui.document.querySelector('.reader-nav [aria-pressed="true"]').textContent, '전체 업무');
+  assert.equal(ui.document.querySelector('.reader-nav [aria-pressed="true"]').textContent, '업무 전체');
   const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion\s*:\s*reduce/);
@@ -592,9 +629,13 @@ for (const sourceKind of ['paste', 'docx']) {
     const chosenGroup = { id: makeId(), title: '가져올 업무 영역' };
     const otherGroup = { id: makeId(), title: '기존 업무 영역' };
     const existingTask = createTask({ title: '이미 있던 업무', method: '기존 방법', groupId: otherGroup.id, ownerRole: '기존 주담당' });
+    delete existingTask.firstAction;
+    const legacyCase = createCase({ title: '유지할 진행 건', status: 'waiting' });
+    delete legacyCase.statusConfirmed; delete legacyCase.taskId;
     const doc = createDocument({
+      schemaVersion: sourceKind === 'paste' ? 1 : 2,
       groups: [chosenGroup, otherGroup], tasks: [existingTask],
-      cases: [createCase({ title: '유지할 진행 건' })],
+      cases: [legacyCase],
       onboarding: { dayOne: '유지할 첫날 안내', firstWeek: '유지할 첫 주 안내' },
     });
     await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
@@ -640,6 +681,7 @@ for (const sourceKind of ['paste', 'docx']) {
     await click('현재 문서에 업무 추가', review);
     const result = savedDocument();
     const added = result.tasks.slice(1);
+    assert.equal(result.schemaVersion, 3);
     assert.deepEqual(result.tasks[0], existingTask);
     assert.deepEqual(result.groups, doc.groups);
     assert.deepEqual(result.cases, doc.cases);
@@ -900,7 +942,7 @@ test('first task needs only name and method, saves once without replacing compos
   assert.equal(doc.tasks[0].ownerRole, '');
   assert.equal(ui.document.querySelector('.map-task').dataset.taskId, taskId);
   assert.equal(ui.document.querySelector('.map-calendar').closest('details').open, false);
-  assert.match(ui.document.querySelector('[data-save-status]').textContent, /자동 저장됨/);
+  assert.match(ui.document.querySelector('[data-save-status]').textContent, /임시저장됨/);
   const json = await backupText();
   assert.deepEqual(parseImport(json).document.tasks, doc.tasks);
   await click('받는 사람 화면 확인');
@@ -942,7 +984,7 @@ test('reader starts with every undated task and keeps an active optional role fi
   await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
   await click('인수자 보기', ui.document.querySelector('.document-card'));
   const before = ui.localStorage.getItem(DATA_KEY);
-  assert.deepEqual([...ui.document.querySelectorAll('.reader-nav > button')].map(node => node.textContent), ['전체 업무', '이번 주', '진행 중인 일']);
+  assert.deepEqual([...ui.document.querySelectorAll('.reader-nav > button')].map(node => node.textContent), ['업무 전체', '언제 하는 일', '지금 이어받을 건']);
   assert.equal(ui.document.querySelectorAll('.work-map .map-task').length, 2);
   assert.equal(control('주담당 역할로 업무 보기').closest('details').open, false);
   await fill('주담당 역할로 업무 보기', '담당 A');
@@ -957,11 +999,8 @@ test('reader starts with every undated task and keeps an active optional role fi
   assert.equal(button('상황별', ui.document.querySelector('.reader-nav')).closest('details').open, true);
   assert.equal(ui.document.querySelector('.read-card').open, false);
   assert.match(ui.document.querySelector('.read-card summary').textContent, /업무 설명 보기/);
-  const progress = control('이번 수행 완료', ui.document.querySelector('.read-card'));
-  await reveal(progress);
-  progress.checked=true;progress.dispatchEvent(new ui.Event('change', { bubbles: true }));
-  await settle();
-  assert.ok(ui.localStorage.getItem(PROGRESS_KEY));
+  assert.equal(ui.document.querySelector('.read-card input[type=checkbox]'), null);
+  assert.equal(ui.localStorage.getItem(PROGRESS_KEY), null);
   assert.equal(ui.localStorage.getItem(DATA_KEY), before);
   assert.equal(networkAttempts.length, 0);
 });
@@ -975,13 +1014,13 @@ test('full document download stays complete after a partial choice while advance
   await click('내보내기', ui.document.querySelector('.top-nav'));
   assert.equal(ui.document.querySelector('.export-selection').closest('details').open, false);
   assert.equal(button('AI용 내용 미리보기').closest('details').open, false);
-  assert.equal(button('전체 문서 받기 (.docx)').closest('details'), null);
+  assert.equal(button('업무 안내 전체 받기 (.docx)').closest('details'), null);
   assert.match(button('전달·백업 파일 받기 (.json)').closest('.callout').textContent, /출처 원문[\s\S]*암호화되지/);
   await click('선택 해제');
   const selected=control(tasks[0].title, ui.document.querySelector('.export-selection'));
   selected.checked=true;selected.dispatchEvent(new ui.Event('change', { bubbles: true }));
   await settle();
-  await click('전체 문서 받기 (.docx)');
+  await click('업무 안내 전체 받기 (.docx)');
   for(let attempt=0;attempt<100&&!downloads.length;attempt++)await new Promise(resolve=>originalSetTimeout(resolve,10));
   assert.equal(downloads.length,1);
   const bytes=new Uint8Array(await downloads.at(-1).blob.arrayBuffer());
@@ -1027,4 +1066,84 @@ test('counted UI paths take 3 actions for an ungrouped first draft and 13 for th
   assert.equal(firstDraft,3);
   assert.equal(threeGroupsFirst,13);
   console.info(`DOM action count (one click or one whole-field fill): first draft=${firstDraft}, three groups then one task=${threeGroupsFirst}; grouping outcomes differ.`);
+});
+
+test('legacy status is not certified; explicit case completion is portable and never completes its task', async()=>{
+  const task=createTask({title:'가상 연결 업무',method:'원문 그대로 보존',firstAction:'확인 요청을 연다.'});
+  const record=createCase({title:'가상 상태 확인 기록',taskId:task.id,status:'done',nextAction:'현재 상태를 다시 확인'});
+  delete record.statusConfirmed;
+  const doc=createDocument({tasks:[task],cases:[record]});
+  await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});
+  await click('인수자 보기',ui.document.querySelector('.document-card'));
+  await click('지금 이어받을 건');
+  assert.match(ui.document.querySelector('.case-card').textContent,/상태 미확인/);
+  assert.match(ui.document.querySelector('#reader-results').textContent,/상태를 확인할 기록 1개/);
+  assert.equal(savedDocument().cases[0].status,'done');
+  assert.equal(savedDocument().cases[0].statusConfirmed,undefined);
+  assert.equal(control('이 건의 현재 상태').value,'unknown');
+  await fill('이 건의 현재 상태','done');
+  assert.equal(savedDocument().cases[0].statusConfirmed,true);
+  assert.match(ui.document.querySelector('.reader-count').textContent,/이어받을 건 0개 · 상태 확인할 기록 0개/);
+  assert.deepEqual(savedDocument().tasks[0],task);
+  const json=await backupText();
+  await mount();
+  const copy=await importJsonThroughUI(json);
+  assert.equal(copy.cases[0].status,'done');
+  assert.equal(copy.cases[0].statusConfirmed,true);
+  assert.equal(copy.cases[0].taskId,copy.tasks[0].id);
+  assert.equal(ui.localStorage.getItem(PROGRESS_KEY),null);
+});
+
+test('search title opens a full task and returns to the same query, result, focus and scroll',async()=>{
+  const task=createTask({title:'가상 반환 업무',method:'공개 가상 방법',firstAction:'요청 목록을 연다.'});
+  const doc=createDocument({tasks:[task]});
+  await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});
+  await click('인수자 보기',ui.document.querySelector('.document-card'));
+  await fill('업무나 상황 찾기','반환');
+  const summary=ui.document.querySelector('.task-result > summary');
+  Object.defineProperty(ui,'scrollY',{value:314,writable:true,configurable:true});
+  ui.scrollTo=(_x,y)=>{ui.scrollY=y;};
+  await click(summary);
+  assert.match(ui.document.querySelector('dialog .first-action').textContent,/요청 목록을 연다/);
+  assert.doesNotMatch(ui.document.querySelector('dialog').textContent,/null|undefined/);
+  ui.scrollY=0;
+  await click('목록으로 돌아가기',ui.document.querySelector('dialog'));
+  assert.equal(control('업무나 상황 찾기').value,'반환');
+  assert.equal(ui.document.querySelector('.task-result > summary'),summary);
+  assert.equal(ui.document.activeElement,summary);
+  assert.equal(ui.scrollY,314);
+  assert.equal(ui.document.querySelector('dialog'),null);
+});
+
+test('an AI plain-text reply upgrades a legacy document without requiring JSON repair',async()=>{
+  const legacy=createDocument({schemaVersion:2,title:'구 형식 AI 가상 자료'});
+  await mount({[DATA_KEY]:JSON.stringify([legacy]),[CURRENT_KEY]:legacy.id});await click('이어서 작성');await click('AI로 초안 만들기');
+  const raw='가상 업무 답글\n요청 내용을 확인한다. 형식 { 가 완성되지 않아도 메모를 남긴다.';
+  await fill('AI의 답글',raw);
+  await click('일반 글로 추가',ui.document.querySelector('dialog'));
+  assert.equal(savedDocument().tasks.length,1);
+  assert.equal(savedDocument().tasks[0].method,raw);
+  assert.equal(savedDocument().schemaVersion,3);
+  assert.equal(legacy.tasks.length,0);
+  assert.equal(savedDocument().tasks[0].firstAction,'');
+  assert.equal(networkAttempts.length,0);
+});
+
+
+test('a PDF opened directly from a case has a return history entry and search states its limits',async()=>{
+  const {reviewExampleDocument}=await import('../src/review-example.js');
+  const doc=reviewExampleDocument();
+  await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});
+  await click('인수자 보기',ui.document.querySelector('.document-card'));
+  assert.match(ui.document.querySelector('.search-box').textContent,/PDF·사진 속 글은 검색되지/);
+  await click('지금 이어받을 건');
+  const card=[...ui.document.querySelectorAll('.case-card')].find(n=>n.textContent.includes('PDF 원문 보기'));
+  const priorLength=ui.history.length;
+  await click('PDF 원문 보기 · 2쪽',card);
+  assert.ok(ui.document.querySelector('dialog').dataset.navigationId);
+  assert.equal(ui.history.length,priorLength+1);
+  assert.ok(ui.history.state.handoverDialog);
+  await click('업무로 돌아가기',ui.document.querySelector('dialog'));
+  assert.equal(ui.document.querySelector('dialog'),null);
+  assert.ok(ui.document.querySelector('.case-card'));
 });

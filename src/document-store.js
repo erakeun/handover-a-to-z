@@ -1,10 +1,11 @@
 import { stringifyDocument } from './model.js';
-import { DATA_KEY, loadDocuments } from './storage.js';
+import { DATA_KEY, LEGACY_DATA_KEY, MIGRATION_KEY, loadDocuments } from './storage.js';
 
 export const DATABASE_NAME = 'handover.az.documents';
 export const DATABASE_VERSION = 1;
 export const STORE_NAME = 'documents';
-export const RECORD_KEY = 'current';
+export const RECORD_KEY = 'current-v3';
+export const LEGACY_RECORD_KEY = 'current';
 export const MAX_STORED_BYTES = 64 * 1024 * 1024;
 const LEGACY_MAX_LENGTH = 20 * 1024 * 1024;
 const encoder = new TextEncoder();
@@ -81,25 +82,45 @@ function parseDocuments(raw, legacy = false) {
   return documents;
 }
 
-function parseRecord(record) {
+function parseRecord(record, modern = false) {
   if (!record || record.version !== 1 ||
       !(record.raw === null || typeof record.raw === 'string') ||
       !(record.legacyRaw === null || typeof record.legacyRaw === 'string')) throw invalid();
-  return { raw: record.raw, documents: parseDocuments(record.raw), legacyRaw: record.legacyRaw };
+  if (modern && (typeof record.previousExists !== 'boolean' ||
+      !(record.previousRaw === null || typeof record.previousRaw === 'string') ||
+      !(record.fallbackRaw === null || typeof record.fallbackRaw === 'string'))) throw invalid();
+  return { ...record, documents: parseDocuments(record.raw) };
 }
 
-function readLegacy(storage) {
+function readStorage(storage, key) {
   if (!storage || typeof storage.getItem !== 'function') {
     throw problem('STORAGE_LEGACY_UNAVAILABLE', '이전 기기 저장소를 확인할 수 없습니다. 원본을 보호하기 위해 자동저장을 중단했습니다.');
   }
   try {
-    const raw = storage.getItem(DATA_KEY);
+    const raw = storage.getItem(key);
     if (raw !== null && typeof raw !== 'string') throw invalid();
     return raw;
   } catch (cause) {
     if (cause?.code === 'STORAGE_INVALID') throw cause;
     throw problem('STORAGE_LEGACY_UNAVAILABLE', '이전 기기 저장소를 읽을 수 없습니다. 원본을 보호하기 위해 자동저장을 중단했습니다.', cause);
   }
+}
+
+const readLegacy = storage => readStorage(storage, LEGACY_DATA_KEY);
+const readFallback = storage => readStorage(storage, DATA_KEY);
+async function legacyHash(raw) {
+  // The absent-old-store case needs no asynchronous crypto work at startup.
+  if (raw === null) return '74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b';
+  if (!globalThis.crypto?.subtle) throw problem('STORAGE_UNAVAILABLE', '이전 저장 원본의 변경 여부를 확인할 수 없어 임시저장을 중단했습니다. 파일로 보관해 주세요.');
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', encoder.encode(raw === null ? 'null' : `string:${raw}`));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+function parseMigration(raw) {
+  if (raw === null) return null;
+  let value;
+  try { value = JSON.parse(raw); } catch { throw invalid(); }
+  if (!value || value.version !== 1 || typeof value.legacyHash !== 'string' || !/^[0-9a-f]{64}$/.test(value.legacyHash)) throw invalid();
+  return value;
 }
 
 function openDatabase(factory, timeoutMs) {
@@ -184,13 +205,19 @@ function transaction(database, mode, timeoutMs, action) {
         finish(failure);
       }, timeoutMs);
       const store = tx.objectStore(STORE_NAME);
+      // Read the prior record first. Once the newest record is available, both
+      // reads can be adopted before a later transaction abort is reported.
+      const previous = store.get(LEGACY_RECORD_KEY);
       const request = store.get(RECORD_KEY);
-      request.onsuccess = () => {
-        if (settled || failure) return;
-        try { value = action(request.result, store); }
+      let reads = 0;
+      const completeRead = () => {
+        if (settled || failure || ++reads !== 2) return;
+        try { value = action(request.result, store, previous.result); }
         catch (cause) { abort(cause); }
       };
+      request.onsuccess = previous.onsuccess = completeRead;
       request.onerror = () => { failure ||= storageProblem(request.error); };
+      previous.onerror = () => { failure ||= storageProblem(previous.error); };
     } catch (cause) { finish(storageProblem(cause)); }
   });
 }
@@ -209,6 +236,8 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
   let readOnly = false;
   let database = null;
   let legacyRaw = null;
+  let fallbackRaw = null;
+  let fallbackBaselineHash = null;
   let legacyError = null;
   let baseline;
   const recovery = new Map();
@@ -240,6 +269,36 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
       throw problem('STORAGE_LEGACY_CHANGED', '이전 버전의 다른 창에서 문서가 변경되었습니다. 새 저장소와 이전 저장소의 원본을 모두 백업한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
     }
   }
+  function confirmFallback(expected) {
+    const current = readFallback(storage);
+    remember('localStorage-v3', current);
+    if (current !== expected) throw problem('STORAGE_LEGACY_CHANGED', '다른 창에서 별도 기기 저장소의 문서가 변경되었습니다. 두 저장 원본을 백업한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
+  }
+  function confirmPrevious(record, previous) {
+    remember('indexedDB-previous', previous?.raw ?? null);
+    const unchangedCreation = !record.previousExists && previous?.version === 1 &&
+      previous.raw === record.legacyRaw && previous.legacyRaw === record.legacyRaw;
+    if (!unchangedCreation && ((previous !== undefined) !== record.previousExists || (previous?.raw ?? null) !== record.previousRaw)) {
+      throw problem('STORAGE_LEGACY_CHANGED', '이전 버전에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 새 문서를 덮어쓰지 않았습니다.');
+    }
+    confirmLegacy(record.legacyRaw);
+    confirmFallback(record.fallbackRaw);
+  }
+  async function fallbackSnapshot() {
+    const oldRaw = readLegacy(storage);
+    const raw = readFallback(storage);
+    remember('localStorage', oldRaw);
+    remember('localStorage-v3', raw);
+    const documents = parseDocuments(raw ?? oldRaw, true);
+    // A disagreement must not substitute the older data for a readable v3 copy.
+    if (raw !== null) snapshot = { raw, documents };
+    const meta = raw === null ? null : parseMigration(readStorage(storage, MIGRATION_KEY));
+    const hash = meta ? await legacyHash(oldRaw) : null;
+    if (meta && meta.legacyHash !== hash) throw problem('STORAGE_LEGACY_CHANGED', '이전 버전에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
+    // Recheck after asynchronous hashing. No stale source is adopted or saved.
+    confirmLegacy(oldRaw); confirmFallback(raw);
+    return { oldRaw, fallbackRaw: raw, raw: raw ?? oldRaw, documents, hash };
+  }
   function adopt(raw, documents) {
     snapshot = { raw, documents };
     remember('indexedDB', raw);
@@ -266,30 +325,38 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
           throw noteFailure(problem('STORAGE_LIMIT', '기존 기기 저장소의 읽기 한도를 초과했습니다. 현재 문서를 JSON으로 백업해 주세요.'));
         }
         try {
-          if (readLegacy(storage) !== expectedRaw) {
+          confirmLegacy(legacyRaw);
+          if (readFallback(storage) !== fallbackRaw || snapshot.raw !== expectedRaw) {
             throw problem('STORAGE_CONFLICT', '다른 창에서 문서가 바뀌었습니다. 현재 내용을 JSON으로 백업하고 변경된 저장을 불러와 주세요.');
           }
+          // The old key stays byte-for-byte unchanged. Write the small baseline
+          // first: if quota blocks the data write, existing data is still intact.
+          const migration = JSON.stringify({ version: 1, legacyHash: fallbackBaselineHash });
+          if (readStorage(storage, MIGRATION_KEY) !== migration) storage.setItem(MIGRATION_KEY, migration);
           storage.setItem(DATA_KEY, raw);
+          fallbackRaw = raw;
           snapshot = { raw, documents: JSON.parse(raw) };
-          remember('localStorage', raw);
+          remember('localStorage-v3', raw);
           failure = null;
           warning = FALLBACK_WARNING;
           return raw;
-        } catch (cause) { throw noteFailure(cause); }
+        } catch (cause) { if (cause?.code === 'STORAGE_LEGACY_CHANGED') throw stop(cause); throw noteFailure(cause); }
       }
       try {
-        await transaction(database, 'readwrite', timeoutMs, (record, store) => {
+        await transaction(database, 'readwrite', timeoutMs, (record, store, previous) => {
           remember('indexedDB', record?.raw);
-          const current = parseRecord(record);
-          confirmLegacy(current.legacyRaw);
+          const current = parseRecord(record, true);
+          confirmPrevious(current, previous);
           if (current.raw !== expectedRaw) {
             throw problem('STORAGE_CONFLICT', '다른 창에서 문서가 바뀌었습니다. 현재 내용을 JSON으로 백업하고 변경된 저장을 불러와 주세요.');
           }
-          store.put({ version: 1, raw, legacyRaw: current.legacyRaw }, RECORD_KEY);
+          const { documents: _documents, ...persisted } = current;
+          store.put({ ...persisted, raw }, RECORD_KEY);
         });
         adopt(raw, JSON.parse(raw));
         assertWritable();
         confirmLegacy(baseline);
+        confirmFallback(fallbackRaw);
         failure = null;
         warning = '';
         return raw;
@@ -302,25 +369,27 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
       assertWritable();
       if (kind === 'localStorage') {
         try {
-          const raw = readLegacy(storage);
-          remember('localStorage', raw);
-          const documents = parseDocuments(raw, true);
-          snapshot = { raw, documents };
+          const next = await fallbackSnapshot();
+          legacyRaw = next.oldRaw; fallbackRaw = next.fallbackRaw; fallbackBaselineHash = next.hash ?? await legacyHash(next.oldRaw);
+          confirmLegacy(legacyRaw); confirmFallback(fallbackRaw);
+          snapshot = { raw: next.raw, documents: next.documents };
           warning = FALLBACK_WARNING;
           failure = null;
           return view();
         } catch (cause) { throw stop(cause); }
       }
       try {
-        await transaction(database, 'readonly', timeoutMs, (record) => {
+        await transaction(database, 'readonly', timeoutMs, (record, _store, previous) => {
           remember('indexedDB', record?.raw);
-          const current = parseRecord(record);
+          const current = parseRecord(record, true);
           adopt(current.raw, current.documents);
           baseline = current.legacyRaw;
-          confirmLegacy(baseline);
+          fallbackRaw = current.fallbackRaw;
+          confirmPrevious(current, previous);
         });
         assertWritable();
         confirmLegacy(baseline);
+        confirmFallback(fallbackRaw);
         failure = null;
         warning = '';
         return view();
@@ -332,12 +401,14 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
   };
 
   try {
-    legacyRaw = readLegacy(storage);
-    remember('localStorage', legacyRaw);
-    snapshot = { raw: legacyRaw, documents: parseDocuments(legacyRaw, true) };
+    const initial = await fallbackSnapshot();
+    legacyRaw = initial.oldRaw; fallbackRaw = initial.fallbackRaw; fallbackBaselineHash = initial.hash;
+    snapshot = { raw: initial.raw, documents: initial.documents };
   } catch (cause) {
     legacyError = cause;
-    snapshot.raw = legacyRaw;
+    legacyRaw = recovery.get('localStorage') ?? null;
+    fallbackRaw = recovery.get('localStorage-v3') ?? null;
+    snapshot.raw = fallbackRaw ?? legacyRaw;
   }
   if (indexedDB === undefined) {
     try { indexedDB = globalThis.indexedDB; }
@@ -346,7 +417,13 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
   // Unsupported is distinct from present-but-denied, blocked or broken.
   if (indexedDB === undefined || indexedDB === null) {
     if (legacyError) stop(legacyError);
-    else { kind = 'localStorage'; warning = FALLBACK_WARNING; }
+    else {
+      try {
+        fallbackBaselineHash ??= await legacyHash(legacyRaw);
+        confirmLegacy(legacyRaw); confirmFallback(fallbackRaw);
+        kind = 'localStorage'; warning = FALLBACK_WARNING;
+      } catch (cause) { stop(cause); }
+    }
     return api;
   }
   try {
@@ -355,25 +432,43 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
     database.onclose = () => {
       if (!readOnly) stop(problem('STORAGE_CLOSED', `기기 저장소 연결이 예기치 않게 닫혔습니다. ${BACKUP_NOTICE}`));
     };
-    await transaction(database, 'readwrite', timeoutMs, (record, store) => {
+    await transaction(database, 'readwrite', timeoutMs, (record, store, previous) => {
+      remember('indexedDB-previous', previous?.raw ?? null);
       if (record !== undefined) {
         remember('indexedDB', record?.raw);
-        const current = parseRecord(record);
+        const current = parseRecord(record, true);
         // Preserve a successfully read IDB snapshot even if a later check or
         // the transaction itself fails. Never substitute older LS documents.
         adopt(current.raw, current.documents);
         baseline = current.legacyRaw;
-        confirmLegacy(baseline);
+        fallbackRaw = current.fallbackRaw;
+        confirmPrevious(current, previous);
       } else {
         if (legacyError) throw legacyError;
         confirmLegacy(legacyRaw);
+        confirmFallback(fallbackRaw);
+        let raw = snapshot.raw;
+        if (previous !== undefined) {
+          const old = parseRecord(previous);
+          // The old IDB record is usually newer than its original LS snapshot.
+          // Never fall back to that older LS snapshot when copying to v3.
+          confirmLegacy(old.legacyRaw);
+          if (fallbackRaw !== null && fallbackRaw !== old.raw && old.raw !== legacyRaw) {
+            throw problem('STORAGE_LEGACY_CHANGED', '이전 저장소와 새 간이 저장소에 서로 다른 문서가 있습니다. 두 원본을 보관한 뒤 확인해 주세요. 자동으로 합치거나 덮어쓰지 않았습니다.');
+          }
+          raw = fallbackRaw ?? old.raw;
+        }
+        const documents = parseDocuments(raw);
+        adopt(raw, documents);
         baseline = legacyRaw;
-        store.put({ version: 1, raw: legacyRaw, legacyRaw }, RECORD_KEY);
+        store.put({ version: 1, raw, legacyRaw, fallbackRaw,
+          previousExists: previous !== undefined, previousRaw: previous?.raw ?? null }, RECORD_KEY);
       }
     });
     remember('indexedDB', snapshot.raw);
     assertWritable();
     confirmLegacy(baseline);
+    confirmFallback(fallbackRaw);
     kind = 'indexedDB';
     warning = '';
   } catch (cause) { stop(cause); }

@@ -14,8 +14,20 @@ const image = (bytes = png, overrides = {}) => ({
   id: makeId(), section: "method", caption: "가상 화면 설명 🐻\r\n순서\t확인",
   ...inspectImageBytes(bytes), data: encodeBase64(bytes), ...overrides,
 });
+// Exercise the actual v1/v2 contract, not a new draft relabelled as legacy.
+const legacyTask = (overrides = {}) => {
+  const task = createTask(overrides);
+  delete task.firstAction;
+  return task;
+};
+const legacyCase = (overrides = {}) => {
+  const item = createCase({ status: "todo", ...overrides });
+  delete item.statusConfirmed;
+  delete item.taskId;
+  return item;
+};
 const document = (images = [image()]) => createDocument({
-  schemaVersion: 2, title: "가상 이미지 인수인계", tasks: [createTask({ title: "가상 업무", images })],
+  schemaVersion: 2, title: "가상 이미지 인수인계", tasks: [legacyTask({ title: "가상 업무", images })],
 });
 const valid = (value) => assert.deepEqual(validateDocument(value).errors, []);
 const invalid = (value, pattern) => {
@@ -76,12 +88,14 @@ test("image limits allow readable screenshots while v1/v2 JSON budgets remain di
 });
 
 test("legacy v1 exact JSON and omitted optional properties remain unchanged", () => {
-  const legacy = createDocument({ title: "기존 문서", tasks: [createTask({ method: "한글 🐻\r\n표\t그대로" })] });
+  const legacy = createDocument({ schemaVersion: 1, title: "기존 문서", tasks: [legacyTask({ method: "한글 🐻\r\n표\t그대로" })] });
   delete legacy.groups;
   for (const key of ["groupId", "ownerRole", "supportRole", "accessStatus"]) delete legacy.tasks[0][key];
   const json = JSON.stringify(legacy, null, 2);
   valid(legacy);
-  assert.equal(createDocument().schemaVersion, 1);
+  assert.equal(legacy.schemaVersion, 1);
+  assert.equal(createDocument().schemaVersion, 3);
+  assert.equal(Object.hasOwn(legacy.tasks[0], "firstAction"), false);
   assert.equal(Object.hasOwn(createTask(), "images"), false);
   assert.equal(stringifyDocument(legacy), json);
   assert.equal(stringifyDocument(parseImport(json).document), json);
@@ -103,9 +117,9 @@ test("v2 image JSON preserves all bytes, IDs, captions, section order, and unrel
 });
 
 test("v2 images are optional and v1 rejects the images key even when empty", () => {
-  for (const tasks of [[], [createTask()], [createTask({ images: [] })]]) valid(createDocument({ schemaVersion: 2, tasks }));
-  for (const images of [[], [image()]]) invalid(createDocument({ tasks: [createTask({ images })] }), /알 수 없는 속성/);
-  for (const version of ["2", 0, 3]) invalid(createDocument({ schemaVersion: version }), /스키마/);
+  for (const tasks of [[], [legacyTask()], [legacyTask({ images: [] })]]) valid(createDocument({ schemaVersion: 2, tasks }));
+  for (const images of [[], [image()]]) invalid(createDocument({ schemaVersion: 1, tasks: [legacyTask({ images })] }), /알 수 없는 속성/);
+  for (const version of ["2", 0, 4]) invalid(createDocument({ schemaVersion: version }), /schemaVersion/);
 });
 
 test("copying remaps image IDs, references and provenance while preserving image content", () => {
@@ -114,7 +128,7 @@ test("copying remaps image IDs, references and provenance while preserving image
   source.sourceFiles = [{ id: makeId(), name: "가상.txt", format: "text", importedAt: source.createdAt, excerpt: "가상 출처", warnings: [] }];
   source.tasks[0].groupId = source.groups[0].id;
   source.tasks[0].sourceRefs = [source.sourceFiles[0].id];
-  source.cases = [createCase({ sourceRefs: [source.sourceFiles[0].id] })];
+  source.cases = [legacyCase({ sourceRefs: [source.sourceFiles[0].id] })];
   const original = copy(source), result = importAsCopy(source);
   valid(result);
   assert.deepEqual(source, original);
@@ -135,7 +149,7 @@ test("copying remaps image IDs, references and provenance while preserving image
 test("image IDs participate in global uniqueness across every model collection", () => {
   for (const target of ["document", "task", "case", "group", "source", "image"]) {
     const source = document([image(), image()]);
-    source.cases = [createCase()];
+    source.cases = [legacyCase()];
     source.groups = [{ id: makeId(), title: "영역" }];
     source.sourceFiles = [{ id: makeId(), name: "가상.txt", format: "text", importedAt: source.createdAt, excerpt: "", warnings: [] }];
     source.tasks[0].images[0].id = ({
@@ -281,9 +295,9 @@ test("per-task and per-document counts enforce limits before binary inspection",
   perTask.tasks[0].images.push(image(png, { data: "AAAA" }));
   invalid(perTask, /업무당.*20/);
   const all = document([]);
-  all.tasks = Array.from({ length: 5 }, () => createTask({ images: Array.from({ length: 20 }, () => image()) }));
+  all.tasks = Array.from({ length: 5 }, () => legacyTask({ images: Array.from({ length: 20 }, () => image()) }));
   valid(all);
-  all.tasks.push(createTask({ images: [image(png, { data: "AAAA" })] }));
+  all.tasks.push(legacyTask({ images: [image(png, { data: "AAAA" })] }));
   invalid(all, /전체.*100/);
 });
 
@@ -309,7 +323,7 @@ test("exact per-image and aggregate byte budgets roundtrip; over-budget fails be
 });
 
 test("v1 retains its raw 5 MiB import cap and excerpt cap even though v2 allows larger image strings", () => {
-  const legacy = createDocument();
+  const legacy = createDocument({ schemaVersion: 1 });
   const padded = JSON.stringify(legacy) + " ".repeat(LIMITS.jsonBytes);
   assert.throws(() => parseImport(padded), /v1.*5 MiB/);
   legacy.provenance = { raw: "a".repeat(LIMITS.excerpt + 1) };

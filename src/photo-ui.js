@@ -1,4 +1,4 @@
-import { makeId, validateDocument } from './model.js';
+import { CURRENT_SCHEMA_VERSION, makeId, validateDocument } from './model.js';
 import { IMAGE_LIMITS, imageDataURL, imageStats, validateImage } from './image-data.js';
 import { preparePhoto } from './image-browser.js';
 
@@ -86,11 +86,11 @@ export function createPhotoUI({ el, button, field, note, modal, notice, isCurren
             let candidateTask = candidate.tasks.find(t => t.id === task.id);
             if (!candidateTask) { candidateTask = structuredClone(task); candidate.tasks.push(candidateTask); }
             candidateTask.images = [...(candidateTask.images || []), image];
-            candidate.schemaVersion = 2;
+            candidate.schemaVersion = CURRENT_SCHEMA_VERSION;
             const result = validateDocument(candidate);
             if (!result.ok) { previewError.textContent = '추가하지 않았습니다. ' + result.errors.join(' '); return; }
             if (!doc.tasks.includes(task)) doc.tasks.push(task);
-            task.images = candidateTask.images; doc.schemaVersion = 2;
+            task.images = candidateTask.images; doc.schemaVersion = CURRENT_SCHEMA_VERSION;
             close(); changed(task.id);
           }, 'primary'),
         ]);

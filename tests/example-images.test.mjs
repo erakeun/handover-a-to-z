@@ -30,10 +30,10 @@ test("example image payloads are immutable embedded synthetic fixtures without r
   assert.equal(bytes, 19_370);
 });
 
-test("sample uses two photos in the intended tasks while blank documents remain v1", () => {
+test("sample uses two photos in the intended tasks and new documents use v3", () => {
   const document = exampleDocument("2026-10-20");
-  assert.equal(document.schemaVersion, 2);
-  assert.equal(createDocument().schemaVersion, 1);
+  assert.equal(document.schemaVersion, 3);
+  assert.equal(createDocument().schemaVersion, 3);
   assert.equal(document.tasks.length, 10);
   assert.equal(document.cases.length, 3);
   assert.equal(document.groups.length, 3);

@@ -22,14 +22,19 @@ const invalid = (document, pattern) => {
   return result;
 };
 const fixture = () => {
-  const document = createDocument({ title: "가상 검증용 문서" });
+  // Preserve v1 import, text-budget and raw-JSON parser coverage when the
+  // editable draft constructor advances to a newer schema.
+  const document = createDocument({ schemaVersion: 1, title: "가상 검증용 문서" });
   document.sourceFiles.push({
     id: makeId(), name: "[가상] 원본.txt", format: "text", importedAt: document.createdAt,
     excerpt: "항목\t담당\t완료 기준\r\n접수\t가상 역할\t기록 남김", warnings: [],
   });
   const sourceRefs = [document.sourceFiles[0].id];
   document.tasks.push(createTask({ title: "가상 업무", timing: { kind: "date", date: "2026-10-20", startRule: "3일 전 시작" }, sourceRefs: [...sourceRefs] }));
-  document.cases.push(createCase({ title: "가상 진행 건", sourceRefs: [...sourceRefs] }));
+  delete document.tasks[0].firstAction;
+  document.cases.push(createCase({ title: "가상 진행 건", status: "todo", sourceRefs: [...sourceRefs] }));
+  delete document.cases[0].statusConfirmed;
+  delete document.cases[0].taskId;
   return document;
 };
 
@@ -40,6 +45,8 @@ test("constructors create independent valid editable drafts and support override
   first.cases.push(createCase());
   valid(first);
   valid(second);
+  assert.equal(first.schemaVersion, 3);
+  assert.equal(second.schemaVersion, 3);
   assert.equal(second.tasks.length, 0);
   assert.notEqual(first.id, second.id);
   assert.equal(createTask({ timing: { kind: "regular", cadence: "monthly", day: "" } }).timing.day, "");
@@ -123,13 +130,15 @@ test("groups roundtrip and remap with tasks, while original v1 documents retain 
   assert.equal(copied.provenance.copyHistory[0].idMap[document.groups[1].id], copied.groups[1].id);
   const legacy = fixture();
   delete legacy.groups;
-  for (const key of ["groupId", "ownerRole", "supportRole", "accessStatus"]) delete legacy.tasks[0][key];
+  for (const key of ["groupId", "ownerRole", "supportRole", "accessStatus", "firstAction"]) delete legacy.tasks[0][key];
   delete legacy.tasks[0].timing.dayRule;
   const roundtrip = parseImport(stringifyDocument(legacy)).document;
   assert.deepEqual(roundtrip, legacy);
   const legacyCopy = importAsCopy(legacy);
+  assert.equal(legacyCopy.schemaVersion, 1);
   assert.equal(Object.hasOwn(legacyCopy, "groups"), false);
-  for (const key of ["groupId", "ownerRole", "supportRole", "accessStatus"]) assert.equal(Object.hasOwn(legacyCopy.tasks[0], key), false);
+  for (const key of ["groupId", "ownerRole", "supportRole", "accessStatus", "firstAction"]) assert.equal(Object.hasOwn(legacyCopy.tasks[0], key), false);
+  for (const key of ["statusConfirmed", "taskId"]) assert.equal(Object.hasOwn(legacyCopy.cases[0], key), false);
 });
 
 test("group references, duplicate group IDs and optional role/access fields are validated", () => {
@@ -158,10 +167,10 @@ test("group references, duplicate group IDs and optional role/access fields are 
 test("schema rejects unsupported versions, missing fields, wrong types and unknown fields without stripping them", () => {
   for (const edit of [
     (doc) => { doc.schemaVersion = "1"; },
-    (doc) => { doc.schemaVersion = 3; },
+    (doc) => { doc.schemaVersion = 4; },
     (doc) => { delete doc.onboarding; },
     (doc) => { doc.tasks[0].accessChecked = "true"; },
-    (doc) => { doc.cases[0].status = "unknown"; },
+    (doc) => { doc.cases[0].status = "invalid-state"; },
     (doc) => { doc.tasks[0].timing.kind = "seasonal"; },
     (doc) => { doc.tasks[0].timing.cadence = "biweekly"; },
     (doc) => { doc.tasks[0].timing.weekday = 0; },
@@ -253,7 +262,8 @@ test("JSON-only preservation rejects cycles, accessors, hidden fields, exotic ty
 });
 
 test("resource limits reject UTF-8 oversize, long fields, too many entries and deep nesting", () => {
-  assert.throws(() => parseImport(`"${"가".repeat(Math.floor(LIMITS.jsonBytes / 3) + 1)}"`), /5 MiB/);
+  const utf8Oversize = { ...fixture(), title: "가".repeat(Math.floor(LIMITS.jsonBytes / 3) + 1) };
+  assert.throws(() => parseImport(JSON.stringify(utf8Oversize)), /v1.*5 MiB/);
   const oversized = fixture();
   oversized.sourceFiles = Array.from({ length: 6 }, () => ({
     id: makeId(), name: "[가상] 큰 텍스트.txt", format: "text",
@@ -285,7 +295,9 @@ test("exact JSON nesting limit roundtrips, and raw abusive depth/count are rejec
   invalid(document, /중첩/);
   assert.throws(() => parseImport(`${"[".repeat(100_000)}0${"]".repeat(100_000)}`), /중첩/);
   assert.throws(() => parseImport(`[${"0,".repeat(LIMITS.nodes)}0]`), /항목 수/);
-  assert.throws(() => parseImport(stringifyDocument(fixture()).replace('"schemaVersion": 1', '"schemaVersion": 9007199254740993')), /숫자/);
+  // Unsupported versions now have a dedicated message. Keep the unsafe-number
+  // assertion on an ordinary preserved field so that numeric validation runs.
+  assert.throws(() => parseImport(stringifyDocument(fixture()).replace('"schemaVersion": 1', '"provenance": {"unsafeInteger": 9007199254740993}, "schemaVersion": 1')), /숫자/);
 });
 
 test("validation accepts blank draft dates but rejects nonexistent days and malformed timestamps", () => {
@@ -446,7 +458,7 @@ test("issues target deadline start rules, actionable open cases, material access
   document.cases = [
     createCase({ title: "진행", status: "doing", nextAction: "" }),
     createCase({ title: "대기", status: "waiting", nextAction: "담당자에게 내일 확인" }),
-    createCase({ title: "완료", status: "done", nextAction: "" }),
+    createCase({ title: "완료", status: "done", statusConfirmed: true, nextAction: "" }),
   ];
   const before = clone(document);
   const issues = issuesFor(document, "2026-10-20");
