@@ -185,7 +185,9 @@ test('35-task reader DOCX preserves entered work and explicit unknowns without a
     for (const [key] of missingFields) item[key] = key === 'verifiedAt' ? '2026-10-20' : `가상 입력 ${key}`;
   }
   const populatedOutput = await reopen(populated);
-  for (const item of populated.tasks) for (const [key] of missingFields) assert.ok(populatedOutput.paragraphs.includes(item[key]), key);
+  for (const item of populated.tasks) for (const [key] of missingFields) {
+    assert.ok(key === 'verifiedAt' ? populatedOutput.text.includes(`최종 내용 확인: ${item[key]}`) : populatedOutput.paragraphs.includes(item[key]), key);
+  }
   assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 8, 'eight group maps, no repeated appendix');
 });
 
@@ -215,7 +217,8 @@ test('DOCX selection applies to summary/detail and excludes source excerpts in p
   ]) assert.ok(!output.text.includes(excluded), `excluded: ${excluded}`);
   assert.ok(output.text.includes('검증용 원문.docx'));
   assert.ok(output.text.includes('선택하지 않은 내용이 섞일 수 있어 생략'));
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tr').length, 2, 'selected task appears once in the map');
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tr').length, 0, 'one selected task uses a compact linked map instead of a duplicate table');
+  assert.ok(output.text.includes('업무 지도 · 내 업무 한눈에 보기'));
 
   const empty = await reopen(document, { taskIds: [], caseIds: [] });
   assert.equal(empty.dom.getElementsByTagNameNS(NS, 'tbl').length, 0);
@@ -378,7 +381,7 @@ test('DOCX distinguishes access not applicable, confirmed, and unconfirmed while
     const document = fixture();
     document.tasks[0].accessStatus = accessStatus;
     const output = await reopen(document, { taskIds: ['task-1'], caseIds: [] });
-    assert.ok(output.text.includes(`접근 권한 확인\n${expected}`));
+    assert.ok(output.text.includes(`접근 권한: ${expected}`));
     assert.ok(output.text.includes('주담당 역할'));
     assert.ok(output.text.includes('지원 역할'));
     assert.ok(output.text.includes('문의 역할'));
@@ -388,7 +391,7 @@ test('DOCX distinguishes access not applicable, confirmed, and unconfirmed while
   delete legacy.tasks[0].supportRole;
   legacy.tasks[0].accessChecked = false;
   const output = await reopen(legacy, { taskIds: ['task-1'], caseIds: [] });
-  assert.ok(output.text.includes('접근 권한 확인\n미확인'));
+  assert.ok(output.text.includes('접근 권한: 미확인'));
 });
 
 test('invalid control characters, prototype keys and malformed export options are rejected', async () => {
@@ -422,7 +425,7 @@ test('reader DOCX omits archive metadata in full and selected exports without de
       assert.ok(!result.text.includes(marker), marker);
     }
     assert.ok(result.text.includes(document.tasks[0].method));
-    assert.ok(result.text.includes('보존된 자료는 인수인계 JSON을 열어 확인'));
+    assert.ok(result.text.includes('전체 원문·복사 이력은 JSON에서 확인'));
     assert.equal(JSON.stringify(document), before);
   }
 });
@@ -597,4 +600,77 @@ test('saved page relations require every needed page and link each task only to 
 
   document.cases[0].sourcePages = [{ sourceId, pages: [2] }];
   await assert.rejects(exportDocx(document, { taskIds: [], caseIds: [document.cases[0].id], evidencePages: [firstPage] }), /연결한 근거 쪽이 빠져/);
+});
+
+test('single-task output keeps the full action guide before large evidence and has no policy-only tail', async () => {
+  const document = reviewExampleDocument();
+  const task = document.tasks[0];
+  const page = await evidencePage(document.sourceFiles[0].id);
+  const before = JSON.stringify(document);
+  const result = await reopen(document, { taskIds: [task.id], caseIds: [], evidencePages: [page] });
+  const body = result.dom.getElementsByTagNameNS(NS, 'body')[0];
+  const elements = Array.from(body.childNodes).filter(node => node.nodeType === 1);
+  const photoIndex = elements.findIndex(node => node.getElementsByTagNameNS(NS, 'drawing').length);
+  for (const value of [task.firstAction, task.method, task.steps, task.exceptions, task.doneWhen]) {
+    assert.ok(elements.findIndex(node => visibleText(node) === value) < photoIndex, value);
+    assert.ok(result.text.includes(value));
+  }
+  assert.equal(result.dom.getElementsByTagNameNS(NS, 'tbl').length, 0, 'single task keeps a compact linked map');
+  assert.ok(result.text.indexOf('출처와 확인 사항') < result.text.indexOf('함께 전달한 근거 쪽'));
+  assert.equal(result.paragraphs.filter(value => value === task.method).length, 1, 'body is not summarized by guessing or duplicated');
+  for (const warning of document.sourceFiles[0].warnings) assert.ok(result.text.includes(warning));
+  const originalPhoto = Buffer.from(task.images[0].data, 'base64');
+  assert.ok(Object.entries(result.zip).some(([name, bytes]) => name.startsWith('word/media/') && Buffer.from(bytes).equals(originalPhoto)));
+  assert.equal(JSON.stringify(document), before);
+});
+
+test('completed case output keeps the earlier action as history and reopening restores actionable wording', async () => {
+  const document = fixture();
+  document.schemaVersion = 3;
+  document.tasks = [];
+  document.cases = [document.cases[0]];
+  const item = document.cases[0];
+  item.status = 'done';
+  item.statusConfirmed = true;
+  const before = JSON.stringify(document);
+  const done = await reopen(document);
+  assert.ok(done.text.includes('완료한 건입니다.'));
+  assert.ok(done.text.includes('이전 다음 행동 · 완료 전 기록'));
+  assert.ok(done.text.includes('이전 기한'));
+  for (const value of [item.nextAction, item.dueDate, item.waitingFor, item.notes]) assert.ok(done.paragraphs.includes(value));
+  assert.ok(!done.paragraphs.includes('다음 행동'));
+  assert.equal(JSON.stringify(document), before);
+  item.status = 'waiting';
+  const reopened = await reopen(document);
+  assert.ok(reopened.paragraphs.includes('다음 행동'));
+  assert.ok(reopened.paragraphs.includes(item.nextAction));
+  assert.ok(!reopened.text.includes('완료 전 기록'));
+  item.status = 'done';
+  item.statusConfirmed = false;
+  const unknown = await reopen(document);
+  assert.ok(unknown.paragraphs.includes('상태 미확인'));
+  assert.ok(!unknown.text.includes('완료한 건입니다.'));
+});
+
+test('PDF evidence links never hide an additional non-PDF source name', async () => {
+  const document = reviewExampleDocument();
+  const task = document.tasks[0];
+  const page = await evidencePage(document.sourceFiles[0].id);
+  document.sourceFiles.push({ id: 'extra-source', name: '추가 참고자료.docx', format: 'docx', importedAt: now, excerpt: '', warnings: [] });
+  task.sourceRefs.push('extra-source');
+  const result = await reopen(document, { taskIds: [task.id], caseIds: [], evidencePages: [page] });
+  const taskText = result.text.slice(result.text.indexOf('업무 상세 · 실행 안내'), result.text.indexOf('출처와 확인 사항'));
+  assert.ok(taskText.includes('추가 참고자료.docx'));
+});
+
+test('short tab-separated condition blocks remain literal and keep their header on the same page', async () => {
+  const document = fixture();
+  document.tasks = [document.tasks[0]];
+  document.tasks[0].method = '조건\t다음 행동\n날짜 있음\t목록에 추가\n날짜 없음\t질문';
+  const before = JSON.stringify(document);
+  const result = await reopen(document);
+  const body = Array.from(result.dom.getElementsByTagNameNS(NS, 'p')).find(node => visibleText(node) === document.tasks[0].method);
+  assert.ok(body);
+  assert.equal(body.getElementsByTagNameNS(NS, 'keepLines').length, 1);
+  assert.equal(JSON.stringify(document), before);
 });

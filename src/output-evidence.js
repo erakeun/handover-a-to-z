@@ -27,6 +27,66 @@ export function linkedPdfSources(doc, selection = {}) {
   return doc.sourceFiles.filter(source => refs.has(source.id) && source.pdf);
 }
 
+/**
+ * Separate already confirmed relations from the choices still needed. A case's
+ * taskId and a shared PDF do not establish which pages that case needs.
+ * Callers may display the pending records together, but must not preselect or
+ * copy another record's pages as if the person had confirmed that relation.
+ */
+export function outputEvidencePlan(doc, selection = {}) {
+  const items = selectedItems(doc, selection);
+  const taskIds = new Set(doc.tasks.map(item => item.id));
+  return linkedPdfSources(doc, selection).map(source => ({
+    source,
+    records: items.filter(item => item.sourceRefs?.includes(source.id)).map(item => {
+      const entry = item.sourcePages?.find(link => link.sourceId === source.id);
+      if (entry) check(Array.isArray(entry.pages) && entry.pages.length && entry.pages.every(page => Number.isInteger(page)), '저장된 근거 쪽을 확인해 주세요.');
+      const pages = entry ? parseEvidencePages(entry.pages.join(','), source.pdf.pageCount) : source.pdf.pageCount === 1 ? [1] : [];
+      return {
+        itemId: item.id, kind: taskIds.has(item.id) ? 'task' : 'case', title: item.title,
+        pages, state: entry ? 'confirmed' : pages.length ? 'single-page' : 'unconfirmed',
+      };
+    }),
+  }));
+}
+
+/**
+ * Apply only the person's explicit item-and-page groups to a copy. This permits
+ * entering a shared page range once without inventing any new relationship.
+ * Existing confirmed choices stay protected unless a review explicitly allows
+ * replacement. Validation completes before the returned copy is modified.
+ */
+export function applyEvidencePageGroups(doc, selection = {}, groups = [], { replaceConfirmed = false } = {}) {
+  const plan = outputEvidencePlan(doc, selection);
+  check(Array.isArray(groups), '함께 연결할 업무와 근거 쪽을 확인해 주세요.');
+  const seen = new Set();
+  const assignments = groups.flatMap(group => {
+    check(group && typeof group === 'object' && !Array.isArray(group), '함께 연결할 업무와 근거 쪽을 확인해 주세요.');
+    const sourcePlan = plan.find(item => item.source.id === group.sourceId);
+    check(sourcePlan, '선택한 업무에 연결되지 않은 근거 쪽이 있습니다.');
+    check(Array.isArray(group.itemIds) && group.itemIds.length && group.itemIds.every(id => typeof id === 'string'), '근거 쪽을 연결할 업무 또는 진행 건을 하나 이상 선택해 주세요.');
+    const pages = parseEvidencePages(group.pages, sourcePlan.source.pdf.pageCount);
+    return group.itemIds.map(itemId => {
+      const record = sourcePlan.records.find(item => item.itemId === itemId);
+      check(record, '선택한 업무에 연결되지 않은 근거 쪽이 있습니다.');
+      const key = JSON.stringify([group.sourceId, itemId]);
+      check(!seen.has(key), '같은 업무의 근거 쪽이 여러 묶음에 있습니다. 한 묶음으로 확인해 주세요.');
+      seen.add(key);
+      const unchanged = record.pages.length === pages.length && record.pages.every((page, index) => page === pages[index]);
+      check(replaceConfirmed || record.state !== 'confirmed' || unchanged, '이미 확인한 근거 쪽입니다. 연결 확인·바꾸기에서 변경해 주세요.');
+      return { itemId, sourceId: group.sourceId, pages, unchanged: record.state === 'confirmed' && unchanged };
+    });
+  });
+  const copy = structuredClone(doc);
+  const items = [...copy.tasks, ...copy.cases];
+  for (const assignment of assignments) {
+    if (assignment.unchanged) continue;
+    const item = items.find(item => item.id === assignment.itemId);
+    item.sourcePages = [...(item.sourcePages || []).filter(link => link.sourceId !== assignment.sourceId), { sourceId: assignment.sourceId, pages: [...assignment.pages] }];
+  }
+  return copy;
+}
+
 /** Reuse confirmed item-to-page relations; a different item's choice is not a substitute. */
 export function storedOutputPages(doc, selection = {}) {
   const items = selectedItems(doc, selection);
