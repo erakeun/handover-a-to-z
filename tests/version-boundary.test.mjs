@@ -9,6 +9,7 @@ import {
   CURRENT_SCHEMA_VERSION, LIMITS, createDocument, createTask, createCase, exampleDocument,
   validateDocument, parseImport, stringifyDocument, importAsCopy, dueInRange,
 } from '../src/model.js';
+import { reviewExampleDocument } from '../src/review-example.js';
 
 // This was the public HEAD when the v3 boundary was added. Pin the comparison so
 // committing this change cannot silently replace the old reader under test.
@@ -28,6 +29,21 @@ for (const filename of ['model.js', 'image-data.js', 'example-images.js']) {
   chmodSync(join(snapshot, filename), 0o444);
 }
 const publicModel = await import(pathToFileURL(join(snapshot, 'model.js')).href);
+// Freeze the deployed 0.3.0 reader as well: its inability to read the new
+// relationship must be an explicit version failure, never dropped page data.
+const V3_PRODUCTION_REVISION = 'e180c825c984ba6f85a2dea8407ed8542797e209';
+const snapshotV3 = mkdtempSync(join(tmpdir(), 'handover-public-v3-model-'));
+after(() => rmSync(snapshotV3, { recursive: true, force: true }));
+writeFileSync(join(snapshotV3, 'package.json'), '{"type":"module"}\n');
+symlinkSync(join(repo, 'node_modules'), join(snapshotV3, 'node_modules'), 'dir');
+const v3Sources = new Map();
+for (const filename of ['model.js', 'image-data.js', 'example-images.js']) {
+  const source = git(['show', `${V3_PRODUCTION_REVISION}:src/${filename}`]);
+  v3Sources.set(filename, source);
+  writeFileSync(join(snapshotV3, filename), source);
+  chmodSync(join(snapshotV3, filename), 0o444);
+}
+const publicV3Model = await import(pathToFileURL(join(snapshotV3, 'model.js')).href);
 const valid = (document) => assert.deepEqual(validateDocument(document).errors, []);
 
 function legacyDocument(version) {
@@ -94,13 +110,15 @@ test('every v3 extension is rejected under both legacy version numbers without d
   }
 });
 
-test('new documents and review extensions use v3 while upgrading preserves all legacy information', () => {
-  assert.equal(CURRENT_SCHEMA_VERSION, 3);
-  assert.equal(createDocument().schemaVersion, 3);
-  assert.equal(exampleDocument('2026-10-20').schemaVersion, 3);
+test('new documents use v4 while upgrading preserves all legacy information and never invents page relationships', () => {
+  assert.equal(CURRENT_SCHEMA_VERSION, 4);
+  assert.equal(createDocument().schemaVersion, 4);
+  assert.equal(exampleDocument('2026-10-20').schemaVersion, 4);
+  assert.equal(Object.hasOwn(createTask(), 'sourcePages'), false);
+  assert.equal(Object.hasOwn(createCase(), 'sourcePages'), false);
   valid(createDocument({ tasks: [createTask()], cases: [createCase()] }));
   const document = legacyDocument(2), before = structuredClone(document);
-  document.schemaVersion = 3;
+  document.schemaVersion = 4;
   valid(document);
   assert.deepEqual({ ...document, schemaVersion: 2 }, before);
   document.tasks[0].firstAction = '이전에 받은 내용을 확인한다.';
@@ -111,9 +129,11 @@ test('new documents and review extensions use v3 while upgrading preserves all l
   const json = stringifyDocument(document);
   assert.equal(stringifyDocument(parseImport(json).document), json);
   const copy = importAsCopy(document);
-  assert.equal(copy.schemaVersion, 3);
+  assert.equal(copy.schemaVersion, 4);
   assert.equal(copy.cases[0].taskId, copy.tasks[0].id);
   assert.deepEqual(copy.sourceFiles[0].pdf, document.sourceFiles[0].pdf);
+  assert.equal(Object.hasOwn(copy.tasks[0], 'sourcePages'), false);
+  assert.equal(Object.hasOwn(copy.cases[0], 'sourcePages'), false);
 });
 
 test('the immutable public HEAD reader explicitly rejects v3 based on its version alone', () => {
@@ -130,8 +150,8 @@ test('the immutable public HEAD reader explicitly rejects v3 based on its versio
   }
 });
 
-test('v3 keeps the shared 24 MiB envelope and v1 keeps its 5 MiB boundary', () => {
-  const document = createDocument();
+test('v3 and v4 keep the shared 24 MiB envelope and v1 keeps its 5 MiB boundary', () => {
+  const document = createDocument({ schemaVersion: 3 });
   document.sourceFiles = Array.from({ length: 6 }, (_, index) => ({
     id: `large-source-${index}`, name: '가상 긴 원문.txt', format: 'text', importedAt: document.createdAt,
     excerpt: 'A'.repeat(LIMITS.excerpt), warnings: [],
@@ -139,6 +159,8 @@ test('v3 keeps the shared 24 MiB envelope and v1 keeps its 5 MiB boundary', () =
   const json = stringifyDocument(document);
   assert.ok(Buffer.byteLength(json) > LIMITS.jsonBytes);
   assert.equal(parseImport(json).document.schemaVersion, 3);
+  document.schemaVersion = 4;
+  assert.equal(parseImport(stringifyDocument(document)).document.schemaVersion, 4);
   document.schemaVersion = 2;
   valid(document);
   document.schemaVersion = 1;
@@ -150,9 +172,109 @@ test('v3 keeps the shared 24 MiB envelope and v1 keeps its 5 MiB boundary', () =
 });
 
 test('unsupported future formats have an explicit latest-app instruction', () => {
-  const document = createDocument({ schemaVersion: 4 });
+  const document = createDocument({ schemaVersion: 5 });
   const message = '이 파일은 최신 인수인계 A to Z에서 열어 주세요';
   assert.ok(validateDocument(document).errors.some(error => error.includes(message)));
   assert.throws(() => parseImport(JSON.stringify(document)), error =>
     error.message === `${message}. 현재 내용은 바뀌지 않았습니다.`);
+});
+
+test('deployed v3 JSON preserves every field and PDF/image byte when opened or copied without page choices', () => {
+  const original = reviewExampleDocument();
+  assert.equal(original.schemaVersion, 3, 'the existing sample stays an unchanged v3 handoff');
+  assert.equal(publicV3Model.validateDocument(original).ok, true);
+  const json = publicV3Model.stringifyDocument(original);
+  const restored = parseImport(json).document;
+  assert.equal(stringifyDocument(restored), json);
+  assert.deepEqual(restored, original);
+  const copy = importAsCopy(restored);
+  assert.equal(copy.schemaVersion, 3);
+  assert.equal(publicV3Model.validateDocument(copy).ok, true);
+  assert.deepEqual(copy.sourceFiles[0].pdf, original.sourceFiles[0].pdf);
+  assert.equal(copy.tasks[0].images[0].data, original.tasks[0].images[0].data);
+  assert.deepEqual(copy.cases.map(item => [item.status, item.statusConfirmed]), original.cases.map(item => [item.status, item.statusConfirmed]));
+  assert.ok([...copy.tasks, ...copy.cases].every(item => !Object.hasOwn(item, 'sourcePages')));
+  assert.equal(stringifyDocument(restored), json);
+});
+
+test('explicit v4 task and case page relationships survive JSON and copy with source IDs remapped', () => {
+  const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  const sourceId = document.sourceFiles[0].id;
+  document.tasks[0].sourcePages = [{ sourceId, pages: [1] }];
+  document.cases[0].sourcePages = [{ sourceId, pages: [2, 1] }];
+  const json = stringifyDocument(document);
+  assert.deepEqual(parseImport(json).document, document);
+  assert.equal(stringifyDocument(parseImport(json).document), json);
+  const copy = importAsCopy(document);
+  valid(copy);
+  assert.equal(copy.schemaVersion, 4);
+  assert.notEqual(copy.sourceFiles[0].id, sourceId);
+  assert.deepEqual(copy.tasks[0].sourcePages, [{ sourceId: copy.sourceFiles[0].id, pages: [1] }]);
+  assert.deepEqual(copy.cases[0].sourcePages, [{ sourceId: copy.sourceFiles[0].id, pages: [2, 1] }]);
+  assert.ok(copy.tasks[0].sourceRefs.includes(copy.tasks[0].sourcePages[0].sourceId));
+  assert.equal(Object.hasOwn(copy.tasks[1], 'sourcePages'), false);
+  assert.deepEqual(copy.sourceFiles[0].pdf, document.sourceFiles[0].pdf);
+  copy.tasks[0].sourcePages[0].pages.push(2);
+  assert.deepEqual(document.tasks[0].sourcePages[0].pages, [1]);
+  assert.equal(stringifyDocument(document), json, 'copying and editing a copy do not alter the input');
+});
+
+test('v4 page relationships reject unlinked, missing, non-PDF, duplicate and out-of-range choices without dropping content', () => {
+  const base = reviewExampleDocument();
+  base.schemaVersion = 4;
+  const sourceId = base.sourceFiles[0].id;
+  const invalidRelations = [
+    [{ sourceId, pages: [] }],
+    [{ sourceId, pages: [0] }],
+    [{ sourceId, pages: [3] }],
+    [{ sourceId, pages: [1.5] }],
+    [{ sourceId, pages: ['1'] }],
+    [{ sourceId, pages: [1, 1] }],
+    [{ sourceId, pages: [1] }, { sourceId, pages: [2] }],
+    [{ sourceId: 'missing-source', pages: [1] }],
+    [{ sourceId, pages: [1], guessed: true }],
+    [{ sourceId, pages: Array.from({ length: 201 }, (_, index) => index + 1) }],
+    null,
+  ];
+  for (const collection of ['tasks', 'cases']) {
+    for (const relation of invalidRelations) {
+      const document = structuredClone(base);
+      document[collection][0].sourcePages = relation;
+      const before = JSON.stringify(document);
+      assert.match(validateDocument(document).errors.join('\n'), /sourcePages/);
+      assert.throws(() => stringifyDocument(document), /sourcePages/);
+      assert.throws(() => parseImport(before), /sourcePages/);
+      assert.equal(JSON.stringify(document), before);
+    }
+    for (const kind of ['unlinked', 'non-PDF']) {
+      const document = structuredClone(base);
+      document[collection][0].sourcePages = [{ sourceId, pages: [1] }];
+      if (kind === 'unlinked') document[collection][0].sourceRefs = [];
+      else { delete document.sourceFiles[0].pdf; document.sourceFiles[0].format = 'text'; }
+      assert.match(validateDocument(document).errors.join('\n'), /sourcePages/);
+    }
+  }
+});
+
+test('page relationships cannot be mislabeled as legacy v1/v2/v3 files and the deployed v3 reader rejects v4 explicitly', () => {
+  for (const version of [1, 2, 3]) {
+    const document = version === 3 ? reviewExampleDocument() : legacyDocument(version);
+    document.tasks[0].sourcePages = [];
+    const before = JSON.stringify(document);
+    assert.match(validateDocument(document).errors.join('\n'), /sourcePages.*알 수 없는/);
+    assert.throws(() => parseImport(before), /sourcePages/);
+    assert.equal(JSON.stringify(document), before);
+  }
+  const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  valid(document);
+  assert.equal(publicV3Model.validateDocument(document).ok, false, 'version alone must reject a v4 file');
+  assert.throws(() => publicV3Model.parseImport(stringifyDocument(document)), /최신 인수인계 A to Z/);
+  document.tasks[0].sourcePages = [{ sourceId: document.sourceFiles[0].id, pages: [1] }];
+  assert.throws(() => publicV3Model.parseImport(stringifyDocument(document)), /최신 인수인계 A to Z/);
+  for (const [filename, source] of v3Sources) {
+    assert.equal(readFileSync(join(snapshotV3, filename), 'utf8'), source);
+    assert.equal(statSync(join(snapshotV3, filename)).mode & 0o222, 0);
+  }
 });

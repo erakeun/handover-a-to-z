@@ -14,8 +14,8 @@ test('new tasks and cases have optional first action and an explicitly unknown c
   assert.equal(item.status, 'unknown');
   assert.equal(item.statusConfirmed, false);
   assert.equal(item.taskId, '');
-  assert.equal(CURRENT_SCHEMA_VERSION, 3);
-  assert.equal(createDocument().schemaVersion, 3);
+  assert.equal(CURRENT_SCHEMA_VERSION, 4);
+  assert.equal(createDocument().schemaVersion, 4);
   valid(createDocument({ tasks: [task], cases: [item] }));
 });
 

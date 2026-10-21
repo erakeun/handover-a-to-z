@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { EXAMPLE_IMAGES } from "../src/example-images.js";
 import { decodeBase64, inspectImageBytes } from "../src/image-data.js";
 import {
-  createDocument, exampleDocument, importAsCopy, parseImport,
+  CURRENT_SCHEMA_VERSION, createDocument, exampleDocument, importAsCopy, parseImport,
   stringifyDocument, validateDocument,
 } from "../src/model.js";
 
@@ -30,10 +30,10 @@ test("example image payloads are immutable embedded synthetic fixtures without r
   assert.equal(bytes, 19_370);
 });
 
-test("sample uses two photos in the intended tasks and new documents use v3", () => {
+test("sample uses two photos in the intended tasks and new documents use the current format", () => {
   const document = exampleDocument("2026-10-20");
-  assert.equal(document.schemaVersion, 3);
-  assert.equal(createDocument().schemaVersion, 3);
+  assert.equal(document.schemaVersion, CURRENT_SCHEMA_VERSION);
+  assert.equal(createDocument().schemaVersion, CURRENT_SCHEMA_VERSION);
   assert.equal(document.tasks.length, 10);
   assert.equal(document.cases.length, 3);
   assert.equal(document.groups.length, 3);

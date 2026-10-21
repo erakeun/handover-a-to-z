@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Window } from 'happy-dom';
 import { unzipSync, strFromU8 } from 'fflate';
-import { createDocument, createTask, createCase, makeId, parseImport, stringifyDocument, validateDocument, dateISO } from '../src/model.js';
+import { CURRENT_SCHEMA_VERSION, createDocument, createTask, createCase, makeId, parseImport, stringifyDocument, validateDocument, dateISO } from '../src/model.js';
 import { DATA_KEY, CURRENT_KEY, PROGRESS_KEY, loadDocuments } from '../src/storage.js';
 import { exportAIText, exportDocx } from '../src/exporters.js';
 import { AUTHOR_PROMPT, parseAIDraft } from '../src/ai-draft.js';
+import { reviewExampleDocument } from '../src/review-example.js';
 
 // These tests execute the real app module against a DOM emulator. They do not
 // launch a browser, navigate to localhost, or claim layout/visual verification.
@@ -206,7 +207,7 @@ test('unsupported or damaged transfer files leave current documents and selectio
   const existing = createDocument({ title: '보존할 가상 문서', tasks: [createTask({ title: '기존 업무', method: '원래 설명' })] });
   await mount({ [DATA_KEY]: JSON.stringify([existing]), [CURRENT_KEY]: existing.id });
   const before = snapshot();
-  const future = { ...structuredClone(existing), schemaVersion: 4 };
+  const future = { ...structuredClone(existing), schemaVersion: CURRENT_SCHEMA_VERSION + 1 };
   const mislabeled = { ...structuredClone(existing), schemaVersion: 2 };
   for (const text of [JSON.stringify(future), JSON.stringify(mislabeled), '{broken']) {
     await click([...ui.document.querySelectorAll('.start-card')].find(node => node.querySelector('strong')?.textContent === '받은 인수인계서 보기'));
@@ -237,7 +238,7 @@ test('opening legacy JSON preserves its format; an intentional edit upgrades wit
   await click('작성하기');
   await fill('첫 행동 한 줄', '접수 내용을 확인하세요.');
   const edited = savedDocument();
-  assert.equal(edited.schemaVersion, 3);
+  assert.equal(edited.schemaVersion, CURRENT_SCHEMA_VERSION);
   assert.equal(edited.tasks[0].method, legacy.tasks[0].method);
   assert.equal(edited.tasks[0].firstAction, '접수 내용을 확인하세요.');
   assert.deepEqual(parseImport(await backupText()).document, edited);
@@ -681,7 +682,7 @@ for (const sourceKind of ['paste', 'docx']) {
     await click('현재 문서에 업무 추가', review);
     const result = savedDocument();
     const added = result.tasks.slice(1);
-    assert.equal(result.schemaVersion, 3);
+    assert.equal(result.schemaVersion, CURRENT_SCHEMA_VERSION);
     assert.deepEqual(result.tasks[0], existingTask);
     assert.deepEqual(result.groups, doc.groups);
     assert.deepEqual(result.cases, doc.cases);
@@ -1035,6 +1036,142 @@ test('full document download stays complete after a partial choice while advance
   assert.equal(networkAttempts.length, 0);
 });
 
+async function selectOutputItems(items) {
+  await click('선택 해제');
+  const list = ui.document.querySelector('.export-selection');
+  for (const item of items) {
+    const checkbox = control(item.title, list);
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new ui.Event('change', { bubbles: true }));
+  }
+  await settle();
+}
+
+test('DOM PDF output asks for each selected item, and blank, invalid or cancelled choices leave legacy JSON untouched', async () => {
+  const doc = reviewExampleDocument();
+  const task = doc.tasks[0], item = doc.cases[0];
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성');
+  await click('내보내기', ui.document.querySelector('.top-nav'));
+  await selectOutputItems([task, item]);
+  const before = snapshot();
+  await click('선택한 업무만 문서로 받기');
+  const dialog = ui.document.querySelector('dialog');
+  assert.match(dialog.querySelector('h2').textContent, /함께 전달할 근거 쪽/);
+  assert.equal(dialog.querySelectorAll('.output-source').length, 1, 'one shared source is shown once');
+  assert.equal(dialog.querySelectorAll('.output-source input').length, 2, 'a task and its case need independent page relationships');
+  assert.equal(control(`${task.title} · 근거 쪽`, dialog).value, '');
+  assert.equal(control(`${item.title} · 근거 쪽`, dialog).value, '');
+  for (const omitted of [...doc.tasks.slice(1), doc.cases[1]]) assert.ok(!dialog.textContent.includes(omitted.title));
+  assert.deepEqual(snapshot(), before, 'opening the preflight does not upgrade or edit v3');
+  await click('연결을 기억하고 함께 만들기', dialog);
+  assert.match(dialog.querySelector('[role=alert]').textContent, /근거 쪽을 선택/);
+  assert.deepEqual(snapshot(), before);
+  await fill(`${task.title} · 근거 쪽`, '1', dialog);
+  await fill(`${item.title} · 근거 쪽`, '3', dialog);
+  await click('연결을 기억하고 함께 만들기', dialog);
+  assert.match(dialog.querySelector('[role=alert]').textContent, /1~2쪽 사이/);
+  assert.deepEqual(snapshot(), before, 'a valid first choice is not committed before a later invalid choice fails');
+  assert.equal(downloads.length, 0);
+  await fill(`${item.title} · 근거 쪽`, '2', dialog);
+  await click('취소', dialog);
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.deepEqual(snapshot(), before);
+  assert.deepEqual(savedDocument(), doc);
+  assert.equal(savedDocument().schemaVersion, 3);
+  assert.ok([...savedDocument().tasks, ...savedDocument().cases].every(record => !Object.hasOwn(record, 'sourcePages')));
+  assert.equal(downloads.length, 0);
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('DOM PDF preflight reuses one item’s confirmed pages without assigning them to other selected items', async () => {
+  const doc = reviewExampleDocument();
+  doc.schemaVersion = CURRENT_SCHEMA_VERSION;
+  const sourceId = doc.sourceFiles[0].id;
+  const confirmed = doc.tasks[0], pending = doc.tasks[1];
+  confirmed.sourcePages = [{ sourceId, pages: [1] }];
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성');
+  await click('내보내기', ui.document.querySelector('.top-nav'));
+  await selectOutputItems([confirmed, pending]);
+  const before = snapshot();
+  await click('인쇄 보기');
+  let dialog = ui.document.querySelector('dialog');
+  assert.equal(dialog.querySelectorAll('.output-source input').length, 1);
+  assert.equal(control(`${pending.title} · 근거 쪽`, dialog).value, '');
+  assert.ok(![...dialog.querySelectorAll('label')].some(label => label.textContent === `${confirmed.title} · 근거 쪽`));
+  await click('취소', dialog);
+  assert.equal(ui.document.querySelector('.print-sheet'), null, 'cancelling does not open a print view with missing evidence');
+  assert.deepEqual(snapshot(), before);
+  await click('근거 쪽 연결 확인·바꾸기');
+  dialog = ui.document.querySelector('dialog');
+  assert.equal(control(`${confirmed.title} · 근거 쪽`, dialog).value, '1', 'the stored choice can be explicitly reviewed');
+  assert.equal(control(`${pending.title} · 근거 쪽`, dialog).value, '');
+  await fill(`${confirmed.title} · 근거 쪽`, '2', dialog);
+  await click('취소', dialog);
+  assert.deepEqual(snapshot(), before, 'cancelled review leaves the previous confirmed relationship unchanged');
+  assert.deepEqual(savedDocument().tasks[0].sourcePages, [{ sourceId, pages: [1] }]);
+  assert.equal(Object.hasOwn(savedDocument().tasks[1], 'sourcePages'), false);
+  assert.equal(downloads.length, 0);
+});
+
+test('DOM output reuses a complete saved page choice, but canvas failure produces no download or document mutation', async () => {
+  const doc = reviewExampleDocument();
+  doc.schemaVersion = CURRENT_SCHEMA_VERSION;
+  const task = doc.tasks[0];
+  task.sourcePages = [{ sourceId: doc.sourceFiles[0].id, pages: [1] }];
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성');
+  await click('내보내기', ui.document.querySelector('.top-nav'));
+  await selectOutputItems([task]);
+  const before = snapshot();
+  const prototype = ui.HTMLCanvasElement.prototype;
+  const originalContext = prototype.getContext;
+  prototype.getContext = () => { throw new Error('가상 캔버스 실패'); };
+  try {
+    await click('선택한 업무만 문서로 받기');
+    assert.equal(ui.document.querySelector('dialog'), null, 'a complete saved relationship is reused without a repeated page prompt');
+    for (let attempt = 0; attempt < 100 && !ui.document.querySelector('#notice').textContent.includes('실패'); attempt++) {
+      await new Promise(resolve => originalSetTimeout(resolve, 10));
+    }
+    assert.match(ui.document.querySelector('#notice').textContent, /문서 생성 실패/);
+    assert.equal(downloads.length, 0, 'failure cannot silently download an output without the required page');
+    assert.deepEqual(snapshot(), before);
+    assert.deepEqual(savedDocument(), doc);
+  } finally { prototype.getContext = originalContext; }
+});
+
+test('DOM newly confirmed page input is not persisted or upgraded when the page cannot render', async () => {
+  const doc = reviewExampleDocument();
+  const task = doc.tasks[0];
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('이어서 작성');
+  await click('내보내기', ui.document.querySelector('.top-nav'));
+  await selectOutputItems([task]);
+  const before = snapshot();
+  await click('선택한 업무만 문서로 받기');
+  const dialog = ui.document.querySelector('dialog');
+  await fill(`${task.title} · 근거 쪽`, '1', dialog);
+  const prototype = ui.HTMLCanvasElement.prototype;
+  const originalContext = prototype.getContext;
+  prototype.getContext = () => { throw new Error('가상 캔버스 실패'); };
+  try {
+    await click('연결을 기억하고 함께 만들기', dialog);
+    for (let attempt = 0; attempt < 100 && !dialog.querySelector('[role=alert]'); attempt++) {
+      await new Promise(resolve => originalSetTimeout(resolve, 10));
+    }
+    assert.match(dialog.querySelector('[role=alert]').textContent, /출력을 완료하지 못했습니다/);
+    assert.equal(downloads.length, 0);
+    assert.deepEqual(snapshot(), before);
+    assert.deepEqual(savedDocument(), doc);
+    assert.equal(savedDocument().schemaVersion, 3);
+    assert.equal(Object.hasOwn(savedDocument().tasks[0], 'sourcePages'), false);
+    assert.equal(button('연결을 기억하고 함께 만들기', dialog).disabled, false);
+    await click('취소', dialog);
+    assert.deepEqual(snapshot(), before);
+  } finally { prototype.getContext = originalContext; }
+});
+
 test('counted UI paths take 3 actions for an ungrouped first draft and 13 for the same three-groups-first workflow', async () => {
   const run=async groupFirst=>{
     await mount();
@@ -1115,6 +1252,137 @@ test('search title opens a full task and returns to the same query, result, focu
   assert.equal(ui.document.querySelector('dialog'),null);
 });
 
+for (const [variant, method, steps, label] of [
+  ['basic body', '1. 예약 명단에서 이름을 확인합니다.\n2. 이름이 없으면 담당 역할에게 묻습니다.', '', '하는 방법'],
+  ['legacy steps only', '', '1. 요청 목록을 엽니다.\n2. 빠진 내용을 표시합니다.', '진행 순서'],
+  ['blank body and meaningful steps', '   ', '1. 보관된 요청을 엽니다.\n2. 조건을 확인합니다.', '진행 순서'],
+]) {
+  test(`DOM reader uses ${variant} without requiring a duplicate first-action entry or changing stored text`, async () => {
+    const task = createTask({ title: '가상 시작 안내 확인', method, steps, firstAction: '' });
+    const doc = createDocument({ tasks: [task] });
+    await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+    await click('인수자 보기', ui.document.querySelector('.document-card'));
+    const before = snapshot();
+    await fill('업무나 상황 찾기', '시작 안내');
+    const result = ui.document.querySelector('.task-result');
+    assert.match(result.querySelector('summary').textContent, /본문 안내 있음/);
+    await click(result.querySelector('summary'));
+    const detail = ui.document.querySelector('dialog .task-detail');
+    const instruction = [...detail.querySelectorAll('.read-block')].find(node => node.querySelector('h4')?.textContent === label);
+    assert.ok(instruction, 'the authored execution block is directly present in the opened detail');
+    assert.equal(instruction.querySelector('p').textContent, steps || method);
+    assert.equal(instruction.closest('details'), null, 'the existing instructions do not require expanding background details');
+    assert.equal(detail.querySelector('.first-action'), null, 'no new first action is invented from the body');
+    assert.doesNotMatch(detail.textContent, /첫 행동이 별도로|먼저 할 일이 아직|실행 안내가 아직 없습니다/);
+    await click('목록으로 돌아가기', ui.document.querySelector('dialog'));
+    assert.equal(control('업무나 상황 찾기').value, '시작 안내');
+    assert.deepEqual(savedDocument().tasks[0], task);
+    assert.deepEqual(snapshot(), before, 'reading must not fill or normalize any authored field');
+    assert.equal(networkAttempts.length, 0);
+  });
+}
+
+test('DOM reader keeps truly missing execution text visible and preserves an explicitly written first action', async () => {
+  const empty = createTask({ title: '가상 실행 내용 없음', method: '   ', steps: '', firstAction: '' });
+  const explicit = createTask({ title: '가상 별도 시작 안내', method: '본문의 나머지 방법입니다.', firstAction: '인계자에게 현재 조건을 먼저 확인합니다.' });
+  const doc = createDocument({ tasks: [empty, explicit] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('인수자 보기', ui.document.querySelector('.document-card'));
+  const before = snapshot();
+  await click(ui.document.querySelector(`[data-task-id="${empty.id}"]`));
+  assert.match(ui.document.querySelector('dialog .task-detail').textContent, /실행 안내가 아직 없습니다/);
+  assert.equal(ui.document.querySelector('dialog .first-action'), null);
+  await click('목록으로 돌아가기', ui.document.querySelector('dialog'));
+  await click(ui.document.querySelector(`[data-task-id="${explicit.id}"]`));
+  assert.equal(ui.document.querySelector('dialog .first-action').textContent, explicit.firstAction);
+  assert.ok(ui.document.querySelector('dialog').textContent.includes(explicit.method));
+  assert.deepEqual(snapshot(), before);
+});
+
+test('DOM search switches to a filtered calendar and case view, returns without retyping, and preserves unknown states and reading context', async () => {
+  const monthly = createTask({ title: '촬영 월말 점검', method: '접수한 조건을 점검합니다.', timing: { kind: 'regular', cadence: 'monthly', dayRule: 'monthEnd' } });
+  const unresolved = createTask({ title: '촬영 월초 확인', method: '정확한 날짜는 아직 모릅니다.', timing: { kind: 'regular', cadence: 'monthly', dayRule: 'monthStartUnconfirmed' } });
+  const outside = createTask({ title: '무관한 재고 점검', method: '재고를 확인합니다.', timing: { kind: 'regular', cadence: 'monthly', dayRule: 'monthEnd' } });
+  const waiting = createCase({ title: '회신 기록 A', taskId: monthly.id, status: 'waiting', statusConfirmed: true, nextAction: '응답을 확인합니다.' });
+  const unknown = createCase({ title: '촬영 상태 미확인', status: 'unknown', statusConfirmed: false, nextAction: '현재 상태를 확인합니다.' });
+  const legacy = createCase({ title: '촬영 이전 기록', status: 'done', nextAction: '옛 기록의 현재 상태를 확인합니다.' });
+  delete legacy.statusConfirmed;
+  const omitted = createCase({ title: '무관한 재고 기록', taskId: outside.id, status: 'waiting', statusConfirmed: true });
+  const doc = createDocument({ tasks: [monthly, unresolved, outside], cases: [waiting, unknown, legacy, omitted] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('인수자 보기', ui.document.querySelector('.document-card'));
+  const before = snapshot();
+  await fill('업무나 상황 찾기', '촬영');
+  const resultTitles = () => [...ui.document.querySelectorAll('#reader-results .read-title h3')].map(node => node.textContent);
+  const originalResults = resultTitles();
+  assert.deepEqual(originalResults, [monthly.title, unresolved.title, unknown.title, legacy.title]);
+  Object.defineProperty(ui, 'scrollY', { value: 314, writable: true, configurable: true });
+  ui.scrollTo = (_x, y) => { ui.scrollY = y; };
+  await click('언제 하는 일', ui.document.querySelector('.reader-nav'));
+  assert.equal(control('업무나 상황 찾기').value, '촬영');
+  assert.ok(ui.document.querySelector('#reader-results .calendar-table'), 'calendar must actually render, not the old global search list');
+  assert.equal(ui.document.querySelector('#reader-results .task-result'), null);
+  assert.match(ui.document.querySelector('.calendar-summary').textContent, /업무 1개/);
+  assert.ok(ui.document.querySelector('.calendar-unresolved').textContent.includes(unresolved.title));
+  assert.ok(!ui.document.querySelector('.calendar-table').textContent.includes(unresolved.title), 'unknown month-start date must not become day one');
+  assert.ok(!ui.document.querySelector('#reader-results').textContent.includes(outside.title));
+  await click(ui.document.querySelector('[data-calendar-action="next"]'));
+  const calendarTitle = ui.document.querySelector('.calendar-title').textContent;
+  ui.scrollY = 210;
+  await click('지금 이어받을 건', ui.document.querySelector('.reader-nav'));
+  assert.equal(control('업무나 상황 찾기').value, '촬영');
+  assert.equal(ui.document.querySelector('#reader-results .calendar-table'), null);
+  assert.match(ui.document.querySelector('#reader-results').textContent, /상태를 확인할 기록 2개/);
+  assert.match(ui.document.querySelector('#reader-results').textContent, /진행 중인 건 1개/);
+  const cards = [...ui.document.querySelectorAll('#reader-results .case-card')];
+  assert.equal(cards.length, 3);
+  assert.ok(cards.some(card => card.textContent.includes(waiting.title)), 'a case linked to a matched task remains findable even without the query in its own text');
+  assert.ok(!cards.some(card => card.textContent.includes(omitted.title)));
+  for (const record of [unknown, legacy]) {
+    const card = cards.find(node => node.textContent.includes(record.title));
+    assert.equal(control('이 건의 현재 상태', card).value, 'unknown');
+    assert.match(card.querySelector('summary').textContent, /상태 미확인/);
+  }
+  await click('업무 전체', ui.document.querySelector('.reader-nav'));
+  assert.equal(control('업무나 상황 찾기').value, '촬영');
+  assert.deepEqual(resultTitles(), originalResults);
+  assert.equal(ui.scrollY, 314, 'the prior result-list position is restored');
+  await click('언제 하는 일', ui.document.querySelector('.reader-nav'));
+  assert.equal(ui.document.querySelector('.calendar-title').textContent, calendarTitle, 'calendar period survives a view round trip');
+  assert.equal(ui.scrollY, 210, 'the calendar has its own return position');
+  assert.deepEqual(snapshot(), before);
+  assert.deepEqual(savedDocument(), doc, 'viewing must neither certify nor reset any case status');
+  assert.equal(networkAttempts.length, 0);
+});
+
+test('DOM empty filtered views state the retained query and offer a return without retyping or silent clearing', async () => {
+  const task = createTask({ title: '촬영 설명만 있는 업무', method: '예외 조건을 읽습니다.', timing: { kind: 'event', trigger: '요청이 들어오면' } });
+  const doc = createDocument({ tasks: [task] });
+  await mount({ [DATA_KEY]: JSON.stringify([doc]), [CURRENT_KEY]: doc.id });
+  await click('인수자 보기', ui.document.querySelector('.document-card'));
+  const before = snapshot();
+  await fill('업무나 상황 찾기', '촬영');
+  await click('지금 이어받을 건', ui.document.querySelector('.reader-nav'));
+  assert.equal(control('업무나 상황 찾기').value, '촬영');
+  assert.match(ui.document.querySelector('#reader-results').textContent, /‘촬영’에 맞는 진행 건이 없습니다/);
+  await click('업무 전체 검색으로 돌아가기', ui.document.querySelector('#reader-results'));
+  assert.equal(control('업무나 상황 찾기').value, '촬영');
+  assert.equal(ui.document.querySelector('.task-result h3').textContent, task.title);
+  await fill('업무나 상황 찾기', '존재하지않는가상단어');
+  await click('언제 하는 일', ui.document.querySelector('.reader-nav'));
+  assert.equal(control('업무나 상황 찾기').value, '존재하지않는가상단어');
+  assert.ok(ui.document.querySelector('.calendar-table'));
+  assert.match(ui.document.querySelector('#reader-results').textContent, /‘존재하지않는가상단어’에 맞는 업무 일정이 없습니다/);
+  await click('업무 전체 검색으로 돌아가기', ui.document.querySelector('#reader-results'));
+  assert.equal(control('업무나 상황 찾기').value, '존재하지않는가상단어');
+  assert.match(ui.document.querySelector('#reader-results').textContent, /검색 결과 0개/);
+  await click('언제 하는 일', ui.document.querySelector('.reader-nav'));
+  await click('검색 지우기', ui.document.querySelector('#reader-results'));
+  assert.equal(control('업무나 상황 찾기').value, '', 'clearing occurs only after the explicit clear action');
+  assert.ok(ui.document.querySelector('.calendar-unresolved').textContent.includes(task.title));
+  assert.deepEqual(snapshot(), before);
+});
+
 test('an AI plain-text reply upgrades a legacy document without requiring JSON repair',async()=>{
   const legacy=createDocument({schemaVersion:2,title:'구 형식 AI 가상 자료'});
   await mount({[DATA_KEY]:JSON.stringify([legacy]),[CURRENT_KEY]:legacy.id});await click('이어서 작성');await click('AI로 초안 만들기');
@@ -1123,7 +1391,7 @@ test('an AI plain-text reply upgrades a legacy document without requiring JSON r
   await click('일반 글로 추가',ui.document.querySelector('dialog'));
   assert.equal(savedDocument().tasks.length,1);
   assert.equal(savedDocument().tasks[0].method,raw);
-  assert.equal(savedDocument().schemaVersion,3);
+  assert.equal(savedDocument().schemaVersion,CURRENT_SCHEMA_VERSION);
   assert.equal(legacy.tasks.length,0);
   assert.equal(savedDocument().tasks[0].firstAction,'');
   assert.equal(networkAttempts.length,0);

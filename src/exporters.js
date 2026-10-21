@@ -4,7 +4,7 @@ import {
   TableRow, TextRun, WidthType,
 } from 'docx';
 import { validateDocument } from './model.js';
-import { decodeBase64 } from './image-data.js';
+import { decodeBase64, inspectImageBytes } from './image-data.js';
 import { caseState, caseStateLabel, caseRecordedLabel } from './handover-flow.js';
 
 const FONT = '맑은 고딕';
@@ -56,6 +56,90 @@ function checkedInput(document, options) {
     cases: select(document.cases, options.caseIds),
     partial: options.taskIds !== undefined || options.caseIds !== undefined,
   };
+}
+
+// Evidence page images are a temporary export choice, never a document field.
+// Refuse missing/invalid pages instead of silently producing instructions whose
+// required source is available only in another file.
+function checkedEvidencePages(document, tasks, cases, value = []) {
+  if (!Array.isArray(value) || value.length > 20) throw new Error('함께 전달할 근거 쪽은 20쪽 이내로 선택해 주세요.');
+  const used = new Set([...tasks, ...cases].flatMap(item => item.sourceRefs));
+  const sources = document.sourceFiles.filter(source => used.has(source.id) && source.pdf);
+  const pages = [];
+  let totalBytes = 0;
+  for (const page of value) {
+    if (!page || typeof page !== 'object') throw new Error('근거 쪽 정보를 확인해 주세요.');
+    const source = sources.find(item => item.id === page.sourceId);
+    if (!source) throw new Error('선택한 업무·진행 건과 연결된 PDF 쪽만 함께 전달할 수 있습니다.');
+    if (!Number.isInteger(page.pageNumber) || page.pageNumber < 1 || page.pageNumber > source.pdf.pageCount) {
+      throw new Error(`${source.name}: 원문 쪽 번호를 확인해 주세요.`);
+    }
+    const bytes = decodeBase64(page.data);
+    const details = inspectImageBytes(bytes);
+    if (details.mime !== 'image/png' || details.width !== page.width || details.height !== page.height) {
+      throw new Error('근거 쪽의 PNG 이미지와 저장된 크기가 일치하지 않습니다.');
+    }
+    const duplicate = pages.find(item => item.sourceId === page.sourceId && item.pageNumber === page.pageNumber);
+    if (duplicate) {
+      if (duplicate.data !== page.data) throw new Error('같은 원문 쪽의 이미지가 서로 다릅니다. 다시 확인해 주세요.');
+      continue;
+    }
+    totalBytes += bytes.length;
+    if (totalBytes > 32 * 1024 * 1024) throw new Error('근거 쪽 이미지 합계가 32 MiB를 넘습니다. 필요한 쪽을 나누어 출력해 주세요.');
+    pages.push({ ...page, source, bytes, anchor: `handover_evidence_${pages.length + 1}` });
+  }
+  for (const source of sources) {
+    const included = pages.filter(page => page.sourceId === source.id).map(page => page.pageNumber);
+    if (!included.length) {
+      throw new Error(`${source.name}: 함께 전달할 근거 쪽을 선택해 주세요. 필요한 표·사진이 빠진 문서는 만들지 않았습니다.`);
+    }
+    for (const item of [...tasks, ...cases].filter(item => item.sourceRefs.includes(source.id))) {
+      const saved = item.sourcePages?.find(reference => reference.sourceId === source.id);
+      const required = saved?.pages || (source.pdf.pageCount === 1 ? [1] : []);
+      if (required.some(pageNumber => !included.includes(pageNumber))) {
+        throw new Error(`${item.title}: 연결한 근거 쪽이 빠져 문서를 만들지 않았습니다. ${source.name}의 ${required.join(', ')}쪽을 함께 전달해 주세요.`);
+      }
+    }
+  }
+  return pages;
+}
+
+function refersToPage(item, page) {
+  if (!item.sourceRefs.includes(page.sourceId)) return false;
+  const saved = item.sourcePages?.find(reference => reference.sourceId === page.sourceId);
+  return saved ? saved.pages.includes(page.pageNumber) : page.source.pdf.pageCount === 1 ? page.pageNumber === 1 : true;
+}
+
+function evidenceLinks(children, item, pages) {
+  for (const page of pages.filter(page => refersToPage(item, page))) {
+    children.push(linkedParagraph(`근거 쪽: ${page.source.name} · 원문 ${page.pageNumber}쪽`, page.anchor));
+  }
+}
+
+function addEvidencePages(children, pages, tasks, numbers) {
+  if (!pages.length) return;
+  children.push(heading('함께 전달한 근거 쪽'));
+  pages.forEach((page, index) => {
+    children.push(bookmarkedHeading(`${index + 1}. ${page.source.name} · 원문 ${page.pageNumber}쪽 / 총 ${page.source.pdf.pageCount}쪽`, page.anchor, HeadingLevel.HEADING_2));
+    const ratio = Math.min(1, IMAGE_WIDTH / page.width, 760 / page.height);
+    children.push(new Paragraph({
+      spacing: { before: 40, after: 60, line: 240, lineRule: LineRuleType.AUTO },
+      keepNext: true,
+      children: [new ImageRun({
+        type: 'png', data: page.bytes,
+        transformation: { width: page.width * ratio, height: page.height * ratio },
+        altText: {
+          name: `evidence_page_${index + 1}`,
+          title: `${page.source.name} · 원문 ${page.pageNumber}쪽`,
+          description: '선택한 원문 페이지의 표·사진·배치입니다. 이 이미지는 검색용 텍스트가 아닙니다.',
+        },
+      })],
+    }));
+    children.push(paragraph('선택한 원문 쪽을 그대로 담은 이미지입니다. 표·사진과 실행 안내를 함께 확인하세요.', {}, { size: 18, color: '475569' }));
+    for (const task of tasks.filter(task => refersToPage(task, page))) {
+      children.push(linkedParagraph(`업무로 돌아가기: ${task.title}`, `handover_task_${numbers.get(task.id)}`));
+    }
+  });
 }
 
 // Keep user text as literal text nodes. Newlines and tabs become OOXML controls,
@@ -261,44 +345,42 @@ function addImages(children, task, section) {
   });
 }
 
-function addTask(children, task, index, document, level = HeadingLevel.HEADING_2) {
+function addTask(children, task, index, document, level = HeadingLevel.HEADING_2, evidencePages = []) {
   const start = timingText(task.timing);
-  const firstAction = filled(task.firstAction) ? task.firstAction : '확인 필요: 먼저 할 일이 아직 적혀 있지 않습니다.';
+  const firstAction = String(task.firstAction || '').trim();
   const exceptions = filled(task.exceptions) ? task.exceptions : '확인 필요: 예외 대응이 아직 적혀 있지 않습니다.';
   const doneWhen = filled(task.doneWhen) ? task.doneWhen : '확인 필요: 완료 기준이 아직 적혀 있지 않습니다.';
-  const core = [start, firstAction, exceptions, doneWhen].join('\n');
-  // A bounded short opening stays together; arbitrary long input must still
-  // flow across pages instead of creating an unbreakable oversized block.
-  const shortOpening = core.length <= 600 && core.split(/\r\n|\r|\n/).length <= 12;
   children.push(bookmarkedHeading(`${index + 1}. ${task.title}`, `handover_task_${index + 1}`, level));
-  field(children, '언제 시작하나요', start, shortOpening);
-  field(children, '먼저 할 일', firstAction, shortOpening);
-  // Keep decisions needed before acting ahead of long instructions and photos.
-  field(children, '막히거나 예외가 생기면', exceptions, shortOpening);
-  field(children, '어디까지 하면 완료인가요', doneWhen);
+  field(children, '언제 시작하나요', start);
+  // A blank optional first-action field does not invalidate instructions already
+  // written in the main body, and must not ask the author to copy them twice.
+  if (firstAction) field(children, '먼저 할 일', task.firstAction);
   if (filled(task.materials)) field(children, '시작 전에 준비할 것 · 접근 경로', task.materials);
+  field(children, '막히거나 예외가 생기면', exceptions);
 
-  // Exact equality only: similar paragraphs may contain different conditions.
-  // All photos survive, even when the corresponding text is empty or shared.
-  const sameProcedure = filled(task.steps) && task.steps === task.method;
+  // Match the web's reading order: the author's primary body comes first.
+  // Only exact repetitions are merged; all original photos remain beside their
+  // own section, and every distinct instruction remains verbatim.
+  const hasMethodText = String(task.method || '').trim().length > 0;
+  const hasStepsText = String(task.steps || '').trim().length > 0;
+  const sameProcedure = hasStepsText && task.steps === task.method;
   const hasStepsPhotos = task.images?.some(image => image.section === 'steps');
   const hasMethodPhotos = task.images?.some(image => image.section === 'method');
-  if (filled(task.steps) || hasStepsPhotos) {
-    if (filled(task.steps)) field(children, '지금 할 일 · 수행 절차', task.steps);
-    else children.push(paragraph('수행 절차 · 사진 안내', { keepNext: true }, { bold: true }));
+  if (hasMethodText || hasMethodPhotos) {
+    if (hasMethodText) field(children, '하는 방법 · 실행 안내', task.method);
+    else children.push(paragraph('하는 방법 · 사진 안내', { keepNext: true }, { bold: true }));
+    addImages(children, task, 'method');
+  }
+  if ((!sameProcedure && hasStepsText) || hasStepsPhotos) {
+    if (!sameProcedure && hasStepsText) field(children, hasMethodText ? '진행 순서 · 추가 안내' : '진행 순서 · 실행 안내', task.steps);
+    else if (hasStepsPhotos) children.push(paragraph('진행 순서 · 사진 안내', { keepNext: true }, { bold: true }));
     addImages(children, task, 'steps');
   }
-  if (!sameProcedure && (filled(task.method) || hasMethodPhotos)) {
-    const label = filled(task.steps) ? '참고 설명 · 어떤 방식으로 하나요' : '지금 할 일 · 어떤 방식으로 하나요';
-    if (filled(task.method)) field(children, label, task.method);
-    else children.push(paragraph(label, { keepNext: true }, { bold: true }));
-    addImages(children, task, 'method');
-  } else if (sameProcedure) {
-    addImages(children, task, 'method');
+  if (!hasStepsText && !hasMethodText && !hasStepsPhotos && !hasMethodPhotos) {
+    field(children, '하는 방법 · 실행 안내', '확인 필요: 실행 방법이 아직 적혀 있지 않습니다.');
   }
-  if (!filled(task.steps) && !filled(task.method) && !hasStepsPhotos && !hasMethodPhotos) {
-    field(children, '지금 할 일 · 수행 절차', '확인 필요: 실행 방법이 아직 적혀 있지 않습니다.');
-  }
+  evidenceLinks(children, task, evidencePages);
+  field(children, '어디까지 하면 완료인가요', doneWhen);
   if (/\t/.test(`${task.method}${task.steps}`)) {
     children.push(paragraph('탭으로 구분한 본문은 원래 표의 열 배치와 다르게 보일 수 있습니다. 조건과 대응의 관계는 근거 원문을 함께 확인하세요.', {}, { size: 20, color: '475569' }));
   }
@@ -321,7 +403,7 @@ function addTask(children, task, index, document, level = HeadingLevel.HEADING_2
   children.push(linkedParagraph('업무 지도로 돌아가기', 'handover_map'));
 }
 
-function addCase(children, item, index, document, taskNumbers) {
+function addCase(children, item, index, document, taskNumbers, evidencePages = []) {
   children.push(heading(`${index + 1}. ${item.title}`, HeadingLevel.HEADING_2));
   if (item.taskId) {
     const task = document.tasks.find(task => task.id === item.taskId);
@@ -338,6 +420,7 @@ function addCase(children, item, index, document, taskNumbers) {
   if (filled(item.waitingFor)) field(children, '기다리는 대상·회신', item.waitingFor);
   if (filled(item.notes)) field(children, '전달 메모', item.notes);
   field(children, '근거 출처', sourceText(item.sourceRefs, document));
+  evidenceLinks(children, item, evidencePages);
 }
 
 function taskGroups(document, tasks, partial) {
@@ -357,21 +440,19 @@ function taskGroups(document, tasks, partial) {
  */
 export async function exportDocx(document, options = {}) {
   const { tasks, cases, partial } = checkedInput(document, options);
+  const evidencePages = checkedEvidencePages(document, tasks, cases, options.evidencePages);
   const groups = taskGroups(document, tasks, partial);
   const numbers = new Map(groups.flatMap(group => group.tasks).map((task, index) => [task.id, index + 1]));
   const usedSources = new Set([...tasks, ...cases].flatMap(item => item.sourceRefs));
   const sources = partial ? document.sourceFiles.filter(source => usedSources.has(source.id)) : document.sourceFiles;
-  const hasPDF = sources.some(source => source.pdf);
   const generatedAt = new Date().toISOString();
   const children = [
     paragraph('업무 인수인계서', { spacing: { after: 100 } }, { size: 22, color: '475569', bold: true }),
     heading(document.title, HeadingLevel.TITLE),
     paragraph(`문서 생성일: ${generatedAt} (UTC)`, {}, { size: 18, color: '475569' }),
     paragraph(`내보내기 범위: ${partial ? '선택 항목' : '전체 업무·진행 건'} · 업무 ${tasks.length}개 · 진행 건 ${cases.length}개`),
-    paragraph(`읽는 범위: 업무 안내와 사진, 진행 건, 출처 이름·확인 경고를 담았습니다. 전체 원문 발췌와 복사 이력은 이 DOCX에 넣지 않았습니다. 보존된 자료는 인수인계 JSON을 열어 확인하세요.${hasPDF ? ' 근거 PDF도 이 DOCX에 포함되지 않았습니다. 표·페이지 확인에는 JSON의 근거 PDF를 함께 여세요.' : ''}`, {}, { size: 20, color: '475569' }),
-    paragraph(SECURITY_NOTICE, {}, { size: 20, color: '9A3412' }),
     bookmarkedHeading('업무 지도 · 내 업무 한눈에 보기', 'handover_map'),
-    paragraph(`${partial ? '선택한 업무만 표시' : '전체 업무 표시'} · ${tasks.length}개. 큰 업무 아래에서 제목을 누르면 실행 안내로 이동합니다. 인쇄본에서는 같은 번호와 제목을 찾으세요.`),
+    paragraph(`${partial ? '선택한 업무만 표시' : '전체 업무 표시'} · ${tasks.length}개. 제목을 누르면 실행 안내로 이동합니다.`),
   ];
   for (const group of groups) {
     if (group.title) children.push(heading(`큰 업무: ${group.title}`, HeadingLevel.HEADING_2));
@@ -380,34 +461,44 @@ export async function exportDocx(document, options = {}) {
   }
   if (!tasks.length) children.push(paragraph('표시할 업무가 없습니다.'));
 
-  children.push(heading('처음 시작하는 사람을 위한 안내'));
-  if (partial) children.push(paragraph('아래 첫날·첫 주 안내는 문서 전체에 공통으로 작성된 내용입니다. 선택한 업무에 맞는지 확인하세요.'));
-  field(children, '첫날 확인할 일', document.onboarding.dayOne);
-  field(children, '첫 주 확인할 일', document.onboarding.firstWeek);
-
-  children.push(heading('현재 진행 건 · 다음 행동'));
-  children.push(paragraph('반복 업무의 실행 방법과 별도로, 지금 넘겨받을 건을 확인하세요. 상태 미확인은 아직 현재 상황을 확인하지 못했다는 뜻입니다.'));
-  cases.forEach((item, index) => addCase(children, item, index, document, numbers));
-  if (!cases.length) children.push(paragraph('내보내기에 포함된 진행 건이 없습니다.'));
-
   children.push(heading('업무 상세 · 실행 안내'));
   for (const group of groups) {
-    if (group.title) children.push(heading(`큰 업무: ${group.title}`, HeadingLevel.HEADING_2));
+    if (group.title && tasks.length > 1) children.push(heading(`큰 업무: ${group.title}`, HeadingLevel.HEADING_2));
     group.tasks.forEach(task => addTask(children, task, numbers.get(task.id) - 1, document,
-      group.title ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2));
+      group.title ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2, evidencePages));
     if (group.title && !group.tasks.length) children.push(paragraph('등록된 세부 업무가 없습니다.'));
   }
   if (!tasks.length) children.push(paragraph('내보내기에 포함된 업무가 없습니다.'));
 
+  if (cases.length) {
+    children.push(heading('현재 진행 건 · 다음 행동'));
+    children.push(paragraph('업무 설명과 별도로 지금 이어받을 건입니다. 상태 미확인은 현재 상황을 아직 확인하지 못했다는 뜻입니다.'));
+    cases.forEach((item, index) => addCase(children, item, index, document, numbers, evidencePages));
+  }
+  // Common onboarding can point outside a partial selection. Do not leave
+  // those instructions in a document that excludes their targets.
+  if (!partial && (filled(document.onboarding.dayOne) || filled(document.onboarding.firstWeek))) {
+    children.push(heading('처음 시작하는 사람을 위한 안내'));
+    if (filled(document.onboarding.dayOne)) field(children, '첫날 확인할 일', document.onboarding.dayOne);
+    if (filled(document.onboarding.firstWeek)) field(children, '첫 주 확인할 일', document.onboarding.firstWeek);
+  }
+
+  addEvidencePages(children, evidencePages, tasks, numbers);
+
   children.push(heading('출처와 확인 사항'));
+  children.push(paragraph(`읽는 범위: 업무 안내와 사진, 진행 건, 출처 이름·확인 경고를 담았습니다. 전체 원문 발췌와 복사 이력은 이 DOCX에 넣지 않았습니다. 보존된 자료는 인수인계 JSON을 열어 확인하세요.${evidencePages.length ? ' 선택한 근거 PDF 쪽은 ‘함께 전달한 근거 쪽’에 이미지로 담았습니다. 선택하지 않은 쪽과 원본 PDF 파일은 JSON에 남습니다.' : ''}`, {}, { size: 20, color: '475569' }));
+  children.push(paragraph(SECURITY_NOTICE, {}, { size: 20, color: '9A3412' }));
   children.push(paragraph('원문에서 가져온 내용과 실제 업무 절차가 일치하는지 인계 담당자가 확인하세요. 원문 추출 경고가 있으면 원본 파일과 대조하세요. 문서의 표·사진 배치가 실행 안내와 다를 수 있습니다.'));
   if (partial) children.push(paragraph('선택한 업무·진행 건에 연결된 출처만 표시합니다. 원문 발췌에는 선택하지 않은 내용이 섞일 수 있어 생략했습니다.'));
   if (!sources.length) children.push(paragraph('포함된 출처 정보가 없습니다.'));
   sources.forEach((source, index) => {
     children.push(heading(`${index + 1}. ${source.name}`, HeadingLevel.HEADING_2));
     const linked = usedSources.has(source.id);
+    const included = evidencePages.filter(page => page.sourceId === source.id).map(page => page.pageNumber).sort((a, b) => a - b);
     field(children, '읽는 범위', source.pdf
-      ? `근거 PDF ${source.pdf.pageCount}쪽은 이 DOCX에 포함되지 않았습니다. 근거 PDF는 인수인계 JSON에서 열람하세요.${linked ? '' : ' 선택된 업무·진행 건과 연결되지 않은 보관 자료입니다.'}`
+      ? (included.length
+        ? `원문 총 ${source.pdf.pageCount}쪽 중 ${included.join(', ')}쪽을 ‘함께 전달한 근거 쪽’에 이미지로 포함했습니다. 원본 PDF 파일과 나머지 쪽은 인수인계 JSON에 남습니다.`
+        : `원문 총 ${source.pdf.pageCount}쪽인 보관 PDF입니다. 선택한 업무·진행 건과 연결되지 않아 이 DOCX에는 페이지를 넣지 않았습니다.`)
       : `출처 이름과 확인 경고만 표시합니다. 보존된 원문 발췌는 인수인계 JSON에서 확인하세요.${linked ? '' : ' 업무·진행 건과 연결되지 않은 보관 자료입니다.'}`);
     field(children, '추출·확인 경고', source.warnings.length ? source.warnings.join('\n') : '기록된 경고 없음 · 원본과의 일치가 보증된 것은 아닙니다.');
   });

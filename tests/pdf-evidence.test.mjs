@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createCanvas } from '@napi-rs/canvas';
 import {
-  PDF_LIMITS, createDocument, createTask, createCase, inspectPdfEvidence,
+  CURRENT_SCHEMA_VERSION, PDF_LIMITS, createDocument, createTask, createCase, inspectPdfEvidence,
   validateDocument, stringifyDocument, parseImport, importAsCopy,
 } from '../src/model.js';
 import { attachPdfEvidence, openPdfEvidence, verifyDocumentPdfs } from '../src/pdf-evidence.js';
@@ -118,7 +118,7 @@ test('PDF bytes and page count are bounded, strict base64, and must have a real 
   assert.throws(() => inspectPdfEvidence({ data: canonical.slice(0, -3) + 'R==', pageCount: 1 }), /정규 base64/);
 });
 
-test('PDF attachments require v3, survive byte-exact JSON, and retain remapped references', () => {
+test('PDF attachments require v3 or later, survive byte-exact JSON, and retain remapped references', () => {
   const doc = withPdf();
   doc.cases.push(createCase({ taskId: doc.tasks[0].id, sourceRefs: [doc.sourceFiles[0].id] }));
   const json = stringifyDocument(doc);
@@ -154,7 +154,7 @@ test('PDF 10 MiB envelope allowance cannot enlarge unrelated strings or the 24 M
 test('a valid synthetic PDF attaches atomically and all stored PDFs can be verified', async () => {
   const doc = empty(), task = doc.tasks[0], bytes = syntheticPdf();
   const source = await attachPdfEvidence(doc, task, asFile(bytes));
-  assert.equal(doc.schemaVersion, 3);
+  assert.equal(doc.schemaVersion, CURRENT_SCHEMA_VERSION);
   assert.equal(doc.sourceFiles.length, 1);
   assert.deepEqual(task.sourceRefs, [source.id]);
   assert.equal(source.pdf.data, bytes.toString('base64'));
@@ -162,7 +162,7 @@ test('a valid synthetic PDF attaches atomically and all stored PDFs can be verif
   assert.deepEqual(await verifyDocumentPdfs(parseImport(stringifyDocument(doc)).document), { count: 1 });
 });
 
-test('adding PDF evidence upgrades a valid legacy document to v3 without backfilling or changing its old content', async () => {
+test('adding PDF evidence upgrades a valid legacy document to the current format without backfilling or changing its old content', async () => {
   for (const schemaVersion of [1, 2]) {
     const doc = empty(); doc.schemaVersion = schemaVersion;
     delete doc.tasks[0].firstAction;
@@ -172,7 +172,7 @@ test('adding PDF evidence upgrades a valid legacy document to v3 without backfil
     assert.equal(validateDocument(doc).ok, true);
     const before = structuredClone(doc);
     await attachPdfEvidence(doc, doc.tasks[0], asFile(syntheticPdf()));
-    assert.equal(doc.schemaVersion, 3);
+    assert.equal(doc.schemaVersion, CURRENT_SCHEMA_VERSION);
     assert.equal(Object.hasOwn(doc.tasks[0], 'firstAction'), false);
     assert.equal(Object.hasOwn(doc.cases[0], 'statusConfirmed'), false);
     assert.equal(Object.hasOwn(doc.cases[0], 'taskId'), false);

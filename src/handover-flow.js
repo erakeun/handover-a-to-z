@@ -23,6 +23,6 @@ export function distinctInstructions(task) {
 
 export function taskReadiness(task) {
   if (firstActionText(task)) return '첫 행동 안내 있음';
-  if ((task?.method || task?.steps || '').trim()) return '본문에서 시작 확인';
+  if (distinctInstructions(task).length) return '본문 안내 있음';
   return task?.sourceRefs?.length ? '원문으로 보기' : '읽기 확인 필요';
 }

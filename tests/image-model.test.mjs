@@ -94,7 +94,7 @@ test("legacy v1 exact JSON and omitted optional properties remain unchanged", ()
   const json = JSON.stringify(legacy, null, 2);
   valid(legacy);
   assert.equal(legacy.schemaVersion, 1);
-  assert.equal(createDocument().schemaVersion, 3);
+  assert.equal(createDocument().schemaVersion, 4);
   assert.equal(Object.hasOwn(legacy.tasks[0], "firstAction"), false);
   assert.equal(Object.hasOwn(createTask(), "images"), false);
   assert.equal(stringifyDocument(legacy), json);
@@ -119,7 +119,7 @@ test("v2 image JSON preserves all bytes, IDs, captions, section order, and unrel
 test("v2 images are optional and v1 rejects the images key even when empty", () => {
   for (const tasks of [[], [legacyTask()], [legacyTask({ images: [] })]]) valid(createDocument({ schemaVersion: 2, tasks }));
   for (const images of [[], [image()]]) invalid(createDocument({ schemaVersion: 1, tasks: [legacyTask({ images })] }), /알 수 없는 속성/);
-  for (const version of ["2", 0, 4]) invalid(createDocument({ schemaVersion: version }), /schemaVersion/);
+  for (const version of ["2", 0, 5]) invalid(createDocument({ schemaVersion: version }), /schemaVersion/);
 });
 
 test("copying remaps image IDs, references and provenance while preserving image content", () => {

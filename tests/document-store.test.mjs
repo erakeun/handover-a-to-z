@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createDocument, createTask } from '../src/model.js';
 import { encodeBase64 } from '../src/image-data.js';
-import { DATA_KEY, LEGACY_DATA_KEY, MIGRATION_KEY, PROGRESS_KEY } from '../src/storage.js';
+import { DATA_KEY, PREVIOUS_DATA_KEY, LEGACY_DATA_KEY, MIGRATION_KEY, PREVIOUS_MIGRATION_KEY, PROGRESS_KEY } from '../src/storage.js';
 import {
-  openDocumentStore, DATABASE_NAME, DATABASE_VERSION, STORE_NAME, RECORD_KEY, LEGACY_RECORD_KEY,
+  openDocumentStore, DATABASE_NAME, DATABASE_VERSION, STORE_NAME, RECORD_KEY, PREVIOUS_RECORD_KEY, LEGACY_RECORD_KEY,
 } from '../src/document-store.js';
 
 function memory(raw = null) {
@@ -24,10 +24,10 @@ function namedError(name) {
   return Object.assign(new Error(name), { name });
 }
 
-function fakeIndexedDB(initialRecord, previousRecord) {
+function fakeIndexedDB(initialRecord, previousRecord, priorV3Record) {
   const control = {
     record: structuredClone(initialRecord),
-    previousRecord: structuredClone(previousRecord), writtenKeys: [],
+    previousRecord: structuredClone(previousRecord), priorV3Record: structuredClone(priorV3Record), writtenKeys: [],
     openError: null, blocked: false, heldOpen: false,
     failNextRead: null, failAfterRead: null, failNextPut: null,
     holdNextCommit: false, heldCommits: [], beforeCommit: null,
@@ -35,7 +35,7 @@ function fakeIndexedDB(initialRecord, previousRecord) {
   };
   const queue = [];
   let running = false;
-  let exists = initialRecord !== undefined || previousRecord !== undefined;
+  let exists = initialRecord !== undefined || previousRecord !== undefined || priorV3Record !== undefined;
   let storeExists = exists;
   function runNext() {
     if (running || !queue.length) return;
@@ -48,6 +48,7 @@ function fakeIndexedDB(initialRecord, previousRecord) {
     let done = false;
     let staged;
     let stagedPrevious;
+    let stagedV3;
     let wrote = false;
     let readFailure;
     let afterReadFailure;
@@ -65,13 +66,13 @@ function fakeIndexedDB(initialRecord, previousRecord) {
         assert.equal(name, STORE_NAME);
         return {
           get(key) {
-            assert.ok([RECORD_KEY, LEGACY_RECORD_KEY].includes(key));
+            assert.ok([RECORD_KEY, LEGACY_RECORD_KEY, PREVIOUS_RECORD_KEY].includes(key));
             const request = {};
             operations.push(() => {
               if (readFailure) return fail(request, readFailure);
-              request.result = structuredClone(key === RECORD_KEY ? staged : stagedPrevious);
+              request.result = structuredClone(key === RECORD_KEY ? staged : key === PREVIOUS_RECORD_KEY ? stagedV3 : stagedPrevious);
               request.onsuccess?.();
-              // Both keys form one source snapshot in the v3 transition.
+              // All keys form one source snapshot in the v4 transition.
               if (!done && afterReadFailure && key === RECORD_KEY) {
                 tx.error = afterReadFailure;
                 tx.abort();
@@ -126,6 +127,7 @@ function fakeIndexedDB(initialRecord, previousRecord) {
     queue.push(() => {
       staged = structuredClone(control.record);
       stagedPrevious = structuredClone(control.previousRecord);
+      stagedV3 = structuredClone(control.priorV3Record);
       readFailure = control.failNextRead;
       afterReadFailure = control.failAfterRead;
       putFailure = control.failNextPut;
@@ -188,7 +190,7 @@ function fakeIndexedDB(initialRecord, previousRecord) {
   return { factory, control };
 }
 
-const record = (raw, legacyRaw = null) => ({ version: 1, raw, legacyRaw, fallbackRaw: null, previousExists: false, previousRaw: null });
+const record = (raw, legacyRaw = null) => ({ version: 1, raw, legacyRaw, fallbackRaw: null, previousExists: false, previousRaw: null, priorV3Exists: false, priorV3Raw: null, previousFallbackRaw: null });
 const flush = async () => { for (let index = 0; index < 12; index++) await Promise.resolve(); };
 const photoBytes = new Uint8Array(await readFile(new URL('../fixtures/images/landscape.png', import.meta.url)));
 const legacyTask = overrides => { const task = createTask(overrides); delete task.firstAction; return task; };
@@ -608,7 +610,7 @@ test('IndexedDB plumbing: unavailable legacy access still exposes readable curre
   assert.equal(control.record.raw, raw);
 });
 
-test('v3 transition copies the latest old IDB text exactly and leaves rollback records untouched', async () => {
+test('v4 transition copies the latest old IDB text exactly and leaves rollback records untouched', async () => {
   const first = createDocument({ schemaVersion: 1, title: '이전 v1', tasks: [legacyTask({ method: '보존할 줄\n두 번째 줄' })] });
   const second = photoDocument();
   const legacyRaw = JSON.stringify([first]);
@@ -634,13 +636,13 @@ test('v3 transition copies the latest old IDB text exactly and leaves rollback r
   assert.deepEqual(control.previousRecord, oldRecord, 'rolling back still sees exact old current');
   assert.equal(storage.getItem(LEGACY_DATA_KEY), legacyRaw);
   assert.equal(control.record.raw, newRaw);
-  assert.equal(JSON.parse(newRaw).at(-1).schemaVersion, 3);
+  assert.equal(JSON.parse(newRaw).at(-1).schemaVersion, 4);
   const reopened = await openDocumentStore({ storage, indexedDB: factory });
   assert.equal(reopened.raw, newRaw);
   assert.deepEqual(reopened.documents, documents);
 });
 
-test('old IDB edits during a v3 session or rollback cannot overwrite the v3 snapshot', async () => {
+test('old IDB edits during a v4 session or rollback cannot overwrite the v4 snapshot', async () => {
   const original = JSON.stringify([createDocument({ schemaVersion: 1, title: '기존 원본' })]);
   const oldRecord = { version: 1, raw: original, legacyRaw: null };
   const { factory, control } = fakeIndexedDB(undefined, oldRecord);
@@ -661,7 +663,7 @@ test('old IDB edits during a v3 session or rollback cannot overwrite the v3 snap
   assert.equal(reopened.recoveryRecords.find(item => item.source === 'indexedDB').raw, newRaw);
 });
 
-test('v3 fallback preserves the old key and detects an old-version edit across a restart', async () => {
+test('v4 fallback preserves the old key and detects an old-version edit across a restart', async () => {
   const original = JSON.stringify([createDocument({ schemaVersion: 1, title: '이전 원본' })], null, 2);
   const storage = memory(original);
   const store = await openDocumentStore({ storage, indexedDB: null });
@@ -697,7 +699,7 @@ test('fallback quota during first data write preserves old data and cannot claim
   assert.equal(reopened.readOnly, false);
 });
 
-test('a corrupt old IDB record is recoverable and never creates or replaces the v3 record', async () => {
+test('a corrupt old IDB record is recoverable and never creates or replaces the v4 record', async () => {
   const storage = memory(JSON.stringify([createDocument({ schemaVersion: 1 })]));
   const oldRecord = { version: 1, raw: '{broken', legacyRaw: storage.getItem(LEGACY_DATA_KEY) };
   const { factory, control } = fakeIndexedDB(undefined, oldRecord);
@@ -725,7 +727,7 @@ test('different new fallback and newer old IDB histories stop instead of guessin
   assert.equal(control.puts, 0);
 });
 
-test('direct v3 fallback seeding and later IDB migration preserve data and guard subsequent fallback edits', async () => {
+test('direct v4 fallback seeding and later IDB migration preserve data and guard subsequent fallback edits', async () => {
   const newRaw = JSON.stringify([createDocument({ title: 'v3 간이 저장' })], null, 2);
   const storage = memory(); storage.setItem(DATA_KEY, newRaw);
   const { factory, control } = fakeIndexedDB();
@@ -739,7 +741,7 @@ test('direct v3 fallback seeding and later IDB migration preserve data and guard
   assert.equal(control.record.raw, newRaw);
 });
 
-test('simply opening the old app may create an unchanged old record without locking v3 editing', async () => {
+test('simply opening the old app may create an unchanged old record without locking v4 editing', async () => {
   for (const original of [null, JSON.stringify([createDocument({ schemaVersion: 1, title: '이전 원본' })])]) {
     const storage = memory(original);
     const { factory, control } = fakeIndexedDB();
@@ -754,4 +756,177 @@ test('simply opening the old app may create an unchanged old record without lock
     await assert.rejects(reopened.save([], reopened.raw), { code: 'STORAGE_LEGACY_CHANGED' });
     assert.equal(control.record.raw, newRaw);
   }
+});
+
+// 0.3.0 used current-v3 plus v3 localStorage, while still guarding the older
+// current/v1 chain. The new key must preserve and watch every source in it.
+const v3Record = (raw, { legacyRaw = null, fallbackRaw = null, previous } = {}) => ({
+  version: 1, raw, legacyRaw, fallbackRaw,
+  previousExists: previous !== undefined, previousRaw: previous?.raw ?? null,
+});
+
+test('v4 migration copies v3 bytes and preserves all rollback keys while saving and reopening new documents', async () => {
+  const legacy = JSON.stringify([createDocument({ schemaVersion: 1, title: '옛 원본' })]);
+  const previous = { version: 1, raw: legacy, legacyRaw: legacy };
+  const v3Doc = createDocument({ schemaVersion: 3, title: '0.3.0 최신 작업', tasks: [createTask({ method: '순서 1\n순서 2' })] });
+  const original = JSON.stringify([v3Doc], null, 2);
+  const prior = v3Record(original, { legacyRaw: legacy, previous });
+  const storage = memory(legacy);
+  const { factory, control } = fakeIndexedDB(undefined, previous, prior);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.readOnly, false);
+  assert.equal(store.raw, original);
+  assert.deepEqual(store.documents, [v3Doc]);
+  assert.deepEqual(control.priorV3Record, prior);
+  assert.deepEqual(control.previousRecord, previous);
+  assert.equal(control.record.priorV3Raw, original);
+  assert.equal(control.record.priorV3Exists, true);
+  const edited = structuredClone(v3Doc); edited.schemaVersion = 4; edited.title = '새 형식 작업';
+  const newRaw = await store.save([edited], original);
+  assert.equal(storage.getItem(LEGACY_DATA_KEY), legacy);
+  assert.equal(storage.getItem(PREVIOUS_DATA_KEY), null);
+  assert.deepEqual(control.priorV3Record, prior);
+  assert.deepEqual(control.previousRecord, previous);
+  assert.ok(control.writtenKeys.every(key => key === RECORD_KEY));
+  const reopened = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(reopened.readOnly, false);
+  assert.equal(reopened.raw, newRaw);
+  assert.deepEqual(reopened.documents, [edited]);
+});
+
+test('v3 edits after v4 migration stop writes and preserve both histories across reopen', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 3, title: 'v3 원본' })]);
+  const prior = v3Record(original);
+  const storage = memory();
+  const { factory, control } = fakeIndexedDB(undefined, undefined, prior);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  const newRaw = await store.save([createDocument({ title: 'v4 작업 보존' })], original);
+  const changed = JSON.stringify([createDocument({ schemaVersion: 3, title: 'v3 창의 다른 작업' })]);
+  control.priorV3Record.raw = changed;
+  await assert.rejects(store.save([], newRaw), { code: 'STORAGE_LEGACY_CHANGED' });
+  assert.equal(control.record.raw, newRaw);
+  assert.equal(control.priorV3Record.raw, changed);
+  const reopened = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(reopened.readOnly, true);
+  assert.equal(reopened.errorCode, 'STORAGE_LEGACY_CHANGED');
+  assert.equal(reopened.raw, newRaw);
+  assert.equal(reopened.documents[0].title, 'v4 작업 보존');
+  assert.equal(reopened.recoveryRecords.find(r => r.source === 'indexedDB-v3').raw, changed);
+});
+
+test('v4 still detects changes to the older current record underneath an unchanged v3 record', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 1, title: '원래 자료' })]);
+  const previous = { version: 1, raw: original, legacyRaw: null };
+  const newer = JSON.stringify([createDocument({ schemaVersion: 3, title: '0.3.0 작업' })]);
+  const prior = v3Record(newer, { previous });
+  const storage = memory();
+  const { factory, control } = fakeIndexedDB(undefined, previous, prior);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.raw, newer);
+  control.previousRecord.raw = JSON.stringify([createDocument({ schemaVersion: 1, title: '더 오래된 앱의 변경' })]);
+  await assert.rejects(store.save([], newer), { code: 'STORAGE_LEGACY_CHANGED' });
+  assert.equal(control.record.raw, newer);
+  assert.deepEqual(control.priorV3Record, prior);
+});
+
+test('v4 localStorage fallback copies v3 without replacing it and detects v3 changes after restart', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 3, title: '간이 저장 원본' })], null, 2);
+  const storage = memory(); storage.setItem(PREVIOUS_DATA_KEY, original);
+  const store = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(store.readOnly, false);
+  assert.equal(store.raw, original);
+  assert.equal(storage.getItem(DATA_KEY), null);
+  const newRaw = await store.save([createDocument({ title: 'v4 간이 저장' })], original);
+  assert.equal(storage.getItem(PREVIOUS_DATA_KEY), original);
+  assert.equal(storage.getItem(DATA_KEY), newRaw);
+  assert.match(JSON.parse(storage.getItem(MIGRATION_KEY)).previousHash, /^[a-f0-9]{64}$/);
+  const unchanged = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(unchanged.readOnly, false);
+  assert.equal(unchanged.raw, newRaw);
+  const changed = JSON.stringify([createDocument({ schemaVersion: 3, title: '구버전에서 수정' })]);
+  storage.setItem(PREVIOUS_DATA_KEY, changed);
+  const reopened = await openDocumentStore({ storage, indexedDB: null });
+  assert.equal(reopened.readOnly, true);
+  assert.equal(reopened.errorCode, 'STORAGE_LEGACY_CHANGED');
+  assert.equal(reopened.raw, newRaw);
+  assert.equal(reopened.documents[0].title, 'v4 간이 저장');
+  await assert.rejects(reopened.save([]));
+  assert.equal(storage.getItem(PREVIOUS_DATA_KEY), changed);
+  assert.equal(storage.getItem(DATA_KEY), newRaw);
+});
+
+test('v3 localStorage original changing during v4 IDB use blocks writes without altering either original', async () => {
+  const original = JSON.stringify([createDocument({ schemaVersion: 3, title: 'v3 간이 저장' })]);
+  const storage = memory(); storage.setItem(PREVIOUS_DATA_KEY, original);
+  const prior = v3Record(original, { fallbackRaw: original });
+  const { factory, control } = fakeIndexedDB(undefined, undefined, prior);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.raw, original);
+  const changed = JSON.stringify([createDocument({ schemaVersion: 3, title: '간이 저장 변경' })]);
+  storage.setItem(PREVIOUS_DATA_KEY, changed);
+  await assert.rejects(store.save([], original), { code: 'STORAGE_LEGACY_CHANGED' });
+  assert.equal(control.record.raw, original);
+  assert.deepEqual(control.priorV3Record, prior);
+  assert.equal(storage.getItem(PREVIOUS_DATA_KEY), changed);
+});
+
+test('corrupt and unsupported v3 source records never create a new v4 record or overwrite source bytes', async () => {
+  for (const raw of ['{broken', JSON.stringify([{ schemaVersion: 99 }])]) {
+    const prior = v3Record(raw);
+    const { factory, control } = fakeIndexedDB(undefined, undefined, prior);
+    const store = await openDocumentStore({ storage: memory(), indexedDB: factory });
+    assert.equal(store.errorCode, 'STORAGE_INVALID');
+    assert.equal(store.readOnly, true);
+    await assert.rejects(store.save([]));
+    assert.equal(control.record, undefined);
+    assert.deepEqual(control.priorV3Record, prior);
+    assert.equal(control.puts, 0);
+    assert.equal(store.recoveryRecords.find(r => r.source === 'indexedDB-v3').raw, raw);
+  }
+});
+
+test('opening 0.3.0 without edits may create its baseline record without locking the new app', async () => {
+  const old = JSON.stringify([createDocument({ schemaVersion: 1, title: '옛 원본' })]);
+  const previous = { version: 1, raw: old, legacyRaw: null };
+  const storage = memory();
+  const { factory, control } = fakeIndexedDB(undefined, previous);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  const newRaw = await store.save([createDocument({ title: 'v4에서 추가' })], old);
+  control.priorV3Record = v3Record(old, { previous });
+  const reopened = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(reopened.readOnly, false);
+  assert.equal(reopened.raw, newRaw);
+  await reopened.save(reopened.documents, newRaw);
+  control.priorV3Record.raw = JSON.stringify([createDocument({ schemaVersion: 3, title: '실제 구버전 편집' })]);
+  await assert.rejects(reopened.save([], newRaw), { code: 'STORAGE_LEGACY_CHANGED' });
+  assert.equal(control.record.raw, newRaw);
+});
+
+test('invalid new snapshots cannot replace a migrated v3 source or its new v4 copy', async () => {
+  const raw = JSON.stringify([createDocument({ schemaVersion: 3, title: '원본 보존' })]);
+  const prior = v3Record(raw);
+  const { factory, control } = fakeIndexedDB(undefined, undefined, prior);
+  const store = await openDocumentStore({ storage: memory(), indexedDB: factory });
+  const puts = control.puts;
+  await assert.rejects(store.save([{ ...store.documents[0], schemaVersion: 99 }], raw));
+  assert.equal(control.puts, puts);
+  assert.equal(control.record.raw, raw);
+  assert.deepEqual(control.priorV3Record, prior);
+});
+
+test('unavailable legacy access exposes readable v3 data but performs no migration or write', async () => {
+  const document = createDocument({ schemaVersion: 3, title: '보여 줄 최신 v3 자료' });
+  const raw = JSON.stringify([document]);
+  const prior = v3Record(raw);
+  const storage = { getItem() { throw namedError('SecurityError'); } };
+  const { factory, control } = fakeIndexedDB(undefined, undefined, prior);
+  const store = await openDocumentStore({ storage, indexedDB: factory });
+  assert.equal(store.errorCode, 'STORAGE_LEGACY_UNAVAILABLE');
+  assert.equal(store.readOnly, true);
+  assert.equal(store.raw, raw);
+  assert.deepEqual(store.documents, [document]);
+  assert.equal(control.record, undefined);
+  assert.equal(control.puts, 0);
+  assert.deepEqual(control.priorV3Record, prior);
+  await assert.rejects(store.save([]));
 });
