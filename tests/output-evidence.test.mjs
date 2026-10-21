@@ -4,7 +4,7 @@ import { createCanvas } from '@napi-rs/canvas';
 import { reviewExampleDocument } from '../src/review-example.js';
 import { createDocument, createTask, makeId, stringifyDocument, parseImport, importAsCopy, CURRENT_SCHEMA_VERSION } from '../src/model.js';
 import { inspectImageBytes, decodeBase64 } from '../src/image-data.js';
-import { linkedPdfSources, parseEvidencePages, prepareOutputEvidence, storedOutputPages, outputEvidencePlan, applyEvidencePageGroups, OUTPUT_EVIDENCE_LIMITS } from '../src/output-evidence.js';
+import { linkedPdfSources, parseEvidencePages, prepareOutputEvidence, storedOutputPages, outputEvidencePlan, fullSourceOutputPlan, applyEvidencePageGroups, OUTPUT_EVIDENCE_LIMITS } from '../src/output-evidence.js';
 
 // Synthetic fixtures and Node canvases only. These are output logic checks,
 // not browser interaction, Word layout, or human usability measurements.
@@ -103,6 +103,105 @@ test('two explicit page groups preserve all eight selected relations and content
   const contentOnly = structuredClone(candidate);
   for (const item of [...contentOnly.tasks, ...contentOnly.cases]) delete item.sourcePages;
   assert.deepEqual(contentOnly, doc, 'only the explicit page relations are added');
+});
+
+test('whole-source appendix plan needs one source choice without inventing eight page relations', () => {
+  const doc = reviewExampleDocument(), sourceId = doc.sourceFiles[0].id;
+  const before = stringifyDocument(doc);
+  assert.deepEqual(fullSourceOutputPlan(doc), { pageChoices: { [sourceId]: '1, 2' }, wholeSourceIds: [sourceId], totalPages: 2 });
+  assert.deepEqual(fullSourceOutputPlan(doc, oneTask(doc)), { pageChoices: { [sourceId]: '1, 2' }, wholeSourceIds: [sourceId], totalPages: 2 });
+  assert.equal(stringifyDocument(doc), before);
+  assert.ok([...doc.tasks, ...doc.cases].every(item => !item.sourcePages));
+  assert.deepEqual(parseImport(stringifyDocument(doc)).document, doc);
+});
+
+test('appendix plan keeps confirmed ranges and single-page sources without unnecessarily adding whole originals', () => {
+  const doc = reviewExampleDocument(), sourceId = doc.sourceFiles[0].id;
+  doc.schemaVersion = CURRENT_SCHEMA_VERSION;
+  doc.tasks[0].sourcePages = [{ sourceId, pages: [2] }];
+  assert.deepEqual(fullSourceOutputPlan(doc, oneTask(doc)), { pageChoices: { [sourceId]: '2' }, wholeSourceIds: [], totalPages: 1 });
+  const second = { ...structuredClone(doc.sourceFiles[0]), id: makeId(), name: 'single-page-synthetic.pdf' };
+  second.pdf.pageCount = 1;
+  doc.sourceFiles.push(second); doc.tasks[0].sourceRefs.push(second.id);
+  const before = JSON.stringify(doc);
+  assert.deepEqual(fullSourceOutputPlan(doc, oneTask(doc)), { pageChoices: { [sourceId]: '2', [second.id]: '1' }, wholeSourceIds: [], totalPages: 2 });
+  assert.equal(JSON.stringify(doc), before);
+  assert.deepEqual(fullSourceOutputPlan(doc, { taskIds: [], caseIds: [] }), { pageChoices: {}, wholeSourceIds: [], totalPages: 0 });
+});
+
+test('appendix plan refuses too many original pages atomically and excludes unselected sources', () => {
+  const doc = reviewExampleDocument(), sourceId = doc.sourceFiles[0].id;
+  const second = { ...structuredClone(doc.sourceFiles[0]), id: makeId(), name: 'long-synthetic.pdf' };
+  second.pdf.pageCount = 19;
+  doc.sourceFiles.push(second); doc.tasks[1].sourceRefs = [second.id];
+  const before = JSON.stringify(doc);
+  assert.equal(fullSourceOutputPlan(doc, oneTask(doc)).totalPages, 2);
+  assert.throws(() => fullSourceOutputPlan(doc), /총 20쪽/);
+  assert.equal(JSON.stringify(doc), before);
+  second.pdf.pageCount = 18;
+  assert.equal(fullSourceOutputPlan(doc).totalPages, 20);
+  second.pdf.pageCount = 21;
+  assert.throws(() => fullSourceOutputPlan(doc), /20쪽/);
+  assert.throws(() => fullSourceOutputPlan(doc, { taskIds: ['missing'] }), /찾을 수 없습니다/);
+  doc.tasks[0].sourceRefs.push('missing');
+  assert.throws(() => fullSourceOutputPlan(doc, oneTask(doc)), /근거 파일/);
+  assert.equal(sourceId, doc.sourceFiles[0].id);
+});
+
+test('99-page synthetic metadata blocks whole appendices but permits explicitly selected necessary pages', async () => {
+  // Metadata-only boundary fixture, not a real 99-page PDF or personal source.
+  // The renderer below is a controlled fake; this does not claim PDF import QA.
+  const doc = reviewExampleDocument(); doc.schemaVersion = CURRENT_SCHEMA_VERSION;
+  const source = doc.sourceFiles[0];
+  source.name = '[synthetic metadata only] 99-page-original.pdf';
+  source.pdf.pageCount = 99;
+  const before = stringifyDocument(doc);
+  assert.throws(() => fullSourceOutputPlan(doc), /20쪽/);
+  assert.throws(() => fullSourceOutputPlan(doc, oneTask(doc)), /20쪽/);
+  assert.equal(stringifyDocument(doc), before, 'refusing a long appendix must not trim or rewrite the source');
+
+  const candidate = applyEvidencePageGroups(doc, oneTask(doc), [{
+    sourceId: source.id, itemIds: [doc.tasks[0].id], pages: '8, 13, 99',
+  }]);
+  const plan = fullSourceOutputPlan(candidate, oneTask(candidate));
+  assert.deepEqual(plan, { pageChoices: { [source.id]: '8, 13, 99' }, wholeSourceIds: [], totalPages: 3 });
+  assert.throws(() => fullSourceOutputPlan(candidate), /20쪽/, 'one task’s explicit pages must not be inferred for other tasks');
+  const candidateBefore = stringifyDocument(candidate), rendered = [];
+  let opened = 0, destroyed = 0;
+  const pages = await prepareOutputEvidence(candidate, oneTask(candidate), plan.pageChoices, {
+    dom, openEvidence: fakeOpen({ opened: () => opened++, destroyed: () => destroyed++, render: (_canvas, number) => rendered.push(number) }),
+  });
+  assert.deepEqual(rendered, [8, 13, 99]);
+  assert.deepEqual(pages.map(page => page.pageNumber), [8, 13, 99]);
+  assert.equal(opened, 1); assert.equal(destroyed, 1);
+  assert.equal(stringifyDocument(candidate), candidateBefore);
+  assert.equal(stringifyDocument(doc), before);
+  assert.deepEqual(candidate.sourceFiles, doc.sourceFiles);
+});
+
+test('eight guides sharing a long original render each explicitly chosen page once, not once per guide', async () => {
+  const doc = reviewExampleDocument(); doc.schemaVersion = CURRENT_SCHEMA_VERSION;
+  const source = doc.sourceFiles[0];
+  source.name = '[synthetic metadata only] shared-99-page-original.pdf';
+  source.pdf.pageCount = 99;
+  const before = stringifyDocument(doc), itemIds = [...doc.tasks, ...doc.cases].map(item => item.id);
+  assert.equal(itemIds.length, 8);
+  const candidate = applyEvidencePageGroups(doc, {}, [{ sourceId: source.id, itemIds, pages: '8-13' }]);
+  const plan = fullSourceOutputPlan(candidate);
+  assert.deepEqual(plan, { pageChoices: { [source.id]: '8, 9, 10, 11, 12, 13' }, wholeSourceIds: [], totalPages: 6 });
+  const rendered = []; let opened = 0, destroyed = 0;
+  const pages = await prepareOutputEvidence(candidate, {}, plan.pageChoices, {
+    dom, openEvidence: fakeOpen({ opened: () => opened++, destroyed: () => destroyed++, render: (_canvas, number) => rendered.push(number) }),
+  });
+  assert.deepEqual(rendered, [8, 9, 10, 11, 12, 13]);
+  assert.equal(pages.length, 6, 'six source pages must not become 48 repeated pages for eight guides');
+  assert.equal(new Set(pages.map(page => `${page.sourceId}:${page.pageNumber}`)).size, 6);
+  assert.equal(opened, 1); assert.equal(destroyed, 1);
+  assert.equal(stringifyDocument(doc), before);
+  assert.deepEqual(candidate.sourceFiles, doc.sourceFiles);
+  const contentOnly = structuredClone(candidate);
+  for (const item of [...contentOnly.tasks, ...contentOnly.cases]) delete item.sourcePages;
+  assert.deepEqual(contentOnly, doc, 'explicit relations are the only saved change');
 });
 
 test('partial batch leaves other relations unconfirmed, protects saved choices, and allows explicit review', () => {
