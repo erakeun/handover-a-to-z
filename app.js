@@ -62824,9 +62824,11 @@ function bookmarkedHeading(text, anchor, level = HeadingLevel.HEADING_1) {
 function field(children2, label, value, keepWithNext = false) {
   children2.push(paragraph(label, {
     keepNext: true,
-    spacing: { before: 160, after: 50 }
+    spacing: { before: 100, after: 40 }
   }, { bold: true, color: "334155" }));
-  children2.push(paragraph(value === "" || value === void 0 ? "\uBBF8\uC785\uB825" : value, { keepNext: keepWithNext }));
+  const text = value === "" || value === void 0 ? "\uBBF8\uC785\uB825" : value;
+  const shortTabBlock = typeof text === "string" && text.includes("	") && text.length <= 600 && text.split(/\r\n|\n|\r/).length <= 8;
+  children2.push(paragraph(text, { keepNext: keepWithNext, ...shortTabBlock ? { keepLines: true } : {} }));
 }
 var filled = (value) => value !== "" && value !== null && value !== void 0;
 function timingText(timing, includeStartRule = true, compact = false) {
@@ -62986,7 +62988,6 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
   field(children2, "\uC5B8\uC81C \uC2DC\uC791\uD558\uB098\uC694", start);
   if (firstAction) field(children2, "\uBA3C\uC800 \uD560 \uC77C", task.firstAction);
   if (filled(task.materials)) field(children2, "\uC2DC\uC791 \uC804\uC5D0 \uC900\uBE44\uD560 \uAC83 \xB7 \uC811\uADFC \uACBD\uB85C", task.materials);
-  field(children2, "\uB9C9\uD788\uAC70\uB098 \uC608\uC678\uAC00 \uC0DD\uAE30\uBA74", exceptions);
   const hasMethodText = String(task.method || "").trim().length > 0;
   const hasStepsText = String(task.steps || "").trim().length > 0;
   const sameProcedure = hasStepsText && task.steps === task.method;
@@ -62995,18 +62996,20 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
   if (hasMethodText || hasMethodPhotos) {
     if (hasMethodText) field(children2, "\uD558\uB294 \uBC29\uBC95 \xB7 \uC2E4\uD589 \uC548\uB0B4", task.method);
     else children2.push(paragraph("\uD558\uB294 \uBC29\uBC95 \xB7 \uC0AC\uC9C4 \uC548\uB0B4", { keepNext: true }, { bold: true }));
-    addImages(children2, task, "method");
   }
   if (!sameProcedure && hasStepsText || hasStepsPhotos) {
     if (!sameProcedure && hasStepsText) field(children2, hasMethodText ? "\uC9C4\uD589 \uC21C\uC11C \xB7 \uCD94\uAC00 \uC548\uB0B4" : "\uC9C4\uD589 \uC21C\uC11C \xB7 \uC2E4\uD589 \uC548\uB0B4", task.steps);
     else if (hasStepsPhotos) children2.push(paragraph("\uC9C4\uD589 \uC21C\uC11C \xB7 \uC0AC\uC9C4 \uC548\uB0B4", { keepNext: true }, { bold: true }));
-    addImages(children2, task, "steps");
   }
   if (!hasStepsText && !hasMethodText && !hasStepsPhotos && !hasMethodPhotos) {
     field(children2, "\uD558\uB294 \uBC29\uBC95 \xB7 \uC2E4\uD589 \uC548\uB0B4", "\uD655\uC778 \uD544\uC694: \uC2E4\uD589 \uBC29\uBC95\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
   }
-  evidenceLinks(children2, task, evidencePages);
+  field(children2, "\uB9C9\uD788\uAC70\uB098 \uC608\uC678\uAC00 \uC0DD\uAE30\uBA74", exceptions);
   field(children2, "\uC5B4\uB514\uAE4C\uC9C0 \uD558\uBA74 \uC644\uB8CC\uC778\uAC00\uC694", doneWhen);
+  if (hasMethodPhotos || hasStepsPhotos) children2.push(heading("\uC0AC\uC9C4\uC73C\uB85C \uD655\uC778", HeadingLevel.HEADING_3));
+  addImages(children2, task, "method");
+  addImages(children2, task, "steps");
+  evidenceLinks(children2, task, evidencePages);
   if (/\t/.test(`${task.method}${task.steps}`)) {
     children2.push(paragraph("\uD0ED\uC73C\uB85C \uAD6C\uBD84\uD55C \uBCF8\uBB38\uC740 \uC6D0\uB798 \uD45C\uC758 \uC5F4 \uBC30\uCE58\uC640 \uB2E4\uB974\uAC8C \uBCF4\uC77C \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC870\uAC74\uACFC \uB300\uC751\uC758 \uAD00\uACC4\uB294 \uADFC\uAC70 \uC6D0\uBB38\uC744 \uD568\uAED8 \uD655\uC778\uD558\uC138\uC694.", {}, { size: 20, color: "475569" }));
   }
@@ -63020,12 +63023,13 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
   ]) {
     if (filled(task[key])) field(children2, label, task[key]);
   }
-  field(children2, "\uC811\uADFC \uAD8C\uD55C \uD655\uC778", task.accessStatus === "notApplicable" ? "\uD574\uB2F9 \uC5C6\uC74C" : task.accessStatus ? task.accessStatus === "confirmed" ? "\uD655\uC778\uD568" : "\uBBF8\uD655\uC778" : task.accessChecked ? "\uD655\uC778\uD568" : "\uBBF8\uD655\uC778");
-  field(children2, "\uCD5C\uC885 \uB0B4\uC6A9 \uD655\uC778", task.verifiedAt || "\uD655\uC778 \uD544\uC694: \uCD5C\uC885 \uD655\uC778\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  const access = task.accessStatus === "notApplicable" ? "\uD574\uB2F9 \uC5C6\uC74C" : task.accessStatus ? task.accessStatus === "confirmed" ? "\uD655\uC778\uD568" : "\uBBF8\uD655\uC778" : task.accessChecked ? "\uD655\uC778\uD568" : "\uBBF8\uD655\uC778";
+  children2.push(paragraph(`\uC811\uADFC \uAD8C\uD55C: ${access} \xB7 \uCD5C\uC885 \uB0B4\uC6A9 \uD655\uC778: ${task.verifiedAt || "\uD655\uC778 \uD544\uC694: \uCD5C\uC885 \uD655\uC778\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."}`));
   if (task.firstDay || task.firstWeek) {
     field(children2, "\uCC98\uC74C \uD655\uC778\uD560 \uB54C", [task.firstDay ? "\uCCAB\uB0A0 \uD655\uC778" : "", task.firstWeek ? "\uCCAB \uC8FC \uD655\uC778" : ""].filter(Boolean).join(" / "));
   }
-  field(children2, "\uADFC\uAC70 \uCD9C\uCC98", sourceText(task.sourceRefs, document2));
+  const otherSources = task.sourceRefs.filter((sourceId) => !evidencePages.some((page) => page.sourceId === sourceId && refersToPage(task, page)));
+  if (otherSources.length || !task.sourceRefs.length) field(children2, "\uADFC\uAC70 \uCD9C\uCC98", sourceText(otherSources, document2));
   children2.push(linkedParagraph("\uC5C5\uBB34 \uC9C0\uB3C4\uB85C \uB3CC\uC544\uAC00\uAE30", "handover_map"));
 }
 function addCase(children2, item, index, document2, taskNumbers, evidencePages = []) {
@@ -63040,9 +63044,11 @@ function addCase(children2, item, index, document2, taskNumbers, evidencePages =
   if (caseState(item) === "unknown" && item.status !== "unknown") {
     field(children2, "\uC774\uC804 \uAE30\uB85D \xB7 \uD604\uC7AC \uC0C1\uD0DC\uB294 \uB2E4\uC2DC \uD655\uC778", caseRecordedLabel(item));
   }
-  field(children2, "\uB2E4\uC74C \uD589\uB3D9", item.nextAction || "\uD655\uC778 \uD544\uC694: \uB2E4\uC74C \uD589\uB3D9\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
-  field(children2, "\uAE30\uD55C", item.dueDate || "\uD655\uC778 \uD544\uC694: \uAE30\uD55C\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
-  if (filled(item.waitingFor)) field(children2, "\uAE30\uB2E4\uB9AC\uB294 \uB300\uC0C1\xB7\uD68C\uC2E0", item.waitingFor);
+  const completed = caseState(item) === "done";
+  if (completed) children2.push(paragraph("\uC644\uB8CC\uD55C \uAC74\uC785\uB2C8\uB2E4. \uC544\uB798 \uD589\uB3D9\uACFC \uAE30\uD55C\uC740 \uC644\uB8CC \uC804 \uAE30\uB85D\uC774\uBA70 \uD604\uC7AC \uD560 \uC77C\uC744 \uB73B\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."));
+  if (filled(item.nextAction) || !completed) field(children2, completed ? "\uC774\uC804 \uB2E4\uC74C \uD589\uB3D9 \xB7 \uC644\uB8CC \uC804 \uAE30\uB85D" : "\uB2E4\uC74C \uD589\uB3D9", item.nextAction || "\uD655\uC778 \uD544\uC694: \uB2E4\uC74C \uD589\uB3D9\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+  if (filled(item.dueDate) || !completed) field(children2, completed ? "\uC774\uC804 \uAE30\uD55C" : "\uAE30\uD55C", item.dueDate || "\uD655\uC778 \uD544\uC694: \uAE30\uD55C\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+  if (filled(item.waitingFor)) field(children2, completed ? "\uC774\uC804 \uD68C\uC2E0 \uB300\uAE30 \uB300\uC0C1" : "\uAE30\uB2E4\uB9AC\uB294 \uB300\uC0C1\xB7\uD68C\uC2E0", item.waitingFor);
   if (filled(item.notes)) field(children2, "\uC804\uB2EC \uBA54\uBAA8", item.notes);
   field(children2, "\uADFC\uAC70 \uCD9C\uCC98", sourceText(item.sourceRefs, document2));
   evidenceLinks(children2, item, evidencePages);
@@ -63065,21 +63071,29 @@ async function exportDocx(document2, options = {}) {
   const usedSources = new Set([...tasks, ...cases].flatMap((item) => item.sourceRefs));
   const sources = partial ? document2.sourceFiles.filter((source) => usedSources.has(source.id)) : document2.sourceFiles;
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const singleTask = tasks.length === 1;
   const children2 = [
-    paragraph("\uC5C5\uBB34 \uC778\uC218\uC778\uACC4\uC11C", { spacing: { after: 100 } }, { size: 22, color: "475569", bold: true }),
+    paragraph("\uC5C5\uBB34 \uC778\uC218\uC778\uACC4\uC11C", { spacing: { after: 60 } }, { size: 22, color: "475569", bold: true }),
     heading(document2.title, HeadingLevel.TITLE),
-    paragraph(`\uBB38\uC11C \uC0DD\uC131\uC77C: ${generatedAt} (UTC)`, {}, { size: 18, color: "475569" }),
-    paragraph(`\uB0B4\uBCF4\uB0B4\uAE30 \uBC94\uC704: ${partial ? "\uC120\uD0DD \uD56D\uBAA9" : "\uC804\uCCB4 \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74"} \xB7 \uC5C5\uBB34 ${tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${cases.length}\uAC1C`),
-    bookmarkedHeading("\uC5C5\uBB34 \uC9C0\uB3C4 \xB7 \uB0B4 \uC5C5\uBB34 \uD55C\uB208\uC5D0 \uBCF4\uAE30", "handover_map"),
-    paragraph(`${partial ? "\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uD45C\uC2DC" : "\uC804\uCCB4 \uC5C5\uBB34 \uD45C\uC2DC"} \xB7 ${tasks.length}\uAC1C. \uC81C\uBAA9\uC744 \uB204\uB974\uBA74 \uC2E4\uD589 \uC548\uB0B4\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.`)
+    paragraph(`\uBB38\uC11C \uC0DD\uC131\uC77C: ${generatedAt.slice(0, 10)} (UTC) \xB7 ${partial ? "\uC120\uD0DD \uD56D\uBAA9" : "\uC804\uCCB4 \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74"} \xB7 \uC5C5\uBB34 ${tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${cases.length}\uAC1C`, {}, { size: 20, color: "475569" }),
+    bookmarkedHeading("\uC5C5\uBB34 \uC9C0\uB3C4 \xB7 \uB0B4 \uC5C5\uBB34 \uD55C\uB208\uC5D0 \uBCF4\uAE30", "handover_map", singleTask ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_1),
+    ...singleTask ? [] : [paragraph(`${partial ? "\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uD45C\uC2DC" : "\uC804\uCCB4 \uC5C5\uBB34 \uD45C\uC2DC"} \xB7 ${tasks.length}\uAC1C. \uC81C\uBAA9\uC744 \uB204\uB974\uBA74 \uC2E4\uD589 \uC548\uB0B4\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.`)]
   ];
   for (const group of groups) {
+    if (singleTask) {
+      const task = group.tasks[0];
+      if (task) {
+        children2.push(linkedParagraph(`${group.title ? `${group.title} \u2192 ` : ""}${task.title}`, `handover_task_${numbers.get(task.id)}`));
+        if (task.ownerRole) children2.push(paragraph(`\uB2F4\uB2F9 \uC5ED\uD560: ${task.ownerRole}`));
+      }
+      continue;
+    }
     if (group.title) children2.push(heading(`\uD070 \uC5C5\uBB34: ${group.title}`, HeadingLevel.HEADING_2));
     if (group.tasks.length) children2.push(summaryTable(group.tasks, numbers));
     else if (group.title) children2.push(paragraph("\uB4F1\uB85D\uB41C \uC138\uBD80 \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   }
   if (!tasks.length) children2.push(paragraph("\uD45C\uC2DC\uD560 \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
-  children2.push(heading("\uC5C5\uBB34 \uC0C1\uC138 \xB7 \uC2E4\uD589 \uC548\uB0B4"));
+  children2.push(heading("\uC5C5\uBB34 \uC0C1\uC138 \xB7 \uC2E4\uD589 \uC548\uB0B4", singleTask ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_1));
   for (const group of groups) {
     if (group.title && tasks.length > 1) children2.push(heading(`\uD070 \uC5C5\uBB34: ${group.title}`, HeadingLevel.HEADING_2));
     group.tasks.forEach((task) => addTask(
@@ -63103,20 +63117,18 @@ async function exportDocx(document2, options = {}) {
     if (filled(document2.onboarding.dayOne)) field(children2, "\uCCAB\uB0A0 \uD655\uC778\uD560 \uC77C", document2.onboarding.dayOne);
     if (filled(document2.onboarding.firstWeek)) field(children2, "\uCCAB \uC8FC \uD655\uC778\uD560 \uC77C", document2.onboarding.firstWeek);
   }
-  addEvidencePages(children2, evidencePages, tasks, numbers);
   children2.push(heading("\uCD9C\uCC98\uC640 \uD655\uC778 \uC0AC\uD56D"));
-  children2.push(paragraph(`\uC77D\uB294 \uBC94\uC704: \uC5C5\uBB34 \uC548\uB0B4\uC640 \uC0AC\uC9C4, \uC9C4\uD589 \uAC74, \uCD9C\uCC98 \uC774\uB984\xB7\uD655\uC778 \uACBD\uACE0\uB97C \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC804\uCCB4 \uC6D0\uBB38 \uBC1C\uCDCC\uC640 \uBCF5\uC0AC \uC774\uB825\uC740 \uC774 DOCX\uC5D0 \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBCF4\uC874\uB41C \uC790\uB8CC\uB294 \uC778\uC218\uC778\uACC4 JSON\uC744 \uC5F4\uC5B4 \uD655\uC778\uD558\uC138\uC694.${evidencePages.length ? " \uC120\uD0DD\uD55C \uADFC\uAC70 PDF \uCABD\uC740 \u2018\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD\u2019\uC5D0 \uC774\uBBF8\uC9C0\uB85C \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uCABD\uACFC \uC6D0\uBCF8 PDF \uD30C\uC77C\uC740 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4." : ""}`, {}, { size: 20, color: "475569" }));
-  children2.push(paragraph(SECURITY_NOTICE, {}, { size: 20, color: "9A3412" }));
-  children2.push(paragraph("\uC6D0\uBB38\uC5D0\uC11C \uAC00\uC838\uC628 \uB0B4\uC6A9\uACFC \uC2E4\uC81C \uC5C5\uBB34 \uC808\uCC28\uAC00 \uC77C\uCE58\uD558\uB294\uC9C0 \uC778\uACC4 \uB2F4\uB2F9\uC790\uAC00 \uD655\uC778\uD558\uC138\uC694. \uC6D0\uBB38 \uCD94\uCD9C \uACBD\uACE0\uAC00 \uC788\uC73C\uBA74 \uC6D0\uBCF8 \uD30C\uC77C\uACFC \uB300\uC870\uD558\uC138\uC694. \uBB38\uC11C\uC758 \uD45C\xB7\uC0AC\uC9C4 \uBC30\uCE58\uAC00 \uC2E4\uD589 \uC548\uB0B4\uC640 \uB2E4\uB97C \uC218 \uC788\uC2B5\uB2C8\uB2E4."));
-  if (partial) children2.push(paragraph("\uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uC5D0 \uC5F0\uACB0\uB41C \uCD9C\uCC98\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uBC1C\uCDCC\uC5D0\uB294 \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uB0B4\uC6A9\uC774 \uC11E\uC77C \uC218 \uC788\uC5B4 \uC0DD\uB7B5\uD588\uC2B5\uB2C8\uB2E4."));
+  children2.push(paragraph(`\uC5C5\uBB34 \uC548\uB0B4\xB7\uC0AC\uC9C4\uACFC \uC120\uD0DD\uD55C \uADFC\uAC70 \uCABD\uC744 \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC804\uCCB4 \uC6D0\uBB38\xB7\uBCF5\uC0AC \uC774\uB825\uC740 JSON\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.${partial ? " \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uB0B4\uC6A9\uC774 \uC11E\uC77C \uC218 \uC788\uC5B4 \uC0DD\uB7B5\uD55C \uC6D0\uBB38 \uBC1C\uCDCC\uB3C4 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4." : ""}`, {}, { size: 20, color: "475569" }));
+  children2.push(paragraph("\uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC740 \uD3C9\uBB38\uC785\uB2C8\uB2E4. \uACF5\uC720 \uC804 \uAC1C\uC778\uC815\uBCF4\xB7\uBE44\uBC00\uBC88\uD638\xB7\uC778\uC99D\uC815\uBCF4\uB97C \uC9C1\uC811 \uD655\uC778\uD558\uACE0 \uC81C\uAC70\uD558\uC138\uC694. \uC544\uB798 \uCD94\uCD9C \uACBD\uACE0\uC640 \uC2E4\uC81C \uC808\uCC28\uB294 \uC6D0\uBCF8\uACFC \uB300\uC870\uD558\uC138\uC694.", {}, { size: 20, color: "9A3412" }));
   if (!sources.length) children2.push(paragraph("\uD3EC\uD568\uB41C \uCD9C\uCC98 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   sources.forEach((source, index) => {
     children2.push(heading(`${index + 1}. ${source.name}`, HeadingLevel.HEADING_2));
     const linked = usedSources.has(source.id);
     const included = evidencePages.filter((page) => page.sourceId === source.id).map((page) => page.pageNumber).sort((a, b) => a - b);
-    field(children2, "\uC77D\uB294 \uBC94\uC704", source.pdf ? included.length ? `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD \uC911 ${included.join(", ")}\uCABD\uC744 \u2018\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD\u2019\uC5D0 \uC774\uBBF8\uC9C0\uB85C \uD3EC\uD568\uD588\uC2B5\uB2C8\uB2E4. \uC6D0\uBCF8 PDF \uD30C\uC77C\uACFC \uB098\uBA38\uC9C0 \uCABD\uC740 \uC778\uC218\uC778\uACC4 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4.` : `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD\uC778 \uBCF4\uAD00 PDF\uC785\uB2C8\uB2E4. \uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544 \uC774 DOCX\uC5D0\uB294 \uD398\uC774\uC9C0\uB97C \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.` : `\uCD9C\uCC98 \uC774\uB984\uACFC \uD655\uC778 \uACBD\uACE0\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uBCF4\uC874\uB41C \uC6D0\uBB38 \uBC1C\uCDCC\uB294 \uC778\uC218\uC778\uACC4 JSON\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.${linked ? "" : " \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}`);
-    field(children2, "\uCD94\uCD9C\xB7\uD655\uC778 \uACBD\uACE0", source.warnings.length ? source.warnings.join("\n") : "\uAE30\uB85D\uB41C \uACBD\uACE0 \uC5C6\uC74C \xB7 \uC6D0\uBCF8\uACFC\uC758 \uC77C\uCE58\uAC00 \uBCF4\uC99D\uB41C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4.");
+    children2.push(paragraph(source.pdf ? included.length ? `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD \uC911 ${included.join(", ")}\uCABD \uD3EC\uD568 \xB7 \uC6D0\uBCF8 PDF\uC640 \uB098\uBA38\uC9C0 \uCABD\uC740 JSON\uC5D0 \uBCF4\uAD00.` : `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD\uC778 \uBCF4\uAD00 PDF\uC785\uB2C8\uB2E4. \uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544 \uC774 DOCX\uC5D0\uB294 \uD398\uC774\uC9C0\uB97C \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.` : `\uCD9C\uCC98 \uC774\uB984\uACFC \uD655\uC778 \uACBD\uACE0\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uBC1C\uCDCC\uB294 JSON\uC5D0 \uBCF4\uAD00.${linked ? "" : " \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}`));
+    children2.push(paragraph(source.warnings.length ? source.warnings.join("\n") : "\uAE30\uB85D\uB41C \uACBD\uACE0 \uC5C6\uC74C \xB7 \uC6D0\uBCF8\uACFC\uC758 \uC77C\uCE58\uAC00 \uBCF4\uC99D\uB41C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4."));
   });
+  addEvidencePages(children2, evidencePages, tasks, numbers);
   const file = new File2({
     title: document2.title,
     subject: "\uC5C5\uBB34 \uC778\uC218\uC778\uACC4\uC11C",
@@ -65723,6 +65735,55 @@ function linkedPdfSources(doc, selection = {}) {
   check5([...refs].every((id) => doc.sourceFiles.some((source) => source.id === id)), "\uC5F0\uACB0\uB41C \uADFC\uAC70 \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4 \uCD9C\uB825\uC744 \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
   return doc.sourceFiles.filter((source) => refs.has(source.id) && source.pdf);
 }
+function outputEvidencePlan(doc, selection = {}) {
+  const items = selectedItems(doc, selection);
+  const taskIds = new Set(doc.tasks.map((item) => item.id));
+  return linkedPdfSources(doc, selection).map((source) => ({
+    source,
+    records: items.filter((item) => item.sourceRefs?.includes(source.id)).map((item) => {
+      const entry = item.sourcePages?.find((link) => link.sourceId === source.id);
+      if (entry) check5(Array.isArray(entry.pages) && entry.pages.length && entry.pages.every((page) => Number.isInteger(page)), "\uC800\uC7A5\uB41C \uADFC\uAC70 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      const pages = entry ? parseEvidencePages(entry.pages.join(","), source.pdf.pageCount) : source.pdf.pageCount === 1 ? [1] : [];
+      return {
+        itemId: item.id,
+        kind: taskIds.has(item.id) ? "task" : "case",
+        title: item.title,
+        pages,
+        state: entry ? "confirmed" : pages.length ? "single-page" : "unconfirmed"
+      };
+    })
+  }));
+}
+function applyEvidencePageGroups(doc, selection = {}, groups = [], { replaceConfirmed = false } = {}) {
+  const plan = outputEvidencePlan(doc, selection);
+  check5(Array.isArray(groups), "\uD568\uAED8 \uC5F0\uACB0\uD560 \uC5C5\uBB34\uC640 \uADFC\uAC70 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+  const seen = /* @__PURE__ */ new Set();
+  const assignments = groups.flatMap((group) => {
+    check5(group && typeof group === "object" && !Array.isArray(group), "\uD568\uAED8 \uC5F0\uACB0\uD560 \uC5C5\uBB34\uC640 \uADFC\uAC70 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+    const sourcePlan = plan.find((item) => item.source.id === group.sourceId);
+    check5(sourcePlan, "\uC120\uD0DD\uD55C \uC5C5\uBB34\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uADFC\uAC70 \uCABD\uC774 \uC788\uC2B5\uB2C8\uB2E4.");
+    check5(Array.isArray(group.itemIds) && group.itemIds.length && group.itemIds.every((id) => typeof id === "string"), "\uADFC\uAC70 \uCABD\uC744 \uC5F0\uACB0\uD560 \uC5C5\uBB34 \uB610\uB294 \uC9C4\uD589 \uAC74\uC744 \uD558\uB098 \uC774\uC0C1 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
+    const pages = parseEvidencePages(group.pages, sourcePlan.source.pdf.pageCount);
+    return group.itemIds.map((itemId) => {
+      const record = sourcePlan.records.find((item) => item.itemId === itemId);
+      check5(record, "\uC120\uD0DD\uD55C \uC5C5\uBB34\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uADFC\uAC70 \uCABD\uC774 \uC788\uC2B5\uB2C8\uB2E4.");
+      const key = JSON.stringify([group.sourceId, itemId]);
+      check5(!seen.has(key), "\uAC19\uC740 \uC5C5\uBB34\uC758 \uADFC\uAC70 \uCABD\uC774 \uC5EC\uB7EC \uBB36\uC74C\uC5D0 \uC788\uC2B5\uB2C8\uB2E4. \uD55C \uBB36\uC74C\uC73C\uB85C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      seen.add(key);
+      const unchanged = record.pages.length === pages.length && record.pages.every((page, index) => page === pages[index]);
+      check5(replaceConfirmed || record.state !== "confirmed" || unchanged, "\uC774\uBBF8 \uD655\uC778\uD55C \uADFC\uAC70 \uCABD\uC785\uB2C8\uB2E4. \uC5F0\uACB0 \uD655\uC778\xB7\uBC14\uAFB8\uAE30\uC5D0\uC11C \uBCC0\uACBD\uD574 \uC8FC\uC138\uC694.");
+      return { itemId, sourceId: group.sourceId, pages, unchanged: record.state === "confirmed" && unchanged };
+    });
+  });
+  const copy = structuredClone(doc);
+  const items = [...copy.tasks, ...copy.cases];
+  for (const assignment of assignments) {
+    if (assignment.unchanged) continue;
+    const item = items.find((item2) => item2.id === assignment.itemId);
+    item.sourcePages = [...(item.sourcePages || []).filter((link) => link.sourceId !== assignment.sourceId), { sourceId: assignment.sourceId, pages: [...assignment.pages] }];
+  }
+  return copy;
+}
 function storedOutputPages(doc, selection = {}) {
   const items = selectedItems(doc, selection);
   const choices = [];
@@ -66998,7 +67059,7 @@ function renderReaderResults() {
     return;
   }
   if (state.readerTab === "calendar") {
-    root.append(el("h2", {}, "\uC5B8\uC81C \uD558\uB294 \uC77C"), note("\uD655\uC778\uB41C \uB0A0\uC9DC\uB294 \uB2EC\uB825\uC5D0, \uC6D4\uCD08\xB7\uC6D4\uB9D0\uACFC \uC0C1\uD669\uBCC4 \uC5C5\uBB34\uB294 \uC544\uB798 \uBAA9\uB85D\uC5D0 \uD45C\uC2DC\uD569\uB2C8\uB2E4."), calendarFor(doc, false));
+    root.append(todayAndWaiting(doc), el("h2", {}, "\uC804\uCCB4 \uC77C\uC815"), note("\uD655\uC778\uB41C \uB0A0\uC9DC\uB294 \uB2EC\uB825\uC5D0, \uC6D4\uCD08\xB7\uC6D4\uB9D0\uACFC \uC0C1\uD669\uBCC4 \uC5C5\uBB34\uB294 \uC544\uB798 \uBAA9\uB85D\uC5D0 \uD45C\uC2DC\uD569\uB2C8\uB2E4."), calendarFor(doc, false));
     return;
   }
   if (state.readerTab === "situations") {
@@ -67059,6 +67120,17 @@ function renderReaderResults() {
 function guideCard(num, title, text, placeholder) {
   return el("article", { class: "guide-card" }, el("span", { class: "eyebrow" }, `START ${num}`), el("h3", {}, title), el("p", { class: "pre-wrap" }, text || placeholder));
 }
+function todayAndWaiting(doc) {
+  const date = today(), tasks = doc.tasks.filter((task) => dueInRange(task, date, date).dates.includes(date));
+  const active = doc.cases.filter((item) => !["done", "unknown"].includes(caseState(item)));
+  const due = active.filter((item) => caseState(item) !== "waiting" && item.dueDate && item.dueDate <= date);
+  const waiting = active.filter((item) => caseState(item) === "waiting");
+  const other = doc.cases.filter((item) => caseState(item) !== "done" && !due.includes(item) && !waiting.includes(item));
+  const root = el("section", { class: "today-focus", "aria-label": "\uC624\uB298 \uD560 \uC77C\uACFC \uD68C\uC2E0 \uB300\uAE30" }, el("h2", {}, "\uC624\uB298 \uD560 \uC77C \xB7 \uD68C\uC2E0 \uB300\uAE30"), note(date + " \xB7 \uD655\uC778\uB41C \uB0A0\uC9DC\uC640 \uD604\uC7AC \uAE30\uB85D\uC744 \uD568\uAED8 \uBD05\uB2C8\uB2E4."));
+  root.append(el("div", { class: "today-columns" }, el("section", {}, el("h3", {}, `\uC624\uB298 \uC77C\uC815\xB7\uAE30\uD55C \uC9C0\uB09C \uAC74 ${tasks.length + due.length}\uAC1C`), tasks.length || due.length ? el("div", { class: "read-list" }, tasks.map((task) => taskCard(task, date)), due.map((item) => caseCard(item))) : note("\uC624\uB298\uB85C \uD655\uC778\uB41C \uC77C\uC815\uC774\uB098 \uAE30\uD55C \uC9C0\uB09C \uAC74\uC740 \uC5C6\uC2B5\uB2C8\uB2E4. \uD68C\uC2E0 \uB300\uAE30\uC640 \uB0A0\uC9DC \uBBF8\uC815\uC740 \uB530\uB85C \uB0A8\uC544 \uC788\uC2B5\uB2C8\uB2E4.")), el("section", {}, el("h3", {}, `\uD68C\uC2E0 \uB300\uAE30 ${waiting.length}\uAC1C`), note("\uBAA8\uB450 \uC624\uB298 \uCC98\uB9AC\uD574\uC57C \uD55C\uB2E4\uB294 \uB73B\uC740 \uC544\uB2D9\uB2C8\uB2E4. \uC801\uD78C \uAE30\uD55C\uACFC \uAE30\uB2E4\uB9AC\uB294 \uB0B4\uC6A9\uC744 \uD655\uC778\uD558\uC138\uC694."), waiting.length ? el("div", { class: "read-list" }, waiting.map((item) => caseCard(item))) : note("\uD68C\uC2E0 \uB300\uAE30\uB85C \uD655\uC778\uB41C \uAC74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."))));
+  if (other.length) root.append(el("details", { class: "optional-section" }, el("summary", {}, `\uB2E4\uB978 \uC9C4\uD589 \uAC74 \xB7 \uAE30\uD55C\xB7\uC0C1\uD0DC \uBBF8\uD655\uC778 ${other.length}\uAC1C`), note("\uAE30\uD55C\uC774 \uC5C6\uAC70\uB098 \uC0C1\uD0DC\uB97C \uBAA8\uB974\uB294 \uAE30\uB85D\uC740 \uC624\uB298 \uD560 \uC77C\uB85C \uC784\uC758 \uC9C0\uC815\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), el("div", { class: "read-list" }, other.map((item) => caseCard(item)))));
+  return root;
+}
 function caseProgress(item) {
   const body = el("div", { class: "case-progress" }, select("\uC774 \uAC74\uC758 \uD604\uC7AC \uC0C1\uD0DC", caseState(item), [["unknown", "\uC544\uC9C1 \uBAA8\uB984"], ["todo", "\uC2DC\uC791 \uC804"], ["doing", "\uC9C4\uD589 \uC911"], ["waiting", "\uD68C\uC2E0 \uB300\uAE30"], ["done", "\uC644\uB8CC"]], (value) => {
     setCaseStatus(item, value);
@@ -67097,8 +67169,8 @@ function readBlock(label, value) {
   return el("div", { class: "read-block" }, el("h4", {}, label), el("p", { class: "pre-wrap" }, value));
 }
 function caseCard(item) {
-  const status = caseState(item);
-  return el("details", { class: "read-card case-card" }, el("summary", {}, el("div", { class: "read-summary" }, el("div", { class: "read-title" }, el("div", { class: "tags" }, tag2(caseStateLabel(item), status === "unknown" || status === "waiting" ? "amber" : status === "done" ? "green" : ""), item.dueDate ? tag2("\uAE30\uD55C " + item.dueDate, item.dueDate < today() && status !== "done" ? "amber" : "") : tag2("\uAE30\uD55C \uBBF8\uD655\uC815")), el("h3", {}, item.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74"), el("p", {}, item.nextAction ? "\uB2E4\uC74C: " + short(item.nextAction) : "\uB2E4\uC74C \uD589\uB3D9 \uD655\uC778\uC774 \uD544\uC694\uD574\uC694")), el("span", { class: "expand-hint" }, "\uC9C4\uD589 \uB0B4\uC6A9 \uD3BC\uCE58\uAE30"))), el("div", { class: "read-content" }, legacyCaseNote(item), readBlock("\uB2E4\uC74C \uD589\uB3D9", item.nextAction || "\uC544\uC9C1 \uC815\uD574\uC9C0\uC9C0 \uC54A\uC558\uC5B4\uC694."), item.waitingFor ? readBlock("\uD68C\uC2E0 \uB300\uAE30", item.waitingFor) : null, item.notes ? readBlock("\uC9C4\uD589 \uBA54\uBAA8", item.notes) : null, item.taskId ? button2("\uC5F0\uACB0\uB41C \uC5C5\uBB34 \uC124\uBA85 \uC5F4\uAE30", () => selectTask(item.taskId, false), "secondary") : null, sourceInfo(item), caseProgress(item)));
+  const status = caseState(item), done = status === "done";
+  return el("details", { class: "read-card case-card" }, el("summary", {}, el("div", { class: "read-summary" }, el("div", { class: "read-title" }, el("div", { class: "tags" }, tag2(caseStateLabel(item), status === "unknown" || status === "waiting" ? "amber" : done ? "green" : ""), item.dueDate ? tag2((done ? "\uAE30\uB85D\uB41C \uAE30\uD55C " : "\uAE30\uD55C ") + item.dueDate, item.dueDate < today() && !done ? "amber" : "") : tag2(done ? "\uAE30\uD55C \uAE30\uB85D \uC5C6\uC74C" : "\uAE30\uD55C \uBBF8\uD655\uC815")), el("h3", {}, item.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74"), el("p", {}, done ? "\uCC98\uB9AC\uAC00 \uB05D\uB09C \uAC74\uC785\uB2C8\uB2E4. \uC774\uC804 \uB0B4\uC6A9\uC740 \uD3BC\uCCD0\uC11C \uBCFC \uC218 \uC788\uC5B4\uC694." : item.nextAction ? "\uB2E4\uC74C: " + short(item.nextAction) : "\uB2E4\uC74C \uD589\uB3D9 \uD655\uC778\uC774 \uD544\uC694\uD574\uC694")), el("span", { class: "expand-hint" }, done ? "\uC644\uB8CC \uC804 \uAE30\uB85D \uD3BC\uCE58\uAE30" : "\uC9C4\uD589 \uB0B4\uC6A9 \uD3BC\uCE58\uAE30"))), el("div", { class: "read-content" }, legacyCaseNote(item), readBlock(done ? "\uC644\uB8CC \uC804 \uB2E4\uC74C \uD589\uB3D9" : "\uB2E4\uC74C \uD589\uB3D9", item.nextAction || (done ? "\uAE30\uB85D \uC5C6\uC74C" : "\uC544\uC9C1 \uC815\uD574\uC9C0\uC9C0 \uC54A\uC558\uC5B4\uC694.")), item.waitingFor ? readBlock(done ? "\uC644\uB8CC \uC804 \uAE30\uB2E4\uB9AC\uB358 \uD68C\uC2E0" : "\uD68C\uC2E0 \uB300\uAE30", item.waitingFor) : null, item.notes ? readBlock("\uC9C4\uD589 \uBA54\uBAA8", item.notes) : null, item.taskId ? button2("\uC5F0\uACB0\uB41C \uC5C5\uBB34 \uC124\uBA85 \uC5F4\uAE30", () => selectTask(item.taskId, false), "secondary") : null, sourceInfo(item), caseProgress(item)));
 }
 function issuesPanel() {
   const doc = current3(), issues = issuesFor(doc);
@@ -67439,9 +67511,56 @@ async function requestOutput(doc, selection, deliver, review = false) {
     return;
   }
   const status = el("p", { role: "status", class: "helper" });
-  const body = el("div", {}, note("\uBCF8\uBB38\uC758 \uD45C\xB7\uC0AC\uC9C4\uC744 \uB2E4\uC2DC \uC785\uB825\uD560 \uD544\uC694 \uC5C6\uC774 \uC6D0\uBB38 \uCABD\uC744 \uD568\uAED8 \uB123\uC2B5\uB2C8\uB2E4. \uC5C5\uBB34\uB9C8\uB2E4 \uD544\uC694\uD55C \uCABD\uC744 \uD55C \uBC88 \uD655\uC778\uD558\uBA74 \uBB38\uC11C\uC640 \uC804\uB2EC JSON\uC5D0 \uAE30\uC5B5\uD569\uB2C8\uB2E4."), note("\uD55C \uCABD\uC9DC\uB9AC PDF\uC640 \uC774\uBBF8 \uD655\uC778\uD55C \uC5F0\uACB0\uC740 \uB2E4\uC2DC \uBB3B\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC608: 1 \uB610\uB294 1, 3-4. \uD55C \uBC88\uC5D0 \uD569\uACC4 20\uCABD\uAE4C\uC9C0 \uCD9C\uB825\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), sources.filter((source) => pending.some((record) => record.source.id === source.id)).map((source) => el("section", { class: "output-source" }, el("h3", {}, source.name), button2(`\uC6D0\uBB38 \uD655\uC778 \xB7 \uCD1D ${source.pdf.pageCount}\uCABD`, () => openPdfSource(source, "\uADFC\uAC70 \uCABD \uC5F0\uACB0\uB85C \uB3CC\uC544\uAC00\uAE30"), "secondary"), pending.filter((record) => record.source.id === source.id).map((record) => field2(`${record.item.title || "\uC774\uB984 \uC5C6\uB294 \uD56D\uBAA9"} \xB7 \uADFC\uAC70 \uCABD`, record.value, (value) => {
-    record.value = value;
-  }, { placeholder: "\uC608: 1 \uB610\uB294 1, 3-4", maxLength: 300 })))), note("\uC6D0\uBCF8 PDF\uB294 \uADF8\uB300\uB85C \uBCF4\uC874\uD569\uB2C8\uB2E4. \uCD9C\uB825\uC5D0\uB294 \uD655\uC778\uD55C \uCABD\uC758 \uC774\uBBF8\uC9C0\uB9CC \uB123\uC73C\uBA70, \uC774\uBBF8\uC9C0 \uC18D \uAE00\uC740 DOCX \uAC80\uC0C9 \uB300\uC0C1\uC774 \uC544\uB2D9\uB2C8\uB2E4."), status);
+  const sourceSection = (source) => {
+    const entries = pending.filter((record) => record.source.id === source.id);
+    const section = el("section", { class: "output-source" }, el("h3", {}, source.name), button2(`\uC6D0\uBB38 \uD655\uC778 \xB7 \uCD1D ${source.pdf.pageCount}\uCABD`, () => openPdfSource(source, "\uADFC\uAC70 \uCABD \uC5F0\uACB0\uB85C \uB3CC\uC544\uAC00\uAE30"), "secondary"));
+    const controls = /* @__PURE__ */ new Map();
+    const individual = entries.map((record) => {
+      const node = field2(`${record.item.title || "\uC774\uB984 \uC5C6\uB294 \uD56D\uBAA9"} \xB7 \uADFC\uAC70 \uCABD`, record.value, (value) => {
+        record.value = value;
+        if (entries.length > 1) {
+          refresh();
+          feedback.textContent = "\uAC1C\uBCC4 \uC785\uB825\uC744 \uBC18\uC601\uD588\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC804 \uC5F0\uACB0 \uB0B4\uC6A9\uC744 \uD655\uC778\uD558\uC138\uC694.";
+        }
+      }, { placeholder: "\uC608: 1 \uB610\uB294 1, 3-4", maxLength: 300 });
+      controls.set(record, node.querySelector("input"));
+      return node;
+    });
+    if (entries.length === 1) {
+      section.append(individual[0]);
+      return section;
+    }
+    const chosen = /* @__PURE__ */ new Set(), rows = el("div", { class: "evidence-batch-items" }), feedback = el("p", { class: "helper", role: "status" });
+    let pages = "";
+    const refresh = () => {
+      rows.replaceChildren(...entries.map((record) => el("label", { class: "evidence-batch-item" }, el("input", { type: "checkbox", checked: chosen.has(record), onchange: (e) => {
+        if (e.target.checked) chosen.add(record);
+        else chosen.delete(record);
+      } }), el("span", {}, record.item.title || "\uC774\uB984 \uC5C6\uB294 \uD56D\uBAA9", el("small", {}, record.value ? `${record.value}\uCABD \uC5F0\uACB0 \uC608\uC815` : "\uBBF8\uC5F0\uACB0")))));
+    };
+    const apply = button2("\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uAC19\uC740 \uCABD \uC5F0\uACB0", () => {
+      try {
+        const selected = [...chosen];
+        applyEvidencePageGroups(snapshot, options, [{ sourceId: source.id, itemIds: selected.map((record) => record.item.id), pages }], { replaceConfirmed: review });
+        const value = parseEvidencePages(pages, source.pdf.pageCount).join(", ");
+        selected.forEach((record) => {
+          record.value = value;
+          controls.get(record).value = value;
+        });
+        chosen.clear();
+        refresh();
+        feedback.textContent = `${selected.length}\uAC1C \uD56D\uBAA9\uC5D0 ${value}\uCABD\uC744 \uC5F0\uACB0\uD588\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uC800\uC7A5 \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uAE30\uC5B5\uD569\uB2C8\uB2E4.`;
+      } catch (error) {
+        feedback.textContent = error.message;
+      }
+    }, "secondary");
+    refresh();
+    section.append(note("\uAC19\uC740 \uCABD\uC774 \uD544\uC694\uD55C \uD56D\uBAA9\uC744 \uD568\uAED8 \uC120\uD0DD\uD558\uC138\uC694. \uC5F0\uACB0 \uAD00\uACC4\uB97C \uC790\uB3D9\uC73C\uB85C \uCD94\uCE21\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), field2("\uD568\uAED8 \uC5F0\uACB0\uD560 \uADFC\uAC70 \uCABD", "", (value) => {
+      pages = value;
+    }, { placeholder: "\uC608: 1 \uB610\uB294 1, 3-4", maxLength: 300 }), rows, apply, feedback, el("details", { class: "optional-section" }, el("summary", {}, "\uD56D\uBAA9\uB9C8\uB2E4 \uB2E4\uB974\uAC8C \uC785\uB825\xB7\uC218\uC815"), individual));
+    return section;
+  };
+  const body = el("div", {}, note("\uAC19\uC740 \uADFC\uAC70 \uCABD\uC740 \uC5EC\uB7EC \uC5C5\uBB34\uC5D0 \uD55C \uBC88\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uD655\uC778\uD55C \uC5F0\uACB0\uC740 \uBB38\uC11C\uC640 \uC804\uB2EC JSON\uC5D0 \uAE30\uC5B5\uD569\uB2C8\uB2E4."), note("\uD55C \uCABD\uC9DC\uB9AC PDF\uC640 \uC774\uBBF8 \uD655\uC778\uD55C \uC5F0\uACB0\uC740 \uB2E4\uC2DC \uBB3B\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uBBF8\uD655\uC778 \uD56D\uBAA9\uB9CC \uC120\uD0DD\uD574 \uC8FC\uC138\uC694. \uD55C \uBC88\uC5D0 \uD569\uACC4 20\uCABD\uAE4C\uC9C0 \uCD9C\uB825\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), sources.filter((source) => pending.some((record) => record.source.id === source.id)).map(sourceSection), note("\uC6D0\uBCF8 PDF\uB294 \uADF8\uB300\uB85C \uBCF4\uC874\uD569\uB2C8\uB2E4. \uCD9C\uB825\uC5D0\uB294 \uD655\uC778\uD55C \uCABD\uC758 \uC774\uBBF8\uC9C0\uB9CC \uB123\uC73C\uBA70, \uC774\uBBF8\uC9C0 \uC18D \uAE00\uC740 DOCX \uAC80\uC0C9 \uB300\uC0C1\uC774 \uC544\uB2D9\uB2C8\uB2E4."), status);
   let busy = false;
   const handle = modal("\uD568\uAED8 \uC804\uB2EC\uD560 \uADFC\uAC70 \uCABD", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2(review ? "\uD655\uC778\uD55C \uC5F0\uACB0 \uC800\uC7A5" : "\uC5F0\uACB0\uC744 \uAE30\uC5B5\uD558\uACE0 \uD568\uAED8 \uB9CC\uB4E4\uAE30", async (e) => {
     if (busy) return;
@@ -67631,7 +67750,7 @@ function printView() {
     sheet.append(item);
   });
   if (cases.length) sheet.append(el("h2", {}, "\uC9C0\uAE08 \uC774\uC5B4\uBC1B\uC744 \uAC74 \xB7 \uD655\uC778 \uAE30\uB85D"));
-  cases.forEach((item) => sheet.append(el("article", { class: "print-item" }, el("h3", {}, item.title || "\uC774\uB984 \uC5C6\uB294 \uAE30\uB85D"), note(caseStateLabel(item) + " \xB7 \uAE30\uD55C " + (item.dueDate || "\uBBF8\uD655\uC815")), legacyCaseNote(item), readBlock("\uB2E4\uC74C \uD589\uB3D9", item.nextAction || "\uD655\uC778 \uD544\uC694"), item.waitingFor ? readBlock("\uD68C\uC2E0 \uB300\uAE30", item.waitingFor) : null, item.notes ? readBlock("\uC9C4\uD589 \uBA54\uBAA8", item.notes) : null)));
+  cases.forEach((item) => sheet.append(el("article", { class: "print-item" }, el("h3", {}, item.title || "\uC774\uB984 \uC5C6\uB294 \uAE30\uB85D"), note(caseStateLabel(item) + " \xB7 \uAE30\uD55C " + (item.dueDate || "\uBBF8\uD655\uC815")), legacyCaseNote(item), readBlock(caseState(item) === "done" ? "\uC644\uB8CC \uC804 \uB2E4\uC74C \uD589\uB3D9" : "\uB2E4\uC74C \uD589\uB3D9", item.nextAction || (caseState(item) === "done" ? "\uAE30\uB85D \uC5C6\uC74C" : "\uD655\uC778 \uD544\uC694")), item.waitingFor ? readBlock(caseState(item) === "done" ? "\uC644\uB8CC \uC804 \uAE30\uB2E4\uB9AC\uB358 \uD68C\uC2E0" : "\uD68C\uC2E0 \uB300\uAE30", item.waitingFor) : null, item.notes ? readBlock("\uC9C4\uD589 \uBA54\uBAA8", item.notes) : null)));
   if (tasks.length === doc.tasks.length && cases.length === doc.cases.length) {
     if (doc.onboarding.dayOne) sheet.append(readBlock("\uCCAB\uB0A0 \uC548\uB0B4", doc.onboarding.dayOne));
     if (doc.onboarding.firstWeek) sheet.append(readBlock("\uCCAB \uC8FC \uC548\uB0B4", doc.onboarding.firstWeek));
