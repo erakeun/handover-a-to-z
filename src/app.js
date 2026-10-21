@@ -13,7 +13,7 @@ import {proposeDraftTitles} from './draft-titles.js';
 import {renderUsageGuide} from './guide.js';
 import {caseState,caseStateLabel,caseRecordedLabel,firstActionText,distinctInstructions,taskReadiness} from './handover-flow.js';
 import {attachPdfEvidence,verifyDocumentPdfs,createPdfEvidenceViewer} from './pdf-evidence.js';
-import {linkedPdfSources,parseEvidencePages,storedOutputPages,prepareOutputEvidence} from './output-evidence.js';
+import {linkedPdfSources,parseEvidencePages,storedOutputPages,prepareOutputEvidence,applyEvidencePageGroups} from './output-evidence.js';
 import {reviewExampleDocument} from './review-example.js';
 
 const app=document.querySelector('#app');
@@ -353,7 +353,7 @@ function renderReaderResults(){
   if(combined.length>state.limit)root.append(button('결과 더 보기',()=>{state.limit+=12;renderReaderResults();},'secondary full'));return;
  }
  if(state.readerTab==='map'){root.append(mapWorkspace(false));return;}
- if(state.readerTab==='calendar'){root.append(el('h2',{},'언제 하는 일'),note('확인된 날짜는 달력에, 월초·월말과 상황별 업무는 아래 목록에 표시합니다.'),calendarFor(doc,false));return;}
+ if(state.readerTab==='calendar'){root.append(todayAndWaiting(doc),el('h2',{},'전체 일정'),note('확인된 날짜는 달력에, 월초·월말과 상황별 업무는 아래 목록에 표시합니다.'),calendarFor(doc,false));return;}
  if(state.readerTab==='situations'){const tasks=doc.tasks.filter(t=>t.timing.kind==='event');root.append(el('h2',{},'상황이 생기면 할 일'),note('비정기 업무도 전체 업무 지도에 함께 남습니다.'),tasks.length?el('div',{class:'read-list'},tasks.map(t=>taskCard(t))):empty('등록된 상황별 업무가 없어요','업무 시점을 상황 발생으로 설정하면 여기에 표시돼요.'));return;}
  if(state.readerTab==='check'){root.append(issuesPanel());return;}
  if(state.readerTab==='start'){
@@ -381,6 +381,17 @@ function renderReaderResults(){
  if(occurrences.length>state.limit)root.append(button(`할 일 더 보기 (${Math.min(state.limit,occurrences.length)}/${occurrences.length})`,()=>{state.limit+=12;renderReaderResults();},'secondary full'));
 }
 function guideCard(num,title,text,placeholder){return el('article',{class:'guide-card'},el('span',{class:'eyebrow'},`START ${num}`),el('h3',{},title),el('p',{class:'pre-wrap'},text||placeholder));}
+function todayAndWaiting(doc){
+ const date=today(),tasks=doc.tasks.filter(task=>dueInRange(task,date,date).dates.includes(date));
+ const active=doc.cases.filter(item=>!['done','unknown'].includes(caseState(item)));
+ const due=active.filter(item=>caseState(item)!=='waiting'&&item.dueDate&&item.dueDate<=date);
+ const waiting=active.filter(item=>caseState(item)==='waiting');
+ const other=doc.cases.filter(item=>caseState(item)!=='done'&&!due.includes(item)&&!waiting.includes(item));
+ const root=el('section',{class:'today-focus','aria-label':'오늘 할 일과 회신 대기'},el('h2',{},'오늘 할 일 · 회신 대기'),note(date+' · 확인된 날짜와 현재 기록을 함께 봅니다.'));
+ root.append(el('div',{class:'today-columns'},el('section',{},el('h3',{},`오늘 일정·기한 지난 건 ${tasks.length+due.length}개`),tasks.length||due.length?el('div',{class:'read-list'},tasks.map(task=>taskCard(task,date)),due.map(item=>caseCard(item))):note('오늘로 확인된 일정이나 기한 지난 건은 없습니다. 회신 대기와 날짜 미정은 따로 남아 있습니다.')),el('section',{},el('h3',{},`회신 대기 ${waiting.length}개`),note('모두 오늘 처리해야 한다는 뜻은 아닙니다. 적힌 기한과 기다리는 내용을 확인하세요.'),waiting.length?el('div',{class:'read-list'},waiting.map(item=>caseCard(item))):note('회신 대기로 확인된 건이 없습니다.'))));
+ if(other.length)root.append(el('details',{class:'optional-section'},el('summary',{},`다른 진행 건 · 기한·상태 미확인 ${other.length}개`),note('기한이 없거나 상태를 모르는 기록은 오늘 할 일로 임의 지정하지 않습니다.'),el('div',{class:'read-list'},other.map(item=>caseCard(item)))));
+ return root;
+}
 function caseProgress(item){
  const body=el('div',{class:'case-progress'},select('이 건의 현재 상태',caseState(item),[['unknown','아직 모름'],['todo','시작 전'],['doing','진행 중'],['waiting','회신 대기'],['done','완료']],value=>{setCaseStatus(item,value);const card=body.closest('.case-card');if(card?.closest('dialog')){const replacement=caseCard(item);replacement.open=true;card.replaceWith(replacement);}renderReaderResults();}),note('이 건의 상태만 바뀌며 전달 JSON에 함께 저장됩니다. 업무 설명의 완료 표시가 아닙니다.'));
  return body;
@@ -406,7 +417,7 @@ function taskCard(task,date){
  details.append(taskContent(task,date));return details;
 }
 function readBlock(label,value){return el('div',{class:'read-block'},el('h4',{},label),el('p',{class:'pre-wrap'},value));}
-function caseCard(item){const status=caseState(item);return el('details',{class:'read-card case-card'},el('summary',{},el('div',{class:'read-summary'},el('div',{class:'read-title'},el('div',{class:'tags'},tag(caseStateLabel(item),status==='unknown'||status==='waiting'?'amber':status==='done'?'green':''),item.dueDate?tag('기한 '+item.dueDate,item.dueDate<today()&&status!=='done'?'amber':''):tag('기한 미확정')),el('h3',{},item.title||'이름 없는 진행 건'),el('p',{},item.nextAction?'다음: '+short(item.nextAction):'다음 행동 확인이 필요해요')),el('span',{class:'expand-hint'},'진행 내용 펼치기'))),el('div',{class:'read-content'},legacyCaseNote(item),readBlock('다음 행동',item.nextAction||'아직 정해지지 않았어요.'),item.waitingFor?readBlock('회신 대기',item.waitingFor):null,item.notes?readBlock('진행 메모',item.notes):null,item.taskId?button('연결된 업무 설명 열기',()=>selectTask(item.taskId,false),'secondary'):null,sourceInfo(item),caseProgress(item)));}
+function caseCard(item){const status=caseState(item),done=status==='done';return el('details',{class:'read-card case-card'},el('summary',{},el('div',{class:'read-summary'},el('div',{class:'read-title'},el('div',{class:'tags'},tag(caseStateLabel(item),status==='unknown'||status==='waiting'?'amber':done?'green':''),item.dueDate?tag((done?'기록된 기한 ':'기한 ')+item.dueDate,item.dueDate<today()&&!done?'amber':''):tag(done?'기한 기록 없음':'기한 미확정')),el('h3',{},item.title||'이름 없는 진행 건'),el('p',{},done?'처리가 끝난 건입니다. 이전 내용은 펼쳐서 볼 수 있어요.':item.nextAction?'다음: '+short(item.nextAction):'다음 행동 확인이 필요해요')),el('span',{class:'expand-hint'},done?'완료 전 기록 펼치기':'진행 내용 펼치기'))),el('div',{class:'read-content'},legacyCaseNote(item),readBlock(done?'완료 전 다음 행동':'다음 행동',item.nextAction||(done?'기록 없음':'아직 정해지지 않았어요.')),item.waitingFor?readBlock(done?'완료 전 기다리던 회신':'회신 대기',item.waitingFor):null,item.notes?readBlock('진행 메모',item.notes):null,item.taskId?button('연결된 업무 설명 열기',()=>selectTask(item.taskId,false),'secondary'):null,sourceInfo(item),caseProgress(item)));}
 
 function issuesPanel(){
  const doc=current(),issues=issuesFor(doc);const section=el('section',{class:'issues-panel'},el('h2',{},'한 번 더 확인하면 좋은 내용'),note('입력한 내용 중 확인할 부분을 모았습니다. 문서의 완전성이나 업무 숙련도를 평가하지 않아요.'));
@@ -525,7 +536,28 @@ async function requestOutput(doc, selection, deliver, review=false){
   await deliver(snapshot,{...options,evidencePages});return;
  }
  const status=el('p',{role:'status',class:'helper'});
- const body=el('div',{},note('본문의 표·사진을 다시 입력할 필요 없이 원문 쪽을 함께 넣습니다. 업무마다 필요한 쪽을 한 번 확인하면 문서와 전달 JSON에 기억합니다.'),note('한 쪽짜리 PDF와 이미 확인한 연결은 다시 묻지 않습니다. 예: 1 또는 1, 3-4. 한 번에 합계 20쪽까지 출력할 수 있습니다.'),sources.filter(source=>pending.some(record=>record.source.id===source.id)).map(source=>el('section',{class:'output-source'},el('h3',{},source.name),button(`원문 확인 · 총 ${source.pdf.pageCount}쪽`,()=>openPdfSource(source,'근거 쪽 연결로 돌아가기'),'secondary'),pending.filter(record=>record.source.id===source.id).map(record=>field(`${record.item.title||'이름 없는 항목'} · 근거 쪽`,record.value,value=>{record.value=value;},{placeholder:'예: 1 또는 1, 3-4',maxLength:300})))),note('원본 PDF는 그대로 보존합니다. 출력에는 확인한 쪽의 이미지만 넣으며, 이미지 속 글은 DOCX 검색 대상이 아닙니다.'),status);
+ const sourceSection=source=>{
+  const entries=pending.filter(record=>record.source.id===source.id);
+  const section=el('section',{class:'output-source'},el('h3',{},source.name),button(`원문 확인 · 총 ${source.pdf.pageCount}쪽`,()=>openPdfSource(source,'근거 쪽 연결로 돌아가기'),'secondary'));
+  const controls=new Map();
+  const individual=entries.map(record=>{const node=field(`${record.item.title||'이름 없는 항목'} · 근거 쪽`,record.value,value=>{record.value=value;if(entries.length>1){refresh();feedback.textContent='개별 입력을 반영했습니다. 저장 전 연결 내용을 확인하세요.';}},{placeholder:'예: 1 또는 1, 3-4',maxLength:300});controls.set(record,node.querySelector('input'));return node;});
+  if(entries.length===1){section.append(individual[0]);return section;}
+  const chosen=new Set(),rows=el('div',{class:'evidence-batch-items'}),feedback=el('p',{class:'helper',role:'status'});let pages='';
+  const refresh=()=>{
+   rows.replaceChildren(...entries.map(record=>el('label',{class:'evidence-batch-item'},el('input',{type:'checkbox',checked:chosen.has(record),onchange:e=>{if(e.target.checked)chosen.add(record);else chosen.delete(record);}}),el('span',{},record.item.title||'이름 없는 항목',el('small',{},record.value?`${record.value}쪽 연결 예정`:'미연결')))));
+  };
+  const apply=button('선택한 항목에 같은 쪽 연결',()=>{
+   try{
+    const selected=[...chosen];
+    applyEvidencePageGroups(snapshot,options,[{sourceId:source.id,itemIds:selected.map(record=>record.item.id),pages}],{replaceConfirmed:review});
+    const value=parseEvidencePages(pages,source.pdf.pageCount).join(', ');
+    selected.forEach(record=>{record.value=value;controls.get(record).value=value;});chosen.clear();refresh();
+    feedback.textContent=`${selected.length}개 항목에 ${value}쪽을 연결했습니다. 아래 저장 버튼을 누르면 기억합니다.`;
+   }catch(error){feedback.textContent=error.message;}
+  },'secondary');
+  refresh();section.append(note('같은 쪽이 필요한 항목을 함께 선택하세요. 연결 관계를 자동으로 추측하지 않습니다.'),field('함께 연결할 근거 쪽','',value=>{pages=value;},{placeholder:'예: 1 또는 1, 3-4',maxLength:300}),rows,apply,feedback,el('details',{class:'optional-section'},el('summary',{},'항목마다 다르게 입력·수정'),individual));return section;
+ };
+ const body=el('div',{},note('같은 근거 쪽은 여러 업무에 한 번에 연결할 수 있습니다. 확인한 연결은 문서와 전달 JSON에 기억합니다.'),note('한 쪽짜리 PDF와 이미 확인한 연결은 다시 묻지 않습니다. 미확인 항목만 선택해 주세요. 한 번에 합계 20쪽까지 출력할 수 있습니다.'),sources.filter(source=>pending.some(record=>record.source.id===source.id)).map(sourceSection),note('원본 PDF는 그대로 보존합니다. 출력에는 확인한 쪽의 이미지만 넣으며, 이미지 속 글은 DOCX 검색 대상이 아닙니다.'),status);
  let busy=false;const handle=modal('함께 전달할 근거 쪽',body,[close=>button('취소',close),close=>button(review?'확인한 연결 저장':'연결을 기억하고 함께 만들기',async e=>{
   if(busy)return;busy=true;const btn=e.currentTarget;btn.disabled=true;status.textContent='확인한 근거 쪽을 준비하고 있습니다…';
   try{
@@ -590,7 +622,7 @@ function printView(){
   if(task.verifiedAt)item.append(note('최종 확인일 '+task.verifiedAt));sheet.append(item);
  });
  if(cases.length)sheet.append(el('h2',{},'지금 이어받을 건 · 확인 기록'));
- cases.forEach(item=>sheet.append(el('article',{class:'print-item'},el('h3',{},item.title||'이름 없는 기록'),note(caseStateLabel(item)+' · 기한 '+(item.dueDate||'미확정')),legacyCaseNote(item),readBlock('다음 행동',item.nextAction||'확인 필요'),item.waitingFor?readBlock('회신 대기',item.waitingFor):null,item.notes?readBlock('진행 메모',item.notes):null)));
+ cases.forEach(item=>sheet.append(el('article',{class:'print-item'},el('h3',{},item.title||'이름 없는 기록'),note(caseStateLabel(item)+' · 기한 '+(item.dueDate||'미확정')),legacyCaseNote(item),readBlock(caseState(item)==='done'?'완료 전 다음 행동':'다음 행동',item.nextAction||(caseState(item)==='done'?'기록 없음':'확인 필요')),item.waitingFor?readBlock(caseState(item)==='done'?'완료 전 기다리던 회신':'회신 대기',item.waitingFor):null,item.notes?readBlock('진행 메모',item.notes):null)));
  if(tasks.length===doc.tasks.length&&cases.length===doc.cases.length){if(doc.onboarding.dayOne)sheet.append(readBlock('첫날 안내',doc.onboarding.dayOne));if(doc.onboarding.firstWeek)sheet.append(readBlock('첫 주 안내',doc.onboarding.firstWeek));}
  (selection.evidencePages||[]).forEach((page,index)=>{const source=doc.sourceFiles.find(s=>s.id===page.sourceId);sheet.append(el('figure',{class:'print-evidence',id:`print-evidence-${index}`},el('figcaption',{},`근거 쪽: ${source.name} · 원문 ${page.pageNumber}쪽`,el('p',{},'연결된 안내: '+[...tasks,...cases].filter(item=>item.sourceRefs.includes(source.id)&&(!item.sourcePages?.find(link=>link.sourceId===source.id)||item.sourcePages.find(link=>link.sourceId===source.id).pages.includes(page.pageNumber))).map(item=>item.title).join(' · '))),el('img',{src:`data:image/png;base64,${page.data}`,width:page.width,height:page.height,alt:`${source.name} 원문 ${page.pageNumber}쪽 — 표와 사진을 포함한 원문 이미지`})));});
  sheet.append(note('설명 읽음과 실제 진행건 완료는 다릅니다. 출력본을 고쳐도 전달 JSON에 자동 반영되지 않습니다.'));return sheet;

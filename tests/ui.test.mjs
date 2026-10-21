@@ -1059,7 +1059,7 @@ test('DOM PDF output asks for each selected item, and blank, invalid or cancelle
   const dialog = ui.document.querySelector('dialog');
   assert.match(dialog.querySelector('h2').textContent, /함께 전달할 근거 쪽/);
   assert.equal(dialog.querySelectorAll('.output-source').length, 1, 'one shared source is shown once');
-  assert.equal(dialog.querySelectorAll('.output-source input').length, 2, 'a task and its case need independent page relationships');
+  assert.equal(dialog.querySelectorAll('.output-source .optional-section input').length, 2, 'a task and its case need independent page relationships');
   assert.equal(control(`${task.title} · 근거 쪽`, dialog).value, '');
   assert.equal(control(`${item.title} · 근거 쪽`, dialog).value, '');
   for (const omitted of [...doc.tasks.slice(1), doc.cases[1]]) assert.ok(!dialog.textContent.includes(omitted.title));
@@ -1414,4 +1414,53 @@ test('a PDF opened directly from a case has a return history entry and search st
   await click('업무로 돌아가기',ui.document.querySelector('dialog'));
   assert.equal(ui.document.querySelector('dialog'),null);
   assert.ok(ui.document.querySelector('.case-card'));
+});
+
+
+test('today overview shows dated work and waiting together without inventing dates or completing manuals', async () => {
+ const task=createTask({title:'가상 오늘 정기 확인',method:'정기 확인을 합니다.',timing:{kind:'regular',cadence:'daily'}});
+ const unknownTask=createTask({title:'가상 월초 미정',timing:{kind:'regular',cadence:'monthly',dayRule:'monthStartUnconfirmed'}});
+ const due=createCase({title:'가상 오늘 기한',status:'doing',statusConfirmed:true,dueDate:dateISO(),nextAction:'기록합니다.'});
+ const waiting=createCase({title:'가상 날짜 없는 회신',status:'waiting',statusConfirmed:true,nextAction:'회신을 확인합니다.',waitingFor:'요청자 역할의 날짜'});
+ const unknown=createCase({title:'가상 상태 미정',status:'unknown',statusConfirmed:false});
+ const done=createCase({title:'가상 완료',status:'done',statusConfirmed:true});
+ const doc=createDocument({tasks:[task,unknownTask],cases:[due,waiting,unknown,done]});
+ await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});
+ await click('인수자 보기',ui.document.querySelector('.document-card'));const before=snapshot();
+ await click('언제 하는 일',ui.document.querySelector('.reader-nav'));
+ const focus=ui.document.querySelector('.today-focus');assert.ok(focus);
+ assert.match(focus.textContent,/오늘 일정·기한 지난 건 2개/);assert.match(focus.textContent,/회신 대기 1개/);
+ assert.ok(focus.textContent.includes(waiting.title));assert.ok(focus.textContent.includes(unknown.title));
+ assert.ok(!focus.textContent.includes(done.title));assert.ok(!focus.querySelector('.today-columns').textContent.includes(unknownTask.title));
+ assert.deepEqual(snapshot(),before);assert.equal(savedDocument().cases[1].dueDate,'');
+});
+
+test('completed case uses historical labels and reopening preserves the exact original action and waiting text', async () => {
+ const item=createCase({title:'가상 날짜 회신 대기',status:'waiting',statusConfirmed:true,nextAction:'날짜를 묻고 답을 기록합니다.',waitingFor:'요청자의 날짜 회신',notes:'보존할 메모'});
+ const doc=createDocument({tasks:[createTask({title:'가상 설명',method:'그대로 보존'})],cases:[item]});
+ await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('인수자 보기',ui.document.querySelector('.document-card'));
+ await fill('업무나 상황 찾기','가상 날짜');
+ await fill('이 건의 현재 상태','done',ui.document.querySelector('.case-card'));
+ let card=ui.document.querySelector('.case-card');assert.ok(!card.querySelector('summary').textContent.includes(item.nextAction));
+ assert.match(card.textContent,/완료 전 다음 행동/);assert.match(card.textContent,/완료 전 기다리던 회신/);
+ const completed=snapshot();const saved=savedDocument();assert.equal(saved.cases[0].nextAction,item.nextAction);assert.equal(saved.cases[0].waitingFor,item.waitingFor);assert.deepEqual(saved.tasks,doc.tasks);
+ await mount(completed);await click('인수자 보기',ui.document.querySelector('.document-card'));await fill('업무나 상황 찾기','가상 날짜');
+ card=ui.document.querySelector('.case-card');assert.match(card.textContent,/완료 전 다음 행동/);
+ await fill('이 건의 현재 상태','doing',card);card=ui.document.querySelector('.case-card');
+ assert.ok(card.querySelector('summary').textContent.includes('다음: '+item.nextAction));assert.ok(!card.textContent.includes('완료 전 다음 행동'));
+ assert.equal(savedDocument().cases[0].waitingFor,item.waitingFor);assert.equal(savedDocument().cases[0].notes,item.notes);
+});
+
+test('batch PDF choices start unchecked, update only explicit items, and cancelling discards the pending batch', async () => {
+ const doc=reviewExampleDocument(),selected=[doc.tasks[0],doc.tasks[1],doc.cases[0]];
+ await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click('내보내기',ui.document.querySelector('.top-nav'));await selectOutputItems(selected);
+ const before=snapshot();await click('선택한 업무만 문서로 받기');const dialog=ui.document.querySelector('dialog');
+ const boxes=[...dialog.querySelectorAll('.evidence-batch-items input')];assert.equal(boxes.length,3);assert.ok(boxes.every(box=>!box.checked));
+ await fill('함께 연결할 근거 쪽','1',dialog);await click('선택한 항목에 같은 쪽 연결',dialog);assert.ok(selected.every(item=>control(item.title+' · 근거 쪽',dialog).value===''));
+ for(const box of [boxes[0],boxes[2]]){box.checked=true;box.dispatchEvent(new ui.Event('change',{bubbles:true}));}
+ await click('선택한 항목에 같은 쪽 연결',dialog);
+ assert.equal(control(selected[0].title+' · 근거 쪽',dialog).value,'1');assert.equal(control(selected[1].title+' · 근거 쪽',dialog).value,'');assert.equal(control(selected[2].title+' · 근거 쪽',dialog).value,'1');
+ await fill(selected[0].title+' · 근거 쪽','2',dialog);assert.match(dialog.querySelector('.evidence-batch-items label').textContent,/2쪽 연결 예정/);
+ await fill(selected[0].title+' · 근거 쪽','',dialog);assert.match(dialog.querySelector('.evidence-batch-items label').textContent,/미연결/);
+ assert.deepEqual(snapshot(),before);await click('취소',dialog);assert.deepEqual(snapshot(),before);
 });

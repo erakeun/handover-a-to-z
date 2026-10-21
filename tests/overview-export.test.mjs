@@ -54,7 +54,7 @@ test('front map respects selected tasks and does not include other owners or tas
     createTask({ id: 'omitted', title: '제외한 고유 업무', ownerRole: '제외 담당' }),
   ] });
   const selected = await overview(document, { taskIds: ['selected'], caseIds: [] });
-  assert.ok(selected.text.includes('선택한 업무만 표시 · 1개'));
+  assert.equal(selected.tables.length, 0, 'one task keeps a title link without a redundant three-column map');
   assert.ok(selected.text.includes('선택한 고유 업무'));
   assert.ok(selected.text.includes('선택 담당'));
   assert.ok(!selected.text.includes('제외한 고유 업무'));
