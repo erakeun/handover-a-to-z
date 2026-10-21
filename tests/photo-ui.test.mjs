@@ -2,7 +2,7 @@ import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Window } from 'happy-dom';
-import { createDocument, createTask, makeId, parseImport, stringifyDocument } from '../src/model.js';
+import { CURRENT_SCHEMA_VERSION, createDocument, createTask, makeId, parseImport, stringifyDocument } from '../src/model.js';
 import { DATA_KEY, CURRENT_KEY, PROGRESS_KEY, loadDocuments } from '../src/storage.js';
 import { IMAGE_LIMITS } from '../src/image-data.js';
 
@@ -169,11 +169,11 @@ test('photo UI: first photo creates a task only after confirmation, stores bytes
   await chooseFile(photoArea('method').querySelector('input[type=file]'), file());
   assert.equal(localDoc().tasks.length, 0);
   await click('취소', latestDialog());
-  assert.equal(localDoc().schemaVersion, 3);
+  assert.equal(localDoc().schemaVersion, CURRENT_SCHEMA_VERSION);
   assert.equal(localDoc().tasks.length, 0);
   await addPhoto('method', '사진 설명 — 가상 조회 화면');
   const before = localDoc();
-  assert.equal(before.schemaVersion, 3);
+  assert.equal(before.schemaVersion, CURRENT_SCHEMA_VERSION);
   assert.equal(before.tasks.length, 1);
   assert.equal(before.tasks[0].images.length, 1);
   assert.equal(before.tasks[0].images[0].caption, '사진 설명 — 가상 조회 화면');

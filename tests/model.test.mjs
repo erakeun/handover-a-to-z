@@ -45,8 +45,8 @@ test("constructors create independent valid editable drafts and support override
   first.cases.push(createCase());
   valid(first);
   valid(second);
-  assert.equal(first.schemaVersion, 3);
-  assert.equal(second.schemaVersion, 3);
+  assert.equal(first.schemaVersion, 4);
+  assert.equal(second.schemaVersion, 4);
   assert.equal(second.tasks.length, 0);
   assert.notEqual(first.id, second.id);
   assert.equal(createTask({ timing: { kind: "regular", cadence: "monthly", day: "" } }).timing.day, "");
@@ -167,7 +167,7 @@ test("group references, duplicate group IDs and optional role/access fields are 
 test("schema rejects unsupported versions, missing fields, wrong types and unknown fields without stripping them", () => {
   for (const edit of [
     (doc) => { doc.schemaVersion = "1"; },
-    (doc) => { doc.schemaVersion = 4; },
+    (doc) => { doc.schemaVersion = 5; },
     (doc) => { delete doc.onboarding; },
     (doc) => { doc.tasks[0].accessChecked = "true"; },
     (doc) => { doc.cases[0].status = "invalid-state"; },

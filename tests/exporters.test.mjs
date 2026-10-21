@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { unzipSync, strFromU8 } from 'fflate';
 import { DOMParser } from '@xmldom/xmldom';
 import { exportDocx, exportAIText } from '../src/exporters.js';
+import { inspectImageBytes, encodeBase64 } from '../src/image-data.js';
+import { reviewExampleDocument } from '../src/review-example.js';
 
 const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const now = '2026-10-20T09:00:00.000Z';
@@ -114,7 +116,8 @@ test('DOCX reopens as OOXML with Korean headings, onboarding, summary, details a
     ...document.sourceFiles[0].warnings, ...document.sourceFiles[1].warnings,
   ]) assert.ok(output.text.includes(text), `preserved: ${text}`);
   assert.ok(output.text.indexOf('업무 지도') < output.text.indexOf('업무 상세'));
-  assert.ok(output.text.indexOf('현재 진행 건 · 다음 행동') < output.text.indexOf('업무 상세'));
+  assert.ok(output.text.indexOf('업무 상세') < output.text.indexOf('현재 진행 건 · 다음 행동'));
+  assert.ok(output.text.indexOf('업무 상세') < output.text.indexOf('처음 시작하는 사람을 위한 안내'));
   for (const value of [document.id, document.sourceFiles[0].excerpt, document.sourceFiles[1].excerpt, '가상-이전-문서', 'PROVENANCE_PRIVATE_NOTE']) assert.ok(!output.text.includes(value), value);
   assert.ok(output.text.includes('암호화되지 않은 평문'));
   assert.ok(output.text.includes('직접 확인'));
@@ -449,7 +452,8 @@ test('first action is explicit and legacy case states remain unconfirmed until c
   const original = JSON.stringify(document);
   const output = await reopen(document);
   assert.ok(output.paragraphs.includes(document.tasks[0].firstAction));
-  assert.ok(output.text.includes('확인 필요: 먼저 할 일이 아직 적혀 있지 않습니다.'));
+  assert.ok(!output.text.includes('확인 필요: 먼저 할 일이 아직 적혀 있지 않습니다.'));
+  assert.ok(output.paragraphs.includes(document.tasks[1].method), 'the main body remains available without a separate first action');
   assert.equal(output.paragraphs.filter(text => text === '상태 미확인').length, 2);
   assert.ok(output.paragraphs.includes('회신 대기'));
   assert.ok(output.paragraphs.includes('이전 기록 · 현재 상태는 다시 확인'));
@@ -461,21 +465,57 @@ test('first action is explicit and legacy case states remain unconfirmed until c
   assert.ok(confirmed.paragraphs.includes('회신 대기'));
 });
 
-test('PDF evidence is named with page scope but is never attached or presented as rendered DOCX content', async () => {
-  const document = fixture();
-  document.schemaVersion = 3;
-  const data = Buffer.from(await readFile(new URL('../fixtures/import/synthetic-text-and-scan.pdf', import.meta.url))).toString('base64');
-  document.sourceFiles[0].format = 'pdf';
-  document.sourceFiles[0].name = '합성 근거 PDF.pdf';
-  document.sourceFiles[0].pdf = { data, pageCount: 2 };
-  const before = JSON.stringify(document);
-  const result = await reopen(document);
-  assert.ok(result.text.includes('합성 근거 PDF.pdf'));
-  assert.ok(result.text.includes('근거 PDF 2쪽은 이 DOCX에 포함되지 않았습니다.'));
-  assert.ok(result.text.includes('근거 PDF는 인수인계 JSON에서 열람'));
-  assert.ok(!result.text.includes(data));
+async function evidencePage(sourceId, pageNumber = 1) {
+  // Structural export test image only. Actual PDF-to-image rendering is tested
+  // independently in the browser, not claimed by this fixture.
+  const bytes = new Uint8Array(await readFile(new URL('../fixtures/images/landscape.png', import.meta.url)));
+  const { width, height } = inspectImageBytes(bytes);
+  return { sourceId, pageNumber, data: encodeBase64(bytes), width, height };
+}
+
+test('selected reception keeps body before extra notes and includes chosen evidence without onboarding or empty cases', async () => {
+  const document = reviewExampleDocument();
+  const task = document.tasks[0];
+  const original = JSON.stringify(document);
+  const page = await evidencePage(document.sourceFiles[0].id);
+  const options = { taskIds: [task.id], caseIds: [], evidencePages: [page] };
+  const result = await reopen(document, options);
+  assert.ok(result.text.indexOf(task.method) < result.text.indexOf(task.steps));
+  assert.ok(result.text.includes('하는 방법 · 실행 안내'));
+  assert.ok(!result.text.includes('참고 설명'));
+  assert.ok(!result.text.includes('처음 시작하는 사람을 위한 안내'));
+  assert.ok(!result.text.includes(document.onboarding.dayOne));
+  assert.ok(!result.text.includes(document.onboarding.firstWeek));
+  assert.ok(!result.text.includes('현재 진행 건 · 다음 행동'));
+  for (const other of document.tasks.slice(1)) assert.ok(!result.text.includes(other.title));
+  assert.ok(result.text.includes('원문 1쪽 / 총 2쪽'));
+  assert.ok(result.text.includes(`근거 쪽: ${document.sourceFiles[0].name} · 원문 1쪽`));
+  assert.ok(!result.text.includes('원문 2쪽 / 총 2쪽'));
+  const media = Object.entries(result.zip).filter(([name]) => /^word\/media\/[^/]+$/.test(name));
+  assert.equal(media.filter(([, bytes]) => Buffer.from(bytes).equals(Buffer.from(page.data, 'base64'))).length, 1);
+  assert.ok(media.some(([, bytes]) => Buffer.from(bytes).equals(Buffer.from(task.images[0].data, 'base64'))));
   assert.ok(!Object.keys(result.zip).some(name => /embeddings|\.pdf$/i.test(name)));
-  assert.equal(JSON.stringify(document), before);
+  const bookmarks = Array.from(result.dom.getElementsByTagNameNS(NS, 'bookmarkStart')).map(node => node.getAttribute('w:name'));
+  for (const link of Array.from(result.dom.getElementsByTagNameNS(NS, 'hyperlink'))) assert.ok(bookmarks.includes(link.getAttribute('w:anchor')));
+  assert.equal(JSON.stringify(document), original);
+});
+
+test('linked PDF omissions and invalid evidence stop DOCX generation while original JSON stays intact', async () => {
+  const document = reviewExampleDocument();
+  const original = JSON.stringify(document);
+  const sourceId = document.sourceFiles[0].id;
+  const page = await evidencePage(sourceId);
+  const selected = { taskIds: [document.tasks[0].id], caseIds: [] };
+  await assert.rejects(exportDocx(document, selected), /함께 전달할 근거 쪽을 선택/);
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: [] }), /함께 전달할 근거 쪽을 선택/);
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: [{ ...page, sourceId: 'unselected-source' }] }), /연결된 PDF/);
+  for (const pageNumber of [0, 3, 1.5]) await assert.rejects(exportDocx(document, { ...selected, evidencePages: [{ ...page, pageNumber }] }), /원문 쪽 번호/);
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: [{ ...page, width: page.width + 1 }] }), /이미지와 저장된 크기/);
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: [{ ...page, data: 'broken' }] }), /base64/);
+  await assert.rejects(exportDocx(document, { taskIds: [], caseIds: [document.cases[0].id] }), /함께 전달할 근거 쪽을 선택/);
+  const duplicate = await reopen(document, { ...selected, evidencePages: [page, { ...page }] });
+  assert.equal(duplicate.paragraphs.filter(text => /원문 1쪽 \/ 총 2쪽/.test(text)).length, 1);
+  assert.equal(JSON.stringify(document), original);
 });
 
 test('all generated navigation links resolve to internal bookmarks and omit source identifiers', async () => {
@@ -511,4 +551,50 @@ test('month-end uncertainty and event detail stay explicit without overflowing t
   const tables = Array.from(output.dom.getElementsByTagNameNS(NS, 'tbl')).map(visibleText).join('\n');
   assert.ok(!tables.includes(document.tasks[1].timing.trigger));
   assert.ok(tables.includes('행사·상황 발생 시 수행'));
+});
+
+
+test('a whitespace-only primary body does not demote legacy steps to additional guidance', async () => {
+  const document = fixture();
+  document.tasks = [document.tasks[0]];
+  document.tasks[0].method = ' \t \n  ';
+  const before = JSON.stringify(document);
+  const result = await reopen(document, { taskIds: [document.tasks[0].id], caseIds: [] });
+  assert.ok(result.text.includes('진행 순서 · 실행 안내'));
+  assert.ok(!result.text.includes('진행 순서 · 추가 안내'));
+  assert.ok(result.paragraphs.includes(document.tasks[0].steps.replace(/\r\n?/g, '\n')));
+  assert.equal(JSON.stringify(document), before);
+});
+
+test('saved page relations require every needed page and link each task only to its own evidence', async () => {
+  const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  const reception = document.tasks[0];
+  const access = document.tasks.at(-1);
+  const sourceId = document.sourceFiles[0].id;
+  reception.sourcePages = [{ sourceId, pages: [1] }];
+  access.sourcePages = [{ sourceId, pages: [2] }];
+  const original = JSON.stringify(document);
+  const firstPage = await evidencePage(sourceId, 1);
+  const secondPage = await evidencePage(sourceId, 2);
+  const options = { taskIds: [reception.id, access.id], caseIds: [] };
+  await assert.rejects(exportDocx(document, { ...options, evidencePages: [firstPage] }), /연결한 근거 쪽이 빠져/);
+  const result = await reopen(document, { ...options, evidencePages: [firstPage, secondPage] });
+  const firstIndex = result.paragraphs.lastIndexOf(`1. ${reception.title}`);
+  const secondIndex = result.paragraphs.lastIndexOf(`2. ${access.title}`);
+  const sourceIndex = result.paragraphs.indexOf('출처와 확인 사항');
+  const firstText = result.paragraphs.slice(firstIndex, secondIndex).join('\n');
+  const secondText = result.paragraphs.slice(secondIndex, sourceIndex).join('\n');
+  assert.ok(firstText.includes(`근거 쪽: ${document.sourceFiles[0].name} · 원문 1쪽`));
+  assert.ok(!firstText.includes(`근거 쪽: ${document.sourceFiles[0].name} · 원문 2쪽`));
+  assert.ok(secondText.includes(`근거 쪽: ${document.sourceFiles[0].name} · 원문 2쪽`));
+  assert.ok(!secondText.includes(`근거 쪽: ${document.sourceFiles[0].name} · 원문 1쪽`));
+  const firstPageStart = result.paragraphs.findIndex(text => text.endsWith('원문 1쪽 / 총 2쪽'));
+  const secondPageStart = result.paragraphs.findIndex(text => text.endsWith('원문 2쪽 / 총 2쪽'));
+  assert.ok(!result.paragraphs.slice(firstPageStart, secondPageStart).includes(`업무로 돌아가기: ${access.title}`));
+  assert.ok(!result.paragraphs.slice(secondPageStart).includes(`업무로 돌아가기: ${reception.title}`));
+  assert.equal(JSON.stringify(document), original);
+
+  document.cases[0].sourcePages = [{ sourceId, pages: [2] }];
+  await assert.rejects(exportDocx(document, { taskIds: [], caseIds: [document.cases[0].id], evidencePages: [firstPage] }), /연결한 근거 쪽이 빠져/);
 });

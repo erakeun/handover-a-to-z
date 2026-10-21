@@ -39,3 +39,6 @@
 
 /* Review: keep the working area ahead of secondary explanations. */
 .storage-details{margin-top:.35rem;font-size:.85rem;color:var(--muted);max-width:54rem}.storage-details>summary,.document-tools>summary{cursor:pointer;min-height:32px;padding:.2rem 0}.storage-details[open]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:6px;background:white}.document-tools{font-size:.85rem;color:var(--green)}.document-tools[open]{max-width:13rem}.document-bar{margin-bottom:1.5rem}.document-bar h1{font-size:1.65rem}.reader-intro{margin-bottom:1rem}.review-status{background:transparent;border-left:3px solid #b89a5e;border-radius:0;padding:.3rem .65rem;margin:.5rem 0 .8rem;font-size:.85rem}.search-box .helper{font-size:.85rem}.read-title>p,.map-task-title{line-height:1.6}.calendar-unresolved-reason,.calendar-footnote{font-size:.82rem}
+
+.output-source{border-top:1px solid var(--line);padding:1rem 0}.output-source .field{margin-top:1rem}.search-context p{margin:.3rem 0}.print-evidence{margin:1.5rem 0}.print-evidence figcaption{font-weight:600}.print-evidence figcaption p{font-weight:400;font-size:.85rem}.print-evidence img{display:block;width:100%;height:auto;object-fit:contain;max-height:235mm}
+@media print{.print-evidence{break-before:page;break-inside:avoid}.print-evidence img{max-height:230mm}.print-evidence figcaption{font-size:10pt}}

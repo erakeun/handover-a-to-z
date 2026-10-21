@@ -111,7 +111,7 @@ test('DOCX embeds exact PNG and JPEG bytes and keeps photos beside their method 
     }
   }
   assert.ok(result.text.indexOf(document.tasks[0].method) < result.text.indexOf(document.tasks[0].images[0].caption));
-  assert.ok(result.text.indexOf(document.tasks[0].images[1].caption) < result.text.indexOf(document.tasks[0].method), 'execution steps precede background method text');
+  assert.ok(result.text.indexOf(document.tasks[0].method) < result.text.indexOf(document.tasks[0].images[1].caption), 'the primary body precedes additional steps and their photos');
   assert.ok(result.text.indexOf(document.tasks[0].steps) < result.text.indexOf(document.tasks[0].images[1].caption));
   assert.equal(result.dom.getElementsByTagName('script').length, 0, 'caption markup remains literal text');
   assert.ok(!strFromU8(result.entries['word/_rels/document.xml.rels']).includes('TargetMode="External"'));
@@ -123,7 +123,7 @@ test('DOCX embeds exact PNG and JPEG bytes and keeps photos beside their method 
 test('large landscape and portrait photos fit A4, preserve proportions and stay with captions', async () => {
   const document = await fixture();
   const result = await reopen(document, { taskIds: ['image-task-one'], caseIds: [] });
-  const images = [...document.tasks[0].images].sort((a, b) => (a.section === 'steps' ? 0 : 1) - (b.section === 'steps' ? 0 : 1));
+  const images = [...document.tasks[0].images].sort((a, b) => (a.section === 'method' ? 0 : 1) - (b.section === 'method' ? 0 : 1));
   const drawings = Array.from(result.dom.getElementsByTagNameNS(NS.wp, 'inline'));
   assert.equal(drawings.length, 2);
   drawings.forEach((drawing, index) => {
@@ -174,8 +174,8 @@ test('photo-only method and steps sections are present even without text or capt
   document.tasks = [task];
   const result = await reopen(document);
   assert.equal(result.media.length, 2);
-  assert.ok(result.text.includes('어떤 방식으로 하나요'));
-  assert.ok(result.text.includes('수행 절차'));
+  assert.ok(result.text.includes('하는 방법'));
+  assert.ok(result.text.includes('진행 순서'));
   assert.ok(result.text.includes('방법 사진 1'));
   assert.ok(result.text.includes('단계 사진 1'));
   assert.ok(!result.text.split('\n').find(line => line.startsWith('미입력 항목:'))?.includes('수행 절차'));

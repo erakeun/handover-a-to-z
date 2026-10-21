@@ -1,10 +1,11 @@
 import { stringifyDocument } from './model.js';
-import { DATA_KEY, LEGACY_DATA_KEY, MIGRATION_KEY, loadDocuments } from './storage.js';
+import { DATA_KEY, PREVIOUS_DATA_KEY, LEGACY_DATA_KEY, MIGRATION_KEY, PREVIOUS_MIGRATION_KEY, loadDocuments } from './storage.js';
 
 export const DATABASE_NAME = 'handover.az.documents';
 export const DATABASE_VERSION = 1;
 export const STORE_NAME = 'documents';
-export const RECORD_KEY = 'current-v3';
+export const RECORD_KEY = 'current-v4';
+export const PREVIOUS_RECORD_KEY = 'current-v3';
 export const LEGACY_RECORD_KEY = 'current';
 export const MAX_STORED_BYTES = 64 * 1024 * 1024;
 const LEGACY_MAX_LENGTH = 20 * 1024 * 1024;
@@ -82,13 +83,16 @@ function parseDocuments(raw, legacy = false) {
   return documents;
 }
 
-function parseRecord(record, modern = false) {
+function parseRecord(record, modern = false, newest = modern) {
   if (!record || record.version !== 1 ||
       !(record.raw === null || typeof record.raw === 'string') ||
       !(record.legacyRaw === null || typeof record.legacyRaw === 'string')) throw invalid();
   if (modern && (typeof record.previousExists !== 'boolean' ||
       !(record.previousRaw === null || typeof record.previousRaw === 'string') ||
       !(record.fallbackRaw === null || typeof record.fallbackRaw === 'string'))) throw invalid();
+  if (newest && (typeof record.priorV3Exists !== 'boolean' ||
+      !(record.priorV3Raw === null || typeof record.priorV3Raw === 'string') ||
+      !(record.previousFallbackRaw === null || typeof record.previousFallbackRaw === 'string'))) throw invalid();
   return { ...record, documents: parseDocuments(record.raw) };
 }
 
@@ -108,6 +112,7 @@ function readStorage(storage, key) {
 
 const readLegacy = storage => readStorage(storage, LEGACY_DATA_KEY);
 const readFallback = storage => readStorage(storage, DATA_KEY);
+const readPreviousFallback = storage => readStorage(storage, PREVIOUS_DATA_KEY);
 async function legacyHash(raw) {
   // The absent-old-store case needs no asynchronous crypto work at startup.
   if (raw === null) return '74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b';
@@ -115,11 +120,12 @@ async function legacyHash(raw) {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', encoder.encode(raw === null ? 'null' : `string:${raw}`));
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
-function parseMigration(raw) {
+function parseMigration(raw, newest = false) {
   if (raw === null) return null;
   let value;
   try { value = JSON.parse(raw); } catch { throw invalid(); }
   if (!value || value.version !== 1 || typeof value.legacyHash !== 'string' || !/^[0-9a-f]{64}$/.test(value.legacyHash)) throw invalid();
+  if (newest && (typeof value.previousHash !== 'string' || !/^[0-9a-f]{64}$/.test(value.previousHash))) throw invalid();
   return value;
 }
 
@@ -205,19 +211,21 @@ function transaction(database, mode, timeoutMs, action) {
         finish(failure);
       }, timeoutMs);
       const store = tx.objectStore(STORE_NAME);
-      // Read the prior record first. Once the newest record is available, both
-      // reads can be adopted before a later transaction abort is reported.
+      // Read old records before the newest record so all three form one
+      // transaction snapshot, even when a later abort follows the reads.
       const previous = store.get(LEGACY_RECORD_KEY);
+      const priorV3 = store.get(PREVIOUS_RECORD_KEY);
       const request = store.get(RECORD_KEY);
       let reads = 0;
       const completeRead = () => {
-        if (settled || failure || ++reads !== 2) return;
-        try { value = action(request.result, store, previous.result); }
+        if (settled || failure || ++reads !== 3) return;
+        try { value = action(request.result, store, previous.result, priorV3.result); }
         catch (cause) { abort(cause); }
       };
-      request.onsuccess = previous.onsuccess = completeRead;
+      request.onsuccess = previous.onsuccess = priorV3.onsuccess = completeRead;
       request.onerror = () => { failure ||= storageProblem(request.error); };
       previous.onerror = () => { failure ||= storageProblem(previous.error); };
+      priorV3.onerror = () => { failure ||= storageProblem(priorV3.error); };
     } catch (cause) { finish(storageProblem(cause)); }
   });
 }
@@ -238,6 +246,8 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
   let legacyRaw = null;
   let fallbackRaw = null;
   let fallbackBaselineHash = null;
+  let previousFallbackRaw = null;
+  let previousBaselineHash = null;
   let legacyError = null;
   let baseline;
   const recovery = new Map();
@@ -271,10 +281,15 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
   }
   function confirmFallback(expected) {
     const current = readFallback(storage);
-    remember('localStorage-v3', current);
+    remember('localStorage-v4', current);
     if (current !== expected) throw problem('STORAGE_LEGACY_CHANGED', '다른 창에서 별도 기기 저장소의 문서가 변경되었습니다. 두 저장 원본을 백업한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
   }
-  function confirmPrevious(record, previous) {
+  function confirmPreviousFallback(expected) {
+    const current = readPreviousFallback(storage);
+    remember('localStorage-v3', current);
+    if (current !== expected) throw problem('STORAGE_LEGACY_CHANGED', '이전 버전의 간이 저장소에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
+  }
+  function confirmOldRecord(record, previous) {
     remember('indexedDB-previous', previous?.raw ?? null);
     const unchangedCreation = !record.previousExists && previous?.version === 1 &&
       previous.raw === record.legacyRaw && previous.legacyRaw === record.legacyRaw;
@@ -282,22 +297,39 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
       throw problem('STORAGE_LEGACY_CHANGED', '이전 버전에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 새 문서를 덮어쓰지 않았습니다.');
     }
     confirmLegacy(record.legacyRaw);
+  }
+  function confirmPrevious(record, previous, priorV3) {
+    confirmOldRecord(record, previous);
+    remember('indexedDB-v3', priorV3?.raw ?? null);
+    if (priorV3 !== undefined) {
+      const old = parseRecord(priorV3, true, false);
+      confirmOldRecord(old, previous);
+      confirmPreviousFallback(old.fallbackRaw);
+    }
+    // Merely opening an old app can copy its unchanged source into its own key.
+    const oldInitialRaw = record.previousFallbackRaw ?? record.previousRaw ?? record.legacyRaw;
+    const unchangedCreation = !record.priorV3Exists && priorV3?.raw === oldInitialRaw;
+    if (!unchangedCreation && ((priorV3 !== undefined) !== record.priorV3Exists || (priorV3?.raw ?? null) !== record.priorV3Raw)) {
+      throw problem('STORAGE_LEGACY_CHANGED', '0.3.0 버전에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
+    }
+    confirmPreviousFallback(record.previousFallbackRaw);
     confirmFallback(record.fallbackRaw);
   }
   async function fallbackSnapshot() {
-    const oldRaw = readLegacy(storage);
-    const raw = readFallback(storage);
-    remember('localStorage', oldRaw);
-    remember('localStorage-v3', raw);
-    const documents = parseDocuments(raw ?? oldRaw, true);
-    // A disagreement must not substitute the older data for a readable v3 copy.
-    if (raw !== null) snapshot = { raw, documents };
-    const meta = raw === null ? null : parseMigration(readStorage(storage, MIGRATION_KEY));
-    const hash = meta ? await legacyHash(oldRaw) : null;
-    if (meta && meta.legacyHash !== hash) throw problem('STORAGE_LEGACY_CHANGED', '이전 버전에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
-    // Recheck after asynchronous hashing. No stale source is adopted or saved.
-    confirmLegacy(oldRaw); confirmFallback(raw);
-    return { oldRaw, fallbackRaw: raw, raw: raw ?? oldRaw, documents, hash };
+    const oldRaw = readLegacy(storage), priorRaw = readPreviousFallback(storage), raw = readFallback(storage);
+    remember('localStorage', oldRaw); remember('localStorage-v3', priorRaw); remember('localStorage-v4', raw);
+    const documents = parseDocuments(raw ?? priorRaw ?? oldRaw, true);
+    // Retain the newest readable snapshot even if an older source diverged.
+    if (raw !== null || priorRaw !== null) snapshot = { raw: raw ?? priorRaw, documents };
+    const meta = raw === null ? null : parseMigration(readStorage(storage, MIGRATION_KEY), true);
+    const priorMeta = priorRaw === null ? null : parseMigration(readStorage(storage, PREVIOUS_MIGRATION_KEY));
+    const hash = meta || priorMeta ? await legacyHash(oldRaw) : null;
+    const priorHash = meta ? await legacyHash(priorRaw) : null;
+    if ((meta && (meta.legacyHash !== hash || meta.previousHash !== priorHash)) || (priorMeta && priorMeta.legacyHash !== hash)) {
+      throw problem('STORAGE_LEGACY_CHANGED', '이전 버전에서 문서가 변경되었습니다. 이전·새 저장 원본을 모두 보관한 뒤 확인해 주세요. 덮어쓰기를 중단했습니다.');
+    }
+    confirmLegacy(oldRaw); confirmPreviousFallback(priorRaw); confirmFallback(raw);
+    return { oldRaw, previousFallbackRaw: priorRaw, fallbackRaw: raw, raw: raw ?? priorRaw ?? oldRaw, documents, hash, priorHash };
   }
   function adopt(raw, documents) {
     snapshot = { raw, documents };
@@ -326,27 +358,28 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
         }
         try {
           confirmLegacy(legacyRaw);
+          confirmPreviousFallback(previousFallbackRaw);
           if (readFallback(storage) !== fallbackRaw || snapshot.raw !== expectedRaw) {
             throw problem('STORAGE_CONFLICT', '다른 창에서 문서가 바뀌었습니다. 현재 내용을 JSON으로 백업하고 변경된 저장을 불러와 주세요.');
           }
           // The old key stays byte-for-byte unchanged. Write the small baseline
           // first: if quota blocks the data write, existing data is still intact.
-          const migration = JSON.stringify({ version: 1, legacyHash: fallbackBaselineHash });
+          const migration = JSON.stringify({ version: 1, legacyHash: fallbackBaselineHash, previousHash: previousBaselineHash });
           if (readStorage(storage, MIGRATION_KEY) !== migration) storage.setItem(MIGRATION_KEY, migration);
           storage.setItem(DATA_KEY, raw);
           fallbackRaw = raw;
           snapshot = { raw, documents: JSON.parse(raw) };
-          remember('localStorage-v3', raw);
+          remember('localStorage-v4', raw);
           failure = null;
           warning = FALLBACK_WARNING;
           return raw;
         } catch (cause) { if (cause?.code === 'STORAGE_LEGACY_CHANGED') throw stop(cause); throw noteFailure(cause); }
       }
       try {
-        await transaction(database, 'readwrite', timeoutMs, (record, store, previous) => {
+        await transaction(database, 'readwrite', timeoutMs, (record, store, previous, priorV3) => {
           remember('indexedDB', record?.raw);
           const current = parseRecord(record, true);
-          confirmPrevious(current, previous);
+          confirmPrevious(current, previous, priorV3);
           if (current.raw !== expectedRaw) {
             throw problem('STORAGE_CONFLICT', '다른 창에서 문서가 바뀌었습니다. 현재 내용을 JSON으로 백업하고 변경된 저장을 불러와 주세요.');
           }
@@ -356,6 +389,7 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
         adopt(raw, JSON.parse(raw));
         assertWritable();
         confirmLegacy(baseline);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         failure = null;
         warning = '';
@@ -370,8 +404,8 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
       if (kind === 'localStorage') {
         try {
           const next = await fallbackSnapshot();
-          legacyRaw = next.oldRaw; fallbackRaw = next.fallbackRaw; fallbackBaselineHash = next.hash ?? await legacyHash(next.oldRaw);
-          confirmLegacy(legacyRaw); confirmFallback(fallbackRaw);
+          legacyRaw = next.oldRaw; previousFallbackRaw = next.previousFallbackRaw; fallbackRaw = next.fallbackRaw; fallbackBaselineHash = next.hash ?? await legacyHash(next.oldRaw); previousBaselineHash = next.priorHash ?? await legacyHash(next.previousFallbackRaw);
+          confirmLegacy(legacyRaw); confirmPreviousFallback(previousFallbackRaw); confirmFallback(fallbackRaw);
           snapshot = { raw: next.raw, documents: next.documents };
           warning = FALLBACK_WARNING;
           failure = null;
@@ -379,16 +413,17 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
         } catch (cause) { throw stop(cause); }
       }
       try {
-        await transaction(database, 'readonly', timeoutMs, (record, _store, previous) => {
+        await transaction(database, 'readonly', timeoutMs, (record, _store, previous, priorV3) => {
           remember('indexedDB', record?.raw);
           const current = parseRecord(record, true);
           adopt(current.raw, current.documents);
           baseline = current.legacyRaw;
-          fallbackRaw = current.fallbackRaw;
-          confirmPrevious(current, previous);
+          fallbackRaw = current.fallbackRaw; previousFallbackRaw = current.previousFallbackRaw;
+          confirmPrevious(current, previous, priorV3);
         });
         assertWritable();
         confirmLegacy(baseline);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         failure = null;
         warning = '';
@@ -402,13 +437,14 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
 
   try {
     const initial = await fallbackSnapshot();
-    legacyRaw = initial.oldRaw; fallbackRaw = initial.fallbackRaw; fallbackBaselineHash = initial.hash;
+    legacyRaw = initial.oldRaw; previousFallbackRaw = initial.previousFallbackRaw; fallbackRaw = initial.fallbackRaw; fallbackBaselineHash = initial.hash; previousBaselineHash = initial.priorHash;
     snapshot = { raw: initial.raw, documents: initial.documents };
   } catch (cause) {
     legacyError = cause;
     legacyRaw = recovery.get('localStorage') ?? null;
-    fallbackRaw = recovery.get('localStorage-v3') ?? null;
-    snapshot.raw = fallbackRaw ?? legacyRaw;
+    fallbackRaw = recovery.get('localStorage-v4') ?? null;
+    previousFallbackRaw = recovery.get('localStorage-v3') ?? null;
+    snapshot.raw = fallbackRaw ?? previousFallbackRaw ?? legacyRaw;
   }
   if (indexedDB === undefined) {
     try { indexedDB = globalThis.indexedDB; }
@@ -420,7 +456,8 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
     else {
       try {
         fallbackBaselineHash ??= await legacyHash(legacyRaw);
-        confirmLegacy(legacyRaw); confirmFallback(fallbackRaw);
+        previousBaselineHash ??= await legacyHash(previousFallbackRaw);
+        confirmLegacy(legacyRaw); confirmPreviousFallback(previousFallbackRaw); confirmFallback(fallbackRaw);
         kind = 'localStorage'; warning = FALLBACK_WARNING;
       } catch (cause) { stop(cause); }
     }
@@ -432,8 +469,9 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
     database.onclose = () => {
       if (!readOnly) stop(problem('STORAGE_CLOSED', `기기 저장소 연결이 예기치 않게 닫혔습니다. ${BACKUP_NOTICE}`));
     };
-    await transaction(database, 'readwrite', timeoutMs, (record, store, previous) => {
+    await transaction(database, 'readwrite', timeoutMs, (record, store, previous, priorV3) => {
       remember('indexedDB-previous', previous?.raw ?? null);
+      remember('indexedDB-v3', priorV3?.raw ?? null);
       if (record !== undefined) {
         remember('indexedDB', record?.raw);
         const current = parseRecord(record, true);
@@ -441,33 +479,49 @@ export async function openDocumentStore({ storage, indexedDB, timeoutMs = 5000 }
         // the transaction itself fails. Never substitute older LS documents.
         adopt(current.raw, current.documents);
         baseline = current.legacyRaw;
-        fallbackRaw = current.fallbackRaw;
-        confirmPrevious(current, previous);
+        fallbackRaw = current.fallbackRaw; previousFallbackRaw = current.previousFallbackRaw;
+        confirmPrevious(current, previous, priorV3);
       } else {
+        // Expose the readable v3 snapshot even when its older source cannot be
+        // checked. The error still blocks migration and all writes.
+        if (priorV3 !== undefined && fallbackRaw === null) {
+          const old = parseRecord(priorV3, true, false);
+          adopt(old.raw, old.documents);
+        }
         if (legacyError) throw legacyError;
         confirmLegacy(legacyRaw);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         let raw = snapshot.raw;
-        if (previous !== undefined) {
+        remember('indexedDB-v3', priorV3?.raw ?? null);
+        if (priorV3 !== undefined) {
+          const old = parseRecord(priorV3, true, false);
+          confirmOldRecord(old, previous);
+          confirmPreviousFallback(old.fallbackRaw);
+          if (fallbackRaw !== null && fallbackRaw !== old.raw) throw problem('STORAGE_LEGACY_CHANGED', '이전 저장소와 새 간이 저장소에 서로 다른 문서가 있습니다. 두 원본을 보관한 뒤 확인해 주세요. 자동으로 합치거나 덮어쓰지 않았습니다.');
+          raw = fallbackRaw ?? old.raw;
+        } else if (previous !== undefined) {
           const old = parseRecord(previous);
           // The old IDB record is usually newer than its original LS snapshot.
-          // Never fall back to that older LS snapshot when copying to v3.
+          // Never fall back to that older LS snapshot when copying to the new record.
           confirmLegacy(old.legacyRaw);
-          if (fallbackRaw !== null && fallbackRaw !== old.raw && old.raw !== legacyRaw) {
+          if ((fallbackRaw ?? previousFallbackRaw) !== null && (fallbackRaw ?? previousFallbackRaw) !== old.raw && old.raw !== legacyRaw) {
             throw problem('STORAGE_LEGACY_CHANGED', '이전 저장소와 새 간이 저장소에 서로 다른 문서가 있습니다. 두 원본을 보관한 뒤 확인해 주세요. 자동으로 합치거나 덮어쓰지 않았습니다.');
           }
-          raw = fallbackRaw ?? old.raw;
+          raw = fallbackRaw ?? previousFallbackRaw ?? old.raw;
         }
         const documents = parseDocuments(raw);
         adopt(raw, documents);
         baseline = legacyRaw;
-        store.put({ version: 1, raw, legacyRaw, fallbackRaw,
-          previousExists: previous !== undefined, previousRaw: previous?.raw ?? null }, RECORD_KEY);
+        store.put({ version: 1, raw, legacyRaw, fallbackRaw, previousFallbackRaw,
+          previousExists: previous !== undefined, previousRaw: previous?.raw ?? null,
+          priorV3Exists: priorV3 !== undefined, priorV3Raw: priorV3?.raw ?? null }, RECORD_KEY);
       }
     });
     remember('indexedDB', snapshot.raw);
     assertWritable();
     confirmLegacy(baseline);
+    confirmPreviousFallback(previousFallbackRaw);
     confirmFallback(fallbackRaw);
     kind = 'indexedDB';
     warning = '';

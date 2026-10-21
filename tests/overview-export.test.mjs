@@ -19,8 +19,8 @@ async function overview(document, options) {
   const children = Array.from(body.childNodes).filter(node => node.nodeType === 1);
   const titleIndex = children.findIndex(node => node.localName === 'p' && textOf(node) === '업무 지도 · 내 업무 한눈에 보기');
   assert.ok(titleIndex >= 0);
-  const endIndex = children.findIndex(node => textOf(node) === '처음 시작하는 사람을 위한 안내');
-  assert.ok(titleIndex < endIndex, 'map appears before onboarding and details');
+  const endIndex = children.findIndex(node => textOf(node) === '업무 상세 · 실행 안내');
+  assert.ok(titleIndex < endIndex, 'map appears before execution details');
   const appendix = children.slice(titleIndex, endIndex);
   const tables = appendix.filter(node => node.localName === 'tbl');
   return { dom, body, appendix, text: appendix.map(textOf).join('\n'), tables, table: tables[0] };

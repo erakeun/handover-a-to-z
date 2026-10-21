@@ -2,7 +2,7 @@ import { IMAGE_LIMITS, validateImage } from "./image-data.js";
 import { EXAMPLE_IMAGES } from "./example-images.js";
 
 /**
- * Portable v1/v2/v3 data model. Legacy documents are never changed by reading.
+ * Portable v1/v2/v3/v4 data model. Legacy documents are never changed by reading.
  * All dates are Gregorian civil dates, not UTC instants.
  * Limits apply to editable drafts as well as imported and exported documents.
  */
@@ -24,7 +24,7 @@ export const LIMITS = Object.freeze({
   offsetDays: 36_600,
 });
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 /** PDF bytes stay inside the portable file; no URL or executable viewer is stored. */
 export const PDF_LIMITS = Object.freeze({ bytes: 10 * 1024 * 1024, pages: 200 });
@@ -260,9 +260,9 @@ function inspectJSON(value, addError) {
     // v1 retains its original graph-wide string cap, including provenance.
     if (depth === 0 && !array) {
       const version = Object.getOwnPropertyDescriptor(node, "schemaVersion")?.value;
-      if (version === 2 || version === 3) {
+      if ([2, 3, 4].includes(version)) {
         maximumString = 4 * Math.ceil(IMAGE_LIMITS.imageBytes / 3);
-        pdfStringAllowed = version === 3;
+        pdfStringAllowed = version === 3 || version === 4;
         graphBudget = LIMITS.imageJsonBytes;
         graphVersion = version;
       }
@@ -319,8 +319,9 @@ export function validateDocument(value) {
   inspectJSON(value, error);
   if (errors.length) return { ok: false, errors, warnings };
   const version = value?.schemaVersion;
-  const hasImages = version === 2 || version === 3;
-  const hasReviewFields = version === 3;
+  const hasImages = [2, 3, 4].includes(version);
+  const hasReviewFields = version === 3 || version === 4;
+  const hasSourcePages = version === 4;
   // This is exactly the format stringifyDocument writes, so valid documents can
   // always be exported and imported again under the same byte budget.
   const jsonBudget = hasImages ? LIMITS.imageJsonBytes : LIMITS.jsonBytes;
@@ -370,6 +371,37 @@ export function validateDocument(value) {
       refs.push({ reference, path: `${path}[${index}]` });
     });
   };
+  // Page relationships are explicit author choices. They are never inferred
+  // from prose, backfilled while reading, or stored in technical provenance.
+  const sourcePages = (item, path) => {
+    if (!owns(item, "sourcePages")) return;
+    if (!list(item.sourcePages, path, LIMITS.references)) return;
+    const seenSources = new Set();
+    item.sourcePages.forEach((entry, index) => {
+      const entryPath = `${path}[${index}]`;
+      if (!object(entry, entryPath, ["sourceId", "pages"])) return;
+      if (string(entry.sourceId, `${entryPath}.sourceId`, LIMITS.id, true)) {
+        if (seenSources.has(entry.sourceId)) error(`${entryPath}.sourceId: 같은 출처의 쪽 관계가 중복되었습니다.`);
+        seenSources.add(entry.sourceId);
+        if (!Array.isArray(item.sourceRefs) || !item.sourceRefs.includes(entry.sourceId)) {
+          error(`${entryPath}.sourceId: 이 업무·진행 건의 sourceRefs에 연결된 출처여야 합니다.`);
+        }
+      }
+      const source = Array.isArray(value.sourceFiles) ? value.sourceFiles.find(source => source?.id === entry.sourceId) : undefined;
+      if (!source?.pdf || source.format !== "pdf") error(`${entryPath}.sourceId: 쪽을 지정할 수 있는 PDF 출처가 없습니다.`);
+      if (!list(entry.pages, `${entryPath}.pages`, PDF_LIMITS.pages)) return;
+      if (!entry.pages.length) error(`${entryPath}.pages: 함께 확인할 원문 쪽을 하나 이상 지정해 주세요.`);
+      const seenPages = new Set();
+      entry.pages.forEach((page, pageIndex) => {
+        const pagePath = `${entryPath}.pages[${pageIndex}]`;
+        if (!Number.isInteger(page) || page < 1 || page > PDF_LIMITS.pages || (source?.pdf && page > source.pdf.pageCount)) {
+          error(`${pagePath}: PDF의 실제 쪽수 범위 안의 정수가 필요합니다.`);
+        }
+        if (seenPages.has(page)) error(`${pagePath}: 같은 원문 쪽이 중복되었습니다.`);
+        seenPages.add(page);
+      });
+    });
+  };
   const title = (node, path) => {
     if (string(node, path, LIMITS.title) && !nonblank(node)) warning(`${path}: 제목을 작성해 주세요.`);
   };
@@ -388,8 +420,8 @@ export function validateDocument(value) {
   };
 
   if (!object(value, "$", DOCUMENT_KEYS, DOCUMENT_KEYS.filter((key) => !["provenance", "groups"].includes(key)))) return { ok: false, errors, warnings };
-  if (![1, 2, 3].includes(version)) {
-    error("$.schemaVersion: 지원하는 스키마 버전은 숫자 1, 2, 3입니다. 이 파일은 최신 인수인계 A to Z에서 열어 주세요.");
+  if (![1, 2, 3, 4].includes(version)) {
+    error("$.schemaVersion: 지원하는 스키마 버전은 숫자 1, 2, 3, 4입니다. 이 파일은 최신 인수인계 A to Z에서 열어 주세요.");
     return { ok: false, errors, warnings };
   }
   // Reject count/size excess before base64 allocation, CRC, or decompression.
@@ -439,7 +471,7 @@ export function validateDocument(value) {
   });
   if (list(value.tasks, "$.tasks", LIMITS.tasks)) value.tasks.forEach((task, index) => {
     const path = `$.tasks[${index}]`;
-    const taskKeys = hasReviewFields ? TASK_KEYS : LEGACY_TASK_KEYS;
+    const taskKeys = hasSourcePages ? [...TASK_KEYS, "sourcePages"] : hasReviewFields ? TASK_KEYS : LEGACY_TASK_KEYS;
     if (!object(task, path, hasImages ? [...taskKeys, "images"] : taskKeys, LEGACY_TASK_KEYS.filter((key) => !OPTIONAL_TASK_KEYS.includes(key)))) return;
     id(task.id, `${path}.id`);
     title(task.title, `${path}.title`);
@@ -456,6 +488,7 @@ export function validateDocument(value) {
     }
     ["accessChecked", "firstDay", "firstWeek"].forEach((key) => boolean(task[key], `${path}.${key}`));
     sourceRefs(task.sourceRefs, `${path}.sourceRefs`);
+    if (hasSourcePages) sourcePages(task, `${path}.sourcePages`);
     if (hasImages && owns(task, "images") && list(task.images, `${path}.images`, IMAGE_LIMITS.perTask)) {
       task.images.forEach((image, imageIndex) => {
         const imagePath = `${path}.images[${imageIndex}]`;
@@ -468,7 +501,7 @@ export function validateDocument(value) {
   });
   if (list(value.cases, "$.cases", LIMITS.cases)) value.cases.forEach((item, index) => {
     const path = `$.cases[${index}]`;
-    if (!object(item, path, hasReviewFields ? CASE_KEYS : LEGACY_CASE_KEYS, LEGACY_CASE_KEYS)) return;
+    if (!object(item, path, hasSourcePages ? [...CASE_KEYS, "sourcePages"] : hasReviewFields ? CASE_KEYS : LEGACY_CASE_KEYS, LEGACY_CASE_KEYS)) return;
     id(item.id, `${path}.id`);
     title(item.title, `${path}.title`);
     if (!STATUSES.has(item.status) || (!hasReviewFields && item.status === "unknown")) error(`${path}.status: v${version}에서 지원하지 않는 진행 상태입니다.`);
@@ -480,6 +513,7 @@ export function validateDocument(value) {
     ["nextAction", "waitingFor", "notes"].forEach((key) => string(item[key], `${path}.${key}`));
     civil(item.dueDate, `${path}.dueDate`);
     sourceRefs(item.sourceRefs, `${path}.sourceRefs`);
+    if (hasSourcePages) sourcePages(item, `${path}.sourcePages`);
   });
   const sourceIds = new Set();
   if (list(value.sourceFiles, "$.sourceFiles", LIMITS.sources)) value.sourceFiles.forEach((source, index) => {
@@ -544,9 +578,9 @@ function rejectDuplicateJSONKeys(text) {
 
 export function parseImport(text) {
   if (typeof text !== "string") throw new TypeError("JSON 텍스트를 전달해 주세요.");
-  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2/v3 24 MiB 이하여야 합니다.");
+  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2/v3/v4 24 MiB 이하여야 합니다.");
   const rawBytes = encoder.encode(text).byteLength;
-  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2/v3 24 MiB 이하여야 합니다.");
+  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2/v3/v4 24 MiB 이하여야 합니다.");
   let document;
   try {
     // Scan nesting/count limits before JSON.parse can allocate an abusive graph.
@@ -556,7 +590,7 @@ export function parseImport(text) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new Error("올바른 JSON 문서가 아닙니다. 파일의 문법을 확인해 주세요.");
   }
-  if (isRecord(document) && owns(document, "schemaVersion") && ![1, 2, 3].includes(document.schemaVersion)) {
+  if (isRecord(document) && owns(document, "schemaVersion") && ![1, 2, 3, 4].includes(document.schemaVersion)) {
     throw new Error("이 파일은 최신 인수인계 A to Z에서 열어 주세요. 현재 내용은 바뀌지 않았습니다.");
   }
   if (document?.schemaVersion === 1 && rawBytes > LIMITS.jsonBytes) throw new Error("v1 JSON 파일은 UTF-8 기준 5 MiB 이하여야 합니다.");
@@ -591,6 +625,7 @@ export function importAsCopy(document) {
     ...item, id: fresh(item.id), sourceRefs: item.sourceRefs.map((reference) => map.get(reference)),
     ...(owns(item, "groupId") ? { groupId: item.groupId === "" ? "" : map.get(item.groupId) } : {}),
     ...(owns(item, "taskId") ? { taskId: item.taskId === "" ? "" : map.get(item.taskId) } : {}),
+    ...(owns(item, "sourcePages") ? { sourcePages: item.sourcePages.map(entry => ({ sourceId: map.get(entry.sourceId), pages: [...entry.pages] })) } : {}),
     ...(owns(item, "images") ? { images: item.images.map((image) => ({ ...image, id: fresh(image.id) })) } : {}),
   });
   const tasks = source.tasks.map(remap);

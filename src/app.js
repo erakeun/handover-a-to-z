@@ -1,5 +1,5 @@
 import {CURRENT_SCHEMA_VERSION,makeId,createDocument,createTask,createCase,validateDocument,parseImport,importAsCopy,stringifyDocument,issuesFor,dueInRange,exampleDocument,dateISO,LIMITS} from './model.js';
-import {loadDocuments,saveDocuments,loadProgress,markProgress,DATA_KEY,PROGRESS_KEY,CURRENT_KEY,LEGACY_CURRENT_KEY} from './storage.js';
+import {loadDocuments,saveDocuments,loadProgress,markProgress,DATA_KEY,PROGRESS_KEY,CURRENT_KEY,PREVIOUS_CURRENT_KEY,LEGACY_CURRENT_KEY} from './storage.js';
 import {extractDocument} from './importers.js';
 import {exportDocx,exportAIText} from './exporters.js';
 import {renderCalendar} from './calendar.js';
@@ -13,6 +13,7 @@ import {proposeDraftTitles} from './draft-titles.js';
 import {renderUsageGuide} from './guide.js';
 import {caseState,caseStateLabel,caseRecordedLabel,firstActionText,distinctInstructions,taskReadiness} from './handover-flow.js';
 import {attachPdfEvidence,verifyDocumentPdfs,createPdfEvidenceViewer} from './pdf-evidence.js';
+import {linkedPdfSources,parseEvidencePages,storedOutputPages,prepareOutputEvidence} from './output-evidence.js';
 import {reviewExampleDocument} from './review-example.js';
 
 const app=document.querySelector('#app');
@@ -23,7 +24,7 @@ let savePending=false,saveRunning=false,editGeneration=0;
 app.textContent='이 기기에 저장한 문서를 불러오는 중입니다…';
 try{
  storage=window.localStorage;documentStore=await openDocumentStore({storage,indexedDB:window.indexedDB});
- state.documents=documentStore.documents;lastDocumentsRaw=documentStore.raw;state.current=storage.getItem(CURRENT_KEY)||storage.getItem(LEGACY_CURRENT_KEY);if(state.documents.length)state.saveMessage='이 브라우저의 임시저장을 열었습니다';
+ state.documents=documentStore.documents;lastDocumentsRaw=documentStore.raw;state.current=storage.getItem(CURRENT_KEY)||storage.getItem(PREVIOUS_CURRENT_KEY)||storage.getItem(LEGACY_CURRENT_KEY);if(state.documents.length)state.saveMessage='이 브라우저의 임시저장을 열었습니다';
  state.storageWarning=documentStore.warning||'';
  if(documentStore.readOnly){state.storageBlocked=documentStore.errorCode==='STORAGE_INVALID'&&!state.documents.length;state.storageError=documentStore.warning;state.saveMessage='임시저장을 사용할 수 없습니다 · 현재 내용은 파일로 보관해 주세요';}
 }
@@ -33,6 +34,13 @@ if(!state.documents.some(d=>d.id===state.current))state.current=state.documents[
 let fieldCount=0;
 let dialogCount=0;
 const openSections=new Set();
+const readerContexts=new Map();
+function readerContextKey(tab=state.readerTab){return JSON.stringify([state.current,state.query,state.roleQuery,tab]);}
+function changeReaderTab(tab){
+ readerContexts.set(readerContextKey(),{scrollY:window.scrollY||0,limit:state.limit});
+ state.readerTab=tab;const context=readerContexts.get(readerContextKey());state.limit=context?.limit||12;render();
+ queueMicrotask(()=>window.scrollTo?.(0,context?.scrollY||0));
+}
 const photos=createPhotoUI({el,button,field,note,modal,notice,confirmAction,isCurrent:id=>current()?.id===id,changed:(taskId,redraw=true)=>{
  state.selected=taskId;saved();if(redraw){render();if(state.storageError)notice('사진은 현재 화면에 남아 있지만 기기 임시저장에 실패했습니다. 지금 ‘파일로 저장’을 눌러 JSON으로 보관해 주세요.');}
 }});
@@ -283,9 +291,9 @@ function sourceInfo(item){
  const sources=current().sourceFiles.filter(s=>item.sourceRefs.includes(s.id));
  return el('section',{class:'source-detail evidence-panel'},el('h4',{},'근거 확인'),sources.map(s=>el('div',{class:'source-item'},el('strong',{},s.name),s.pdf?button(`PDF 원문 보기 · ${s.pdf.pageCount}쪽`,()=>openPdfSource(s),'secondary'):note('원래 파일 모양은 이 전달본에 없습니다. 아래 추출문과 별도 원문을 대조해 주세요.'),el('details',{},el('summary',{},'추출문·확인할 곳'),s.warnings?.map(w=>note(w,'warning-text')),s.excerpt?el('pre',{},s.excerpt):note('추출문 없음 · PDF 쪽에서 확인하세요.')))));
 }
-function openPdfSource(source){
+function openPdfSource(source,returnLabel='업무로 돌아가기'){
  const viewer=el('div',{class:'pdf-evidence-host'});let dispose=()=>{};
- const handle=modal(source.name,el('div',{},note('JSON 안의 PDF를 기기에서 표시합니다. 원문 속 링크·양식·스크립트는 실행하지 않습니다.'),viewer),[close=>button('업무로 돌아가기',close,'primary')],{stack:true,navigation:true,onClose:()=>dispose()});
+ const handle=modal(source.name,el('div',{},note('JSON 안의 PDF를 기기에서 표시합니다. 원문 속 링크·양식·스크립트는 실행하지 않습니다.'),viewer),[close=>button(returnLabel,close,'primary')],{stack:true,navigation:true,onClose:()=>dispose()});
  handle.dialog.classList.add('pdf-dialog');
  Promise.resolve(createPdfEvidenceViewer(source.pdf,viewer,{isCurrent:()=>handle.dialog.isConnected})).then(cleanup=>{if(cleanup){dispose=typeof cleanup==='function'?cleanup:()=>cleanup.destroy?.();if(!handle.dialog.isConnected)dispose();}}).catch(error=>{if(handle.dialog.isConnected)viewer.replaceChildren(el('p',{class:'error',role:'alert'},error.message));});
 }
@@ -318,10 +326,10 @@ function searchable(item){return JSON.stringify(item,(key,value)=>key==='images'
 function matches(item,query){return query.normalize('NFKC').toLocaleLowerCase('ko-KR').trim().split(/\s+/).filter(Boolean).every(term=>searchable(item).includes(term));}
 function readerView(){
  const doc=current(),unknown=doc.cases.filter(c=>caseState(c)==='unknown').length,active=doc.cases.filter(c=>!['unknown','done'].includes(caseState(c))).length;
- const shell=el('section',{},el('div',{class:'reader-intro'},el('div',{},el('h2',{},'필요한 업무부터 살펴보세요'),el('p',{class:'helper reader-count',role:'status'},`업무 ${doc.tasks.length}개 · 이어받을 건 ${active}개 · 상태 확인할 기록 ${unknown}개`)),button('첫날 안내 보기',()=>{state.readerTab='start';state.query='';render();},'quiet')));
+ const shell=el('section',{},el('div',{class:'reader-intro'},el('div',{},el('h2',{},'필요한 업무부터 살펴보세요'),el('p',{class:'helper reader-count',role:'status'},`업무 ${doc.tasks.length}개 · 이어받을 건 ${active}개 · 상태 확인할 기록 ${unknown}개`)),button('첫날 안내 보기',()=>changeReaderTab('start'),'quiet')));
  if(doc.tasks.some(t=>!t.verifiedAt))shell.append(note('현행성 확인일이 없는 업무가 있습니다. 실제 시작 전 중요한 조건·권한을 확인해 주세요.','review-status'));
  shell.append(el('div',{class:'search-box'},field('업무나 상황 찾기',state.query,v=>{state.query=v;state.limit=12;renderReaderResults();},{type:'search',placeholder:'예: 자료가 누락됐을 때, 행사, 월말…',maxLength:300}),note('업무 방법, 예외 상황, 진행 메모를 찾습니다. PDF·사진 속 글은 검색되지 않으니 연결된 원문을 열어 확인하세요.')));
- const tab=(v,t)=>button(t,()=>{state.readerTab=v;state.query='';state.limit=12;render();},state.readerTab===v?'pill selected':'pill',{'aria-pressed':state.readerTab===v});
+ const tab=(v,t)=>button(t,()=>changeReaderTab(v),state.readerTab===v?'pill selected':'pill',{'aria-pressed':state.readerTab===v});
  const more=disclosure('reader-options','다른 기준으로 보기',el('div',{class:'actions'},...[['week','이번 주'],['month','이번 달'],['situations','상황별'],['start','첫날 · 첫 주'],['check','확인 필요']].map(([v,t])=>tab(v,t))));
  const roleOptions=[...new Set(doc.tasks.map(t=>t.ownerRole).filter(Boolean))];if(state.roleQuery&&!roleOptions.includes(state.roleQuery))state.roleQuery='';if(roleOptions.length)more.append(el('div',{class:'role-filter'},select('주담당 역할로 업무 보기',state.roleQuery,[['','전체 역할'],...roleOptions.map(r=>[r,r])],v=>{state.roleQuery=v;state.limit=12;render();}),note('업무 설명에만 적용합니다. 자료 접근 권한과 담당 역할은 별개입니다.')));
  if(state.roleQuery||!['map','calendar','cases'].includes(state.readerTab))more.open=true;
@@ -332,8 +340,14 @@ function readerView(){
 function renderReaderResults(){
  const root=document.querySelector('#reader-results');if(!root)return;
  const count=document.querySelector('.reader-count');if(count){const doc=current();count.textContent=`업무 ${doc.tasks.length}개 · 이어받을 건 ${doc.cases.filter(c=>!['unknown','done'].includes(caseState(c))).length}개 · 상태 확인할 기록 ${doc.cases.filter(c=>caseState(c)==='unknown').length}개`;}
- const source=current();const doc=state.roleQuery?{...source,tasks:source.tasks.filter(t=>t.ownerRole===state.roleQuery)}:source;root.replaceChildren();
- if(state.query.trim()){
+ const source=current();let doc=state.roleQuery?{...source,tasks:source.tasks.filter(t=>t.ownerRole===state.roleQuery)}:source;root.replaceChildren();
+ if(state.query.trim()&&['calendar','cases'].includes(state.readerTab)){
+  const tasks=doc.tasks.filter(t=>matches(t,state.query));const ids=new Set(tasks.map(t=>t.id));
+  doc={...doc,tasks,cases:doc.cases.filter(c=>matches(c,state.query)||ids.has(c.taskId))};
+  root.append(el('div',{class:'callout search-context'},el('p',{role:'status'},`‘${state.query}’ 검색 유지 · ${state.readerTab==='calendar'?'일정':'진행 건'} 보기`),button('업무 전체 검색으로 돌아가기',()=>changeReaderTab('map'),'quiet'),button('검색 지우기',()=>{state.query='';state.limit=12;render();},'quiet')));
+  if(!(state.readerTab==='calendar'?doc.tasks.length:doc.cases.length))root.append(note(`‘${state.query}’에 맞는 ${state.readerTab==='calendar'?'업무 일정':'진행 건'}이 없습니다. 위에서 업무 전체 검색으로 돌아갈 수 있습니다.`));
+ }
+ if(state.query.trim()&&!['calendar','cases'].includes(state.readerTab)){
   const tasks=doc.tasks.filter(t=>matches(t,state.query));const cases=doc.cases.filter(t=>matches(t,state.query));const combined=[...tasks.map(t=>({task:t})),...cases.map(c=>({case:c}))];
   root.append(el('div',{class:'section-heading'},el('h2',{},`검색 결과 ${combined.length}개`),el('span',{role:'status',class:'helper'},`${state.query} 검색`)),note(state.roleQuery?'기간과 관계없이 선택한 주담당 역할의 업무와 모든 진행 건에서 찾습니다.':'선택한 주·월과 관계없이 전체 업무와 진행 건에서 찾습니다.'),combined.length?el('div',{class:'read-list'},combined.slice(0,state.limit).map(x=>x.task?taskCard(x.task):caseCard(x.case))):empty('해당하는 업무를 찾지 못했어요','더 짧은 말이나 다른 상황으로 찾아보세요.'));
   if(combined.length>state.limit)root.append(button('결과 더 보기',()=>{state.limit+=12;renderReaderResults();},'secondary full'));return;
@@ -354,7 +368,7 @@ function renderReaderResults(){
   const unknown=doc.cases.filter(c=>caseState(c)==='unknown');
   if(unknown.length)root.append(el('h2',{},`상태를 확인할 기록 ${unknown.length}개`),note('미착수나 진행 중으로 확정되지 않았습니다. 이전 기록을 보존한 채 현재 상태를 확인해 주세요.'),el('div',{class:'read-list'},unknown.map(c=>caseCard(c))));
   const active=doc.cases.filter(c=>!['unknown','done'].includes(caseState(c))).sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
-  root.append(el('div',{class:'section-heading'},el('h2',{},`진행 중인 건 ${active.length}개`),note('다음 행동과 기한부터 확인해 주세요.')),active.length?el('div',{class:'read-list'},active.slice(0,state.limit).map(c=>caseCard(c))):empty('진행 중인 건이 없어요','현재 이어받을 건이 없는 상태입니다. 일반 업무는 이번 주·이번 달에서 확인해 주세요.'));
+  root.append(el('div',{class:'section-heading'},el('h2',{},`진행 중인 건 ${active.length}개`),note('다음 행동과 기한부터 확인해 주세요.')),active.length?el('div',{class:'read-list'},active.slice(0,state.limit).map(c=>caseCard(c))):empty(state.query.trim()?'검색에 맞는 진행 중인 건이 없어요':'진행 중인 건이 없어요',state.query.trim()?'검색어를 유지한 상태입니다. 업무 전체 검색으로 돌아가거나 검색을 지워 다른 진행 건을 볼 수 있습니다.':'현재 이어받을 건이 없는 상태입니다. 일반 업무는 이번 주·이번 달에서 확인해 주세요.'));
   if(active.length>state.limit)root.append(button('진행 건 더 보기',()=>{state.limit+=12;renderReaderResults();}));
   const done=doc.cases.filter(c=>caseState(c)==='done');if(done.length)root.append(el('details',{},el('summary',{},`완료한 건 ${done.length}개`),el('div',{class:'read-list'},done.map(c=>caseCard(c)))));return;
  }
@@ -372,7 +386,7 @@ function caseProgress(item){
  return body;
 }
 function taskContent(task,date){
- const content=el('section',{class:'read-content task-detail'},el('div',{class:'action-start'},el('p',{class:'eyebrow'},date||timingLabel(task.timing)),el('h3',{},'첫 행동'),firstActionText(task)?el('p',{class:'first-action'},firstActionText(task)):el('p',{},'첫 행동이 별도로 확인되지 않았습니다. 아래 본문과 근거에서 시작할 곳을 확인하세요.')),task.timing.startRule?readBlock('시작·준비 기준',task.timing.startRule):null);
+ const content=el('section',{class:'read-content task-detail'},el('div',{class:'action-start'},el('p',{class:'eyebrow'},date||timingLabel(task.timing)),firstActionText(task)?[el('h3',{},'첫 행동'),el('p',{class:'first-action'},firstActionText(task))]:null),task.timing.startRule?readBlock('시작·준비 기준',task.timing.startRule):null);
  if(task.exceptions)content.append(readBlock('막혔을 때 · 먼저 확인',task.exceptions));
  if(task.approval)content.append(readBlock('필요한 승인·확인',task.approval));
  const instructions=distinctInstructions(task);for(const part of instructions)content.append(...[readBlock(part.label,part.text),photos.gallery(task,part.key)].filter(Boolean));
@@ -500,11 +514,43 @@ function exportSelection(doc){
  selection.caseIds=selection.caseIds.filter(id=>doc.cases.some(c=>c.id===id));
  return selection;
 }
+async function requestOutput(doc, selection, deliver, review=false){
+ const generation=editGeneration, snapshot=structuredClone(doc), options=structuredClone(selection), sources=linkedPdfSources(snapshot,options);
+ const items=[...snapshot.tasks.filter(t=>!options.taskIds||options.taskIds.includes(t.id)),...snapshot.cases.filter(c=>!options.caseIds||options.caseIds.includes(c.id))];
+ const records=items.flatMap(item=>sources.filter(source=>item.sourceRefs.includes(source.id)&&source.pdf.pageCount>1).map(source=>({item,source,value:(item.sourcePages?.find(link=>link.sourceId===source.id)?.pages||[]).join(', ')})));
+ const pending=records.filter(record=>review||!record.value);
+ if(!pending.length){
+  if(review){notice('연결된 PDF는 한 쪽이거나 없습니다. 별도 쪽 선택 없이 함께 출력됩니다.');return;}
+  const evidencePages=await prepareOutputEvidence(snapshot,options,storedOutputPages(snapshot,options),{dom:document,isCurrent:()=>editGeneration===generation&&current()?.id===doc.id&&current()?.updatedAt===snapshot.updatedAt});
+  await deliver(snapshot,{...options,evidencePages});return;
+ }
+ const status=el('p',{role:'status',class:'helper'});
+ const body=el('div',{},note('본문의 표·사진을 다시 입력할 필요 없이 원문 쪽을 함께 넣습니다. 업무마다 필요한 쪽을 한 번 확인하면 문서와 전달 JSON에 기억합니다.'),note('한 쪽짜리 PDF와 이미 확인한 연결은 다시 묻지 않습니다. 예: 1 또는 1, 3-4. 한 번에 합계 20쪽까지 출력할 수 있습니다.'),sources.filter(source=>pending.some(record=>record.source.id===source.id)).map(source=>el('section',{class:'output-source'},el('h3',{},source.name),button(`원문 확인 · 총 ${source.pdf.pageCount}쪽`,()=>openPdfSource(source,'근거 쪽 연결로 돌아가기'),'secondary'),pending.filter(record=>record.source.id===source.id).map(record=>field(`${record.item.title||'이름 없는 항목'} · 근거 쪽`,record.value,value=>{record.value=value;},{placeholder:'예: 1 또는 1, 3-4',maxLength:300})))),note('원본 PDF는 그대로 보존합니다. 출력에는 확인한 쪽의 이미지만 넣으며, 이미지 속 글은 DOCX 검색 대상이 아닙니다.'),status);
+ let busy=false;const handle=modal('함께 전달할 근거 쪽',body,[close=>button('취소',close),close=>button(review?'확인한 연결 저장':'연결을 기억하고 함께 만들기',async e=>{
+  if(busy)return;busy=true;const btn=e.currentTarget;btn.disabled=true;status.textContent='확인한 근거 쪽을 준비하고 있습니다…';
+  try{
+   const isCurrent=()=>handle.dialog.isConnected&&editGeneration===generation&&current()?.id===doc.id&&current()?.updatedAt===snapshot.updatedAt;
+   const candidate=structuredClone(snapshot);candidate.schemaVersion=CURRENT_SCHEMA_VERSION;
+   for(const record of pending){
+    const pages=parseEvidencePages(record.value,record.source.pdf.pageCount);const item=[...candidate.tasks,...candidate.cases].find(item=>item.id===record.item.id);
+    item.sourcePages=[...(item.sourcePages||[]).filter(link=>link.sourceId!==record.source.id),{sourceId:record.source.id,pages}];
+   }
+   const checked=validateDocument(candidate);if(!checked.ok)throw new Error(checked.errors.join(' / '));
+   const evidencePages=await prepareOutputEvidence(candidate,options,storedOutputPages(candidate,options),{dom:document,isCurrent});
+   if(!isCurrent())throw new Error('문서가 바뀌어 출력을 멈췄습니다. 현재 내용으로 다시 시작해 주세요.');
+   for(const record of pending){const target=[...doc.tasks,...doc.cases].find(item=>item.id===record.item.id);target.sourcePages=structuredClone([...candidate.tasks,...candidate.cases].find(item=>item.id===record.item.id).sourcePages);}
+   saved();candidate.updatedAt=doc.updatedAt;
+   if(!review)await deliver(candidate,{...options,evidencePages});
+   close();if(review)notice('확인한 근거 쪽 연결을 반영했습니다. 임시저장 상태를 확인하고 JSON으로 백업해 주세요.');
+  }catch(error){if(handle.dialog.isConnected){status.setAttribute('role','alert');status.textContent='출력을 완료하지 못했습니다. '+error.message;}}
+  finally{busy=false;btn.disabled=false;}
+ },'primary')]);
+}
 function exportView(){
  const doc=current();const selection=exportSelection(doc);let includeContacts=false,includeMaterials=false,includeEvidence=false;
  const body=el('section',{class:'export-layout'});const panel=el('div',{class:'editor'},el('h2',{},'전달하거나 문서로 저장하세요'));
  panel.append(el('div',{class:'delivery-actions'},el('div',{class:'callout'},el('h3',{},'다음 담당자에게 전달하기'),el('p',{},'이 앱에서 다시 열고 고칠 수 있는 파일입니다. 백업할 때도 사용하세요.'),button('전달·백업 파일 받기 (.json)',backup,'primary'),note('모든 업무·사진·진행 건과 현재 담긴 출처 원문·PDF 근거가 단일 JSON에 포함됩니다. 포함하지 않은 원본 전체까지 보존한 것은 아닙니다. 이전 개인 수행 체크는 별도입니다. 파일은 암호화되지 않으므로 민감한 내용이 없는지 확인해 주세요.','warning-text')),
- el('div',{class:'callout'},el('h3',{},'제출하거나 문서 프로그램에서 열기'),el('p',{},'업무지도와 사람이 읽는 안내를 받습니다. PDF 근거 자체·전체 원문 발췌·내부 이력은 JSON에 남습니다.'),button('업무 안내 전체 받기 (.docx)',async()=>{try{download(await exportDocx(doc),`${safeName(doc.title)}-전체.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}catch(error){notice(error.message);}},'secondary'),note('문서 프로그램에서 고친 내용은 이 앱에 자동 반영되지 않습니다. 다시 가져오면 별도 검토용 초안이 됩니다.'))));
+ el('div',{class:'callout'},el('h3',{},'제출하거나 문서 프로그램에서 열기'),el('p',{},'업무지도·실행 안내·사진을 받습니다. 연결된 PDF의 확인한 근거 쪽을 함께 넣습니다.'),button('업무 안내 전체 받기 (.docx)',async()=>{try{await requestOutput(doc,{},async(snapshot,options)=>download(await exportDocx(snapshot,options),`${safeName(snapshot.title)}-전체.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));}catch(error){notice(error.message);}},'secondary'),note('문서 프로그램에서 고친 내용은 이 앱에 자동 반영되지 않습니다. 다시 가져오면 별도 검토용 초안이 됩니다.'))));
  const scope=disclosure('export-scope','출력할 업무 선택 · 인쇄');
  const selectionCount=el('p',{class:'helper',role:'status','data-export-selection-count':''});
  const updateCount=()=>{selectionCount.textContent=`선택: 업무 ${selection.taskIds.length}/${doc.tasks.length}개 · 진행 건 ${selection.caseIds.length}/${doc.cases.length}개`;};
@@ -513,8 +559,9 @@ function exportView(){
  const selectList=el('div',{class:'export-selection'});const redraw=()=>{selectList.replaceChildren(el('h4',{},`업무 매뉴얼 ${doc.tasks.length}개`),...doc.tasks.map(t=>check(t.title||'이름 없는 업무',selection.taskIds.includes(t.id),v=>toggle(selection.taskIds,t.id,v))),el('h4',{},`진행 건 ${doc.cases.length}개`),...doc.cases.map(c=>check(c.title||'이름 없는 진행 건',selection.caseIds.includes(c.id),v=>toggle(selection.caseIds,c.id,v))));updateCount();};redraw();scope.append(selectionCount,selectList,note('선택은 이 문서에서 화면을 오가는 동안 유지됩니다. 새로 추가한 항목은 직접 선택해 주세요.'));
  scope.append(el('div',{class:'actions'},button('선택한 업무만 문서로 받기',async e=>{
   if(!selection.taskIds.length&&!selection.caseIds.length){notice('내보낼 항목을 선택해 주세요.');return;}
-  const btn=e.currentTarget;btn.disabled=true;btn.textContent='문서 만드는 중…';try{const bytes=await exportDocx(doc,selection);download(bytes,`${safeName(doc.title)}-${today()}.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');notice('문서 파일을 만들었습니다. 문서 프로그램에서 열어 확인해 주세요.');}catch(error){notice('문서 생성 실패: '+error.message);}finally{btn.disabled=false;btn.textContent='선택한 업무만 문서로 받기';}
- },'primary'),button('인쇄 보기',()=>{state.printSelection=structuredClone(selection);switchView('print');})));
+  const btn=e.currentTarget;btn.disabled=true;btn.textContent='문서 만드는 중…';try{await requestOutput(doc,selection,async(snapshot,options)=>{const bytes=await exportDocx(snapshot,options);download(bytes,`${safeName(snapshot.title)}-${today()}.docx`,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');notice('문서 파일을 만들었습니다. 문서 프로그램에서 열어 확인해 주세요.');});}catch(error){notice('문서 생성 실패: '+error.message);}finally{btn.disabled=false;btn.textContent='선택한 업무만 문서로 받기';}
+ },'primary'),button('인쇄 보기',async()=>{try{await requestOutput(doc,selection,async(snapshot,options)=>{state.printDocument=snapshot;state.printSelection=options;switchView('print');});}catch(error){notice(error.message);}})));
+ scope.append(button('근거 쪽 연결 확인·바꾸기',async()=>{try{await requestOutput(doc,selection,async()=>{},true);}catch(error){notice(error.message);}},'quiet'));
  panel.append(scope);
  const extras=disclosure('export-extras','추가 기능 · AI 도움 · 수행 기록');
  extras.append(el('div',{class:'export-aside'},el('div',{class:'panel'},el('h3',{},'내 AI에게 도움 요청하기'),el('p',{},'위에서 선택한 업무와 프롬프트를 직접 확인한 뒤, 사용하는 AI에 붙여넣으세요. 이 앱은 AI에 접속하지 않습니다.'),check('연락할 역할·회신 대기 포함',false,v=>includeContacts=v),check('준비자료 포함',false,v=>includeMaterials=v),check('근거 포함',false,v=>includeEvidence=v),note('민감 항목은 기본 제외합니다. 방법·메모 안에 섞인 정보는 자동으로 찾아내지 못하므로 직접 확인해 주세요.'),button('AI용 내용 미리보기',()=>aiPreview(selection,{includeContacts,includeMaterials,includeEvidence}),'secondary full')),
@@ -531,19 +578,21 @@ function aiPreview(selection,options,initialPurpose='write'){
  modal('AI에 공유하기 전 직접 확인하세요',el('div',{},note('외부 AI에 붙여넣으면 해당 서비스로 정보가 전달됩니다. 조직의 공유 기준을 확인하고, 아래 평문에서 민감한 부분을 직접 지우세요.','warning-text'),select('도움받을 목적',purpose,[['write','작성 내용을 다듬기'],['ask','인수자 질문 만들기']],v=>{purpose=v;refresh();}),check('연락할 역할·회신 대기 포함',config.includeContacts,v=>{config.includeContacts=v;refresh();}),check('준비자료 포함',config.includeMaterials,v=>{config.includeMaterials=v;refresh();}),check('근거 포함',config.includeEvidence,v=>{config.includeEvidence=v;refresh();}),note('포함 설정을 바꾸면 미리보기를 다시 만듭니다. 직접 지운 내용이 있다면 마지막에 다시 확인해 주세요.'),preview),[close=>button('닫기',close),()=>button('텍스트 파일 내려받기',()=>download(preview.value,'인수인계-AI-공유전확인.txt','text/plain'),'primary')]);
 }
 function printView(){
- const doc=current(),selection=state.printSelection||{taskIds:doc.tasks.map(t=>t.id),caseIds:doc.cases.map(c=>c.id)};
+ const doc=state.printDocument||current(),selection=state.printSelection||{taskIds:doc.tasks.map(t=>t.id),caseIds:doc.cases.map(c=>c.id)};
  const tasks=doc.tasks.filter(t=>selection.taskIds.includes(t.id)),cases=doc.cases.filter(c=>selection.caseIds.includes(c.id));
- const sheet=el('section',{class:'print-sheet'},el('div',{class:'actions no-print'},button('내보내기로 돌아가기',()=>switchView('export')),button('인쇄 / PDF 저장',()=>window.print(),'primary')),el('header',{class:'print-heading'},el('p',{class:'eyebrow'},'인수인계 A to Z'),el('h2',{},doc.title||'인수인계'),note(`출력일 ${today()} · 선택 업무 ${tasks.length}/${doc.tasks.length}개 · 진행·확인 기록 ${cases.length}/${doc.cases.length}개`),note('업무 안내와 사진을 출력합니다. PDF 원문 자체·전체 추출문·내부 이력은 전달 JSON에 남습니다.')),renderWorkOverview({doc,taskIds:selection.taskIds,el,button}),doc.onboarding.dayOne?readBlock('첫날 안내',doc.onboarding.dayOne):null,doc.onboarding.firstWeek?readBlock('첫 주 안내',doc.onboarding.firstWeek):null,el('h2',{},'업무 안내'));
+ const sheet=el('section',{class:'print-sheet'},el('div',{class:'actions no-print'},button('내보내기로 돌아가기',()=>switchView('export')),button('인쇄 / PDF 저장',()=>window.print(),'primary')),el('header',{class:'print-heading'},el('p',{class:'eyebrow'},'인수인계 A to Z'),el('h2',{},doc.title||'인수인계'),note(`출력일 ${today()} · 선택 업무 ${tasks.length}/${doc.tasks.length}개 · 진행·확인 기록 ${cases.length}/${doc.cases.length}개`),note('업무 안내·사진과 확인한 PDF 근거 쪽을 출력합니다. 원문 파일과 전체 자료는 전달 JSON에 보존됩니다.')),renderWorkOverview({doc,taskIds:selection.taskIds,el,button}),el('h2',{},'업무 안내'));
  tasks.forEach((task,i)=>{
-  const item=el('article',{class:'print-item'},el('h3',{},`${i+1}. ${task.title||'이름 없는 업무'}`),note(timingLabel(task.timing)),readBlock('첫 행동',firstActionText(task)||'별도 확인이 필요합니다. 아래 본문·근거에서 시작할 곳을 확인해 주세요.'),task.timing.startRule?readBlock('시작·준비 기준',task.timing.startRule):null,task.exceptions?readBlock('막혔을 때 · 먼저 확인',task.exceptions):null,task.approval?readBlock('승인·확인',task.approval):null);
+  const item=el('article',{class:'print-item'},el('h3',{},`${i+1}. ${task.title||'이름 없는 업무'}`),note(timingLabel(task.timing)),firstActionText(task)?readBlock('첫 행동',firstActionText(task)):null,task.timing.startRule?readBlock('시작·준비 기준',task.timing.startRule):null,task.exceptions?readBlock('막혔을 때 · 먼저 확인',task.exceptions):null,task.approval?readBlock('승인·확인',task.approval):null);
   const instructions=distinctInstructions(task);for(const part of instructions)item.append(...[readBlock(part.label,part.text),photos.gallery(task,part.key,{print:true})].filter(Boolean));
   for(const key of ['method','steps'])if(!instructions.some(p=>p.key===key))item.append(...[photos.gallery(task,key,{print:true})].filter(Boolean));
   item.append(...[['여기까지 하면 끝','doneWhen'],['주담당 역할','ownerRole'],['지원 역할','supportRole'],['목적','purpose'],['준비자료','materials'],['문의할 역할','contacts'],['근거 메모','evidence']].map(([label,key])=>task[key]?readBlock(label,task[key]):null).filter(Boolean));
-  for(const source of doc.sourceFiles.filter(s=>task.sourceRefs.includes(s.id)))item.append(note(`근거: ${source.name}${source.pdf?` · PDF ${source.pdf.pageCount}쪽은 JSON에서 열람`:' · 원본 모양 미포함, 추출문은 JSON에서 확인'}`));
+  for(const source of doc.sourceFiles.filter(s=>task.sourceRefs.includes(s.id))){if(source.pdf){const wanted=task.sourcePages?.find(link=>link.sourceId===source.id)?.pages;for(const [index,page] of (selection.evidencePages||[]).entries())if(page.sourceId===source.id&&(!wanted||wanted.includes(page.pageNumber)))item.append(el('p',{},el('a',{href:`#print-evidence-${index}`},`근거 쪽: ${source.name} · 원문 ${page.pageNumber}쪽`)));}else item.append(note(`근거: ${source.name} · 원본 모양 미포함, 추출문은 JSON에서 확인`));}
   if(task.verifiedAt)item.append(note('최종 확인일 '+task.verifiedAt));sheet.append(item);
  });
- sheet.append(el('h2',{},'지금 이어받을 건 · 확인 기록'));
+ if(cases.length)sheet.append(el('h2',{},'지금 이어받을 건 · 확인 기록'));
  cases.forEach(item=>sheet.append(el('article',{class:'print-item'},el('h3',{},item.title||'이름 없는 기록'),note(caseStateLabel(item)+' · 기한 '+(item.dueDate||'미확정')),legacyCaseNote(item),readBlock('다음 행동',item.nextAction||'확인 필요'),item.waitingFor?readBlock('회신 대기',item.waitingFor):null,item.notes?readBlock('진행 메모',item.notes):null)));
+ if(tasks.length===doc.tasks.length&&cases.length===doc.cases.length){if(doc.onboarding.dayOne)sheet.append(readBlock('첫날 안내',doc.onboarding.dayOne));if(doc.onboarding.firstWeek)sheet.append(readBlock('첫 주 안내',doc.onboarding.firstWeek));}
+ (selection.evidencePages||[]).forEach((page,index)=>{const source=doc.sourceFiles.find(s=>s.id===page.sourceId);sheet.append(el('figure',{class:'print-evidence',id:`print-evidence-${index}`},el('figcaption',{},`근거 쪽: ${source.name} · 원문 ${page.pageNumber}쪽`,el('p',{},'연결된 안내: '+[...tasks,...cases].filter(item=>item.sourceRefs.includes(source.id)&&(!item.sourcePages?.find(link=>link.sourceId===source.id)||item.sourcePages.find(link=>link.sourceId===source.id).pages.includes(page.pageNumber))).map(item=>item.title).join(' · '))),el('img',{src:`data:image/png;base64,${page.data}`,width:page.width,height:page.height,alt:`${source.name} 원문 ${page.pageNumber}쪽 — 표와 사진을 포함한 원문 이미지`})));});
  sheet.append(note('설명 읽음과 실제 진행건 완료는 다릅니다. 출력본을 고쳐도 전달 JSON에 자동 반영되지 않습니다.'));return sheet;
 }
 

@@ -46,9 +46,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/@xmldom/xmldom/lib/conventions.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/conventions.js
 var require_conventions = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
     "use strict";
     function find(list, predicate, ac) {
       if (ac === void 0) {
@@ -255,9 +255,9 @@ var require_conventions = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/errors.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/errors.js
 var require_errors = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/errors.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/errors.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     function extendError(constructor, writableName) {
@@ -414,9 +414,9 @@ var require_errors = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/grammar.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/grammar.js
 var require_grammar = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/grammar.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/grammar.js"(exports) {
     "use strict";
     function detectUnicodeSupport(RegExpImpl) {
       try {
@@ -621,9 +621,9 @@ var require_grammar = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/dom.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/dom.js
 var require_dom = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var find = conventions.find;
@@ -650,11 +650,11 @@ var require_dom = __commonJS({
     function splitOnASCIIWhitespace(input) {
       return input ? input.split(/[\t\n\f\r ]+/).filter(notEmptyString) : [];
     }
-    function orderedSetReducer(current3, element2) {
-      if (!hasOwn(current3, element2)) {
-        current3[element2] = true;
+    function orderedSetReducer(current4, element2) {
+      if (!hasOwn(current4, element2)) {
+        current4[element2] = true;
       }
-      return current3;
+      return current4;
     }
     function toOrderedSet(input) {
       if (!input) return [];
@@ -3288,9 +3288,9 @@ var require_dom = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/entities.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/entities.js
 var require_entities = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/entities.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/entities.js"(exports) {
     "use strict";
     var freeze = require_conventions().freeze;
     exports.XML_ENTITIES = freeze({
@@ -5431,9 +5431,9 @@ var require_entities = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/sax.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/sax.js
 var require_sax = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/sax.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/sax.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var g = require_grammar();
@@ -6019,34 +6019,34 @@ var require_sax = __commonJS({
             p.skip(1);
             return internalSubset;
           }
-          var current3 = null;
+          var current4 = null;
           if (p.char() === "<" && p.char(1) === "!") {
             switch (p.char(2)) {
               case "E":
                 if (p.char(3) === "L") {
-                  current3 = p.getMatch(g.elementdecl);
+                  current4 = p.getMatch(g.elementdecl);
                 } else if (p.char(3) === "N") {
-                  current3 = p.getMatch(g.EntityDecl);
+                  current4 = p.getMatch(g.EntityDecl);
                 }
                 break;
               case "A":
-                current3 = p.getMatch(g.AttlistDecl);
+                current4 = p.getMatch(g.AttlistDecl);
                 break;
               case "N":
-                current3 = p.getMatch(g.NotationDecl);
+                current4 = p.getMatch(g.NotationDecl);
                 break;
               case "-":
-                current3 = p.getMatch(g.Comment);
+                current4 = p.getMatch(g.Comment);
                 break;
             }
           } else if (p.char() === "<" && p.char(1) === "?") {
-            current3 = parsePI(p, errorHandler);
+            current4 = parsePI(p, errorHandler);
           } else if (p.char() === "%") {
-            current3 = p.getMatch(g.PEReference);
+            current4 = p.getMatch(g.PEReference);
           } else {
             return errorHandler.fatalError("Error detected in Markup declaration");
           }
-          if (!current3) {
+          if (!current4) {
             return errorHandler.fatalError("Error in internal subset at position " + p.getIndex());
           }
         }
@@ -6213,9 +6213,9 @@ var require_sax = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/dom-parser.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/dom-parser.js
 var require_dom_parser = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/dom-parser.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/dom-parser.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var dom = require_dom();
@@ -6481,9 +6481,9 @@ var require_dom_parser = __commonJS({
   }
 });
 
-// node_modules/@xmldom/xmldom/lib/index.js
+// ../handover-review/node_modules/@xmldom/xmldom/lib/index.js
 var require_lib = __commonJS({
-  "node_modules/@xmldom/xmldom/lib/index.js"(exports) {
+  "../handover-review/node_modules/@xmldom/xmldom/lib/index.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     exports.assign = conventions.assign;
@@ -6525,7 +6525,7 @@ var require_lib = __commonJS({
   }
 });
 
-// node_modules/pdfjs-dist/legacy/build/pdf.mjs
+// ../handover-review/node_modules/pdfjs-dist/legacy/build/pdf.mjs
 var pdf_exports = {};
 __export(pdf_exports, {
   AbortException: () => AbortException,
@@ -8239,7 +8239,7 @@ function percentage(value) {
 }
 var __webpack_modules__, __webpack_module_cache__, a_callable_namespaceFn, a_possible_prototype_namespaceFn, a_set_namespaceFn, a_string_namespaceFn, a_weak_key_namespaceFn, a_weak_map_namespaceFn, add_to_unscopables_namespaceFn, an_instance_namespaceFn, an_object_or_undefined_namespaceFn, an_object_namespaceFn, an_uint8_array_namespaceFn, array_buffer_basic_detection_namespaceFn, array_buffer_byte_length_namespaceFn, array_buffer_is_detached_namespaceFn, array_buffer_not_detached_namespaceFn, array_buffer_view_core_namespaceFn, array_from_constructor_and_list_namespaceFn, array_includes_namespaceFn, array_set_length_namespaceFn, array_slice_namespaceFn, base64_map_namespaceFn, call_with_safe_iteration_closing_namespaceFn, classof_raw_namespaceFn, classof_namespaceFn, copy_constructor_properties_namespaceFn, correct_prototype_getter_namespaceFn, create_iter_result_object_namespaceFn, create_non_enumerable_property_namespaceFn, create_property_descriptor_namespaceFn, create_property_namespaceFn, define_built_in_accessor_namespaceFn, define_built_in_namespaceFn, define_built_ins_namespaceFn, define_global_property_namespaceFn, descriptors_namespaceFn, document_create_element_namespaceFn, does_not_exceed_safe_integer_namespaceFn, dom_exception_constants_namespaceFn, enum_bug_keys_namespaceFn, environment_user_agent_namespaceFn, environment_v8_version_namespaceFn, error_stack_clear_namespaceFn, export_namespaceFn, fails_namespaceFn, function_apply_namespaceFn, function_bind_context_namespaceFn, function_bind_native_namespaceFn, function_call_namespaceFn, function_name_namespaceFn, function_uncurry_this_accessor_namespaceFn, function_uncurry_this_clause_namespaceFn, function_uncurry_this_namespaceFn, get_alphabet_option_namespaceFn, get_built_in_namespaceFn, get_iterator_direct_namespaceFn, get_iterator_flattenable_namespaceFn, get_iterator_internal_namespaceFn, get_iterator_method_internal_namespaceFn, get_method_namespaceFn, get_set_record_namespaceFn, global_this_namespaceFn, has_own_property_namespaceFn, hidden_keys_namespaceFn, html_namespaceFn, ie8_dom_define_namespaceFn, indexed_object_namespaceFn, inherit_if_required_namespaceFn, inspect_source_namespaceFn, internal_state_namespaceFn, is_array_iterator_method_namespaceFn, is_array_namespaceFn, is_big_int_array_namespaceFn, is_callable_namespaceFn, is_forced_namespaceFn, is_null_or_undefined_namespaceFn, is_object_namespaceFn, is_possible_prototype_namespaceFn, is_pure_namespaceFn, is_raw_json_namespaceFn, is_symbol_namespaceFn, iterate_simple_namespaceFn, iterate_namespaceFn, iterator_cleanup_state_namespaceFn, iterator_close_all_namespaceFn, iterator_close_namespaceFn, iterator_create_proxy_namespaceFn, iterator_helper_throws_on_invalid_iterator_namespaceFn, iterator_helper_without_closing_on_early_error_namespaceFn, iterators_core_namespaceFn, iterators_namespaceFn, length_of_array_like_namespaceFn, make_built_in_namespaceFn, map_helpers_namespaceFn, native_raw_json_namespaceFn, new_promise_capability_namespaceFn, normalize_string_argument_namespaceFn, not_a_nan_namespaceFn, object_create_namespaceFn, object_define_properties_namespaceFn, object_define_property_namespaceFn, object_get_own_property_descriptor_namespaceFn, object_get_own_property_names_namespaceFn, object_get_own_property_symbols_namespaceFn, object_get_prototype_of_namespaceFn, object_is_prototype_of_namespaceFn, object_keys_internal_namespaceFn, object_keys_namespaceFn, object_property_is_enumerable_namespaceFn, object_set_prototype_of_namespaceFn, ordinary_to_primitive_namespaceFn, own_keys_namespaceFn, parse_json_string_namespaceFn, perform_namespaceFn, promise_resolve_namespaceFn, require_object_coercible_namespaceFn, set_clone_namespaceFn, set_difference_namespaceFn, set_helpers_namespaceFn, set_intersection_namespaceFn, set_is_disjoint_from_namespaceFn, set_is_subset_of_namespaceFn, set_is_superset_of_namespaceFn, set_iterate_namespaceFn, set_method_accept_set_like_namespaceFn, set_method_get_keys_before_cloning_detection_namespaceFn, set_size_namespaceFn, set_symmetric_difference_namespaceFn, set_union_namespaceFn, shared_key_namespaceFn, shared_store_namespaceFn, shared_namespaceFn, symbol_constructor_detection_namespaceFn, this_number_value_namespaceFn, to_absolute_index_namespaceFn, to_big_int_namespaceFn, to_indexed_object_namespaceFn, to_integer_or_infinity_namespaceFn, to_length_namespaceFn, to_object_namespaceFn, to_positive_integer_namespaceFn, to_primitive_namespaceFn, to_property_key_namespaceFn, to_string_tag_support_namespaceFn, to_string_namespaceFn, try_to_string_namespaceFn, uid_namespaceFn, uint8_from_base64_namespaceFn, uint8_from_hex_namespaceFn, url_constructor_detection_namespaceFn, use_symbol_as_uid_namespaceFn, v8_prototype_define_bug_namespaceFn, validate_arguments_length_namespaceFn, weak_map_basic_detection_namespaceFn, weak_map_helpers_namespaceFn, well_known_symbol_namespaceFn, es_array_includes_namespaceFn, es_array_push_namespaceFn, es_iterator_constructor_namespaceFn, es_iterator_drop_namespaceFn, es_iterator_every_namespaceFn, es_iterator_filter_namespaceFn, es_iterator_find_namespaceFn, es_iterator_flat_map_namespaceFn, es_iterator_for_each_namespaceFn, es_iterator_map_namespaceFn, es_iterator_some_namespaceFn, es_iterator_take_namespaceFn, es_iterator_to_array_namespaceFn, es_json_parse_namespaceFn, es_json_stringify_namespaceFn, es_map_get_or_insert_computed_namespaceFn, es_map_get_or_insert_namespaceFn, es_math_sum_precise_namespaceFn, es_promise_try_namespaceFn, es_set_difference_v2_namespaceFn, es_set_intersection_v2_namespaceFn, es_set_is_disjoint_from_v2_namespaceFn, es_set_is_subset_of_v2_namespaceFn, es_set_is_superset_of_v2_namespaceFn, es_set_symmetric_difference_v2_namespaceFn, es_set_union_v2_namespaceFn, es_typed_array_with_namespaceFn, es_uint8_array_from_base64_namespaceFn, es_uint8_array_set_from_base64_namespaceFn, es_uint8_array_set_from_hex_namespaceFn, es_uint8_array_to_base64_namespaceFn, es_uint8_array_to_hex_namespaceFn, es_weak_map_get_or_insert_computed_namespaceFn, es_weak_map_get_or_insert_namespaceFn, web_dom_exception_stack_namespaceFn, web_url_parse_namespaceFn, isNodeJS, BBOX_INIT, F32_BBOX_INIT, FONT_IDENTITY_MATRIX, SVG_NS, RenderingIntentFlag, AnnotationMode, AnnotationPrefix, AnnotationEditorPrefix, AnnotationEditorType, AnnotationEditorParamsType, PermissionFlag, TextRenderingMode, ImageKind, AnnotationType, AnnotationBorderStyleType, VerbosityLevel, OPS, DrawOPS, PasswordResponses, verbosity, BaseException, PasswordException, UnknownErrorException, InvalidPDFException, ResponseException, FormatError, AbortException, FeatureTest, Util, NormalizeRegex, NormalizationMap, makeArr, makeMap, makeObj, makeSet, PageViewport, XfaText, disallowedRichTextStyleRegExp, disallowedEventHandlerAttrRegExp, XfaLayer, PixelsPerInch, RenderingCancelledException, StatTimer, PDFDateString, OutputScale, SupportedImageMimeTypes, ColorScheme, CSSConstants, contrastCache, EditorToolbar, FloatingToolbar, INTERNAL_EVT, internalOpt, CurrentPointers, IdManager, ImageManager, CommandManager, KeyboardManager, ColorManager, AnnotationEditorUIManager, AltText, Comment, MIN_TOUCH_SPAN, TouchManager, AnnotationEditor, FakeEditor, SEED, MASK_HIGH, MASK_LOW, MurmurHash3_64, SerializableEmpty, AnnotationStorage, PrintAnnotationStorage, FORCED_DEPENDENCY_LABEL, canvas_dependency_tracker_floor, ceil, EMPTY_BBOX, BBoxReader, ensureDebugMetadata, CanvasBBoxTracker, CanvasDependencyTracker, CanvasNestedDependencyTracker, Dependencies, CanvasImagesTracker, CONTROL_CHAR_REGEXP, FontLoader, FontFaceObject, CSS_FONT_INFO, SYSTEM_FONT_INFO, FONT_INFO, PATTERN_INFO, InfoUtils, CssFontInfo, SystemFontInfo, FontInfo, PatternInfo, FontPathInfo, isRefProxy, isNameProxy, isValidExplicitDest, LoopbackPort, CallbackKind, StreamKind, MessageHandler, BaseBinaryDataFactory, DOMBinaryDataFactory, BaseCanvasFactory, DOMCanvasFactory, BaseFilterFactory, DOMFilterFactory, NodeFilterFactory, NodeCanvasFactory, NodeBinaryDataFactory, MESH_WGSL, WebGPU, _webGPU, PathType, BaseShadingPattern, RadialAxialShadingPattern, MeshShadingPattern, DummyShadingPattern, PaintType, TilingPattern, MIN_FONT_SIZE, MAX_FONT_SIZE, EXECUTION_TIME, EXECUTION_STEPS, FULL_CHUNK_HEIGHT, XY, CanvasExtraState, TransferMapsFallback, LINE_CAP_STYLES, LINE_JOIN_STYLES, NORMAL_CLIP, EO_CLIP, CanvasGraphics, BasePDFStream, BasePDFStreamReader, BasePDFStreamRangeReader, PDFFetchStream, PDFFetchStreamReader, PDFFetchStreamRangeReader, PDFDataTransportStream, PDFDataTransportStreamReader, PDFDataTransportStreamRangeReader, OK_RESPONSE, PARTIAL_CONTENT_RESPONSE, PDFNetworkStream, PDFNetworkStreamReader, PDFNetworkStreamRangeReader, PDFNodeStream, PDFNodeStreamReader, PDFNodeStreamRangeReader, GlobalWorkerOptions, Metadata, INTERNAL, OptionalContentGroup, OptionalContentConfig, PagesMapper, INITIAL_DATA, dataObj, PDFObjects, MAX_TEXT_DIVS_TO_RENDER, DEFAULT_FONT_SIZE, TextLayer, RENDERING_CANCELLED_TIMEOUT, PDFDocumentLoadingTask, PDFDataRangeTransport, PDFDocumentProxy, PDFPageProxy, PDFWorker, WorkerTransport, RenderTask, InternalRenderTask, api_version, build, ColorPicker, BasicColorPicker, ColorConverters, BaseSVGFactory, DOMSVGFactory, annotation_layer_DEFAULT_FONT_SIZE, GetElementsByNameSet, TIMEZONE_OFFSET, AnnotationElementFactory, AnnotationElement, EditorAnnotationElement, LinkAnnotationElement, TextAnnotationElement, WidgetAnnotationElement, TextWidgetAnnotationElement, SignatureWidgetAnnotationElement, CheckboxWidgetAnnotationElement, RadioButtonWidgetAnnotationElement, PushButtonWidgetAnnotationElement, ChoiceWidgetAnnotationElement, PopupAnnotationElement, PopupElement, FreeTextAnnotationElement, LineAnnotationElement, SquareAnnotationElement, CircleAnnotationElement, PolylineAnnotationElement, PolygonAnnotationElement, CaretAnnotationElement, InkAnnotationElement, HighlightAnnotationElement, UnderlineAnnotationElement, SquigglyAnnotationElement, StrikeOutAnnotationElement, StampAnnotationElement, FileAttachmentAnnotationElement, MediaAnnotationElement, AnnotationLayer, EOL_PATTERN, FreeTextEditor, DrawingOptions, DrawingEditor, Outline, FreeDrawOutliner, FreeDrawOutline, HighlightOutliner, HighlightOutline, FreeHighlightOutliner, FreeHighlightDrawer, FreeHighlightOutline, HighlightDrawingOptions, HighlightEditor, InkDrawOutliner, InkDrawOutline, InkDrawingOptions, InkEditor, ContourDrawOutline, BASE_HEADER_LENGTH, POINTS_PROPERTIES_NUMBER, SignatureExtractor, SignatureOptions, DrawnSignatureOptions, SignatureEditor, StampEditor, AnnotationEditorLayer, DrawLayer, TextLayerImages;
 var init_pdf = __esm({
-  "node_modules/pdfjs-dist/legacy/build/pdf.mjs"() {
+  "../handover-review/node_modules/pdfjs-dist/legacy/build/pdf.mjs"() {
     __webpack_modules__ = {
       /***/
       463(module) {
@@ -9319,12 +9319,12 @@ var init_pdf = __esm({
       };
     });
     global_this_namespaceFn = /* @__PURE__ */ __webpack_require__.cw(function(module, exports) {
-      var check6 = function(it) {
+      var check7 = function(it) {
         return it && it.Math === Math && it;
       };
       module.exports = // eslint-disable-next-line es/no-global-this -- safe
-      check6(typeof globalThis == "object" && globalThis) || check6(typeof window == "object" && window) || // eslint-disable-next-line no-restricted-globals -- safe
-      check6(typeof self == "object" && self) || check6(typeof global == "object" && global) || check6(typeof this == "object" && this) || // eslint-disable-next-line no-new-func -- fallback
+      check7(typeof globalThis == "object" && globalThis) || check7(typeof window == "object" && window) || // eslint-disable-next-line no-restricted-globals -- safe
+      check7(typeof self == "object" && self) || check7(typeof global == "object" && global) || check7(typeof this == "object" && this) || // eslint-disable-next-line no-new-func -- fallback
       /* @__PURE__ */ (function() {
         return this;
       })() || Function("return this")();
@@ -10018,12 +10018,12 @@ var init_pdf = __esm({
         P = toPropertyKey2(P);
         anObject(Attributes2);
         if (typeof O === "function" && P === "prototype" && "value" in Attributes2 && WRITABLE in Attributes2 && !Attributes2[WRITABLE]) {
-          var current3 = $getOwnPropertyDescriptor(O, P);
-          if (current3 && current3[WRITABLE]) {
+          var current4 = $getOwnPropertyDescriptor(O, P);
+          if (current4 && current4[WRITABLE]) {
             O[P] = Attributes2.value;
             Attributes2 = {
-              configurable: CONFIGURABLE in Attributes2 ? Attributes2[CONFIGURABLE] : current3[CONFIGURABLE],
-              enumerable: ENUMERABLE in Attributes2 ? Attributes2[ENUMERABLE] : current3[ENUMERABLE],
+              configurable: CONFIGURABLE in Attributes2 ? Attributes2[CONFIGURABLE] : current4[CONFIGURABLE],
+              enumerable: ENUMERABLE in Attributes2 ? Attributes2[ENUMERABLE] : current4[ENUMERABLE],
               writable: false
             };
           }
@@ -21795,11 +21795,11 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
         }
         const {
           ctx,
-          current: current3
+          current: current4
         } = graphics;
-        current3.patternFill = current3.patternStroke = false;
-        ctx.fillStyle = ctx.strokeStyle = current3.transferMapsFallback?.applyToColor(color) ?? color;
-        current3.fillColor = current3.strokeColor = color;
+        current4.patternFill = current4.patternStroke = false;
+        ctx.fillStyle = ctx.strokeStyle = current4.transferMapsFallback?.applyToColor(color) ?? color;
+        current4.fillColor = current4.strokeColor = color;
       }
       isModifyingCurrentTransform() {
         return false;
@@ -23089,19 +23089,19 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
       setFont(opIdx, fontRefName, size2) {
         this.dependencyTracker?.recordSimpleData("font", opIdx).recordSimpleDataFromNamed("fontObj", fontRefName, opIdx);
         const fontObj = this.commonObjs.get(fontRefName);
-        const current3 = this.current;
+        const current4 = this.current;
         if (!fontObj) {
           throw new Error(`Can't find font for ${fontRefName}`);
         }
-        current3.fontMatrix = fontObj.fontMatrix || FONT_IDENTITY_MATRIX;
-        if (current3.fontMatrix[0] === 0 || current3.fontMatrix[3] === 0) {
+        current4.fontMatrix = fontObj.fontMatrix || FONT_IDENTITY_MATRIX;
+        if (current4.fontMatrix[0] === 0 || current4.fontMatrix[3] === 0) {
           warn("Invalid font matrix for font " + fontRefName);
         }
         if (size2 < 0) {
           size2 = -size2;
-          current3.fontDirection = -1;
+          current4.fontDirection = -1;
         } else {
-          current3.fontDirection = 1;
+          current4.fontDirection = 1;
         }
         this.current.font = fontObj;
         this.current.fontSize = size2;
@@ -23141,12 +23141,12 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
       setTextMatrix(opIdx, matrix) {
         this.dependencyTracker?.resetIncrementalData("sameLineText").recordSimpleData("textMatrix", opIdx);
         const {
-          current: current3
+          current: current4
         } = this;
-        current3.textMatrix = matrix;
-        current3.textMatrixScale = Math.hypot(matrix[0], matrix[1]);
-        current3.x = current3.lineX = 0;
-        current3.y = current3.lineY = 0;
+        current4.textMatrix = matrix;
+        current4.textMatrixScale = Math.hypot(matrix[0], matrix[1]);
+        current4.x = current4.lineX = 0;
+        current4.y = current4.lineY = 0;
       }
       nextLine(opIdx) {
         this.moveText(opIdx, 0, this.current.leading);
@@ -23159,14 +23159,14 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
       }
       paintChar(opIdx, character, x2, y, patternFillTransform, patternStrokeTransform) {
         const ctx = this.ctx;
-        const current3 = this.current;
-        const font = current3.font;
-        const textRenderingMode = current3.textRenderingMode;
-        const fontSize = current3.fontSize / current3.fontSizeScale;
+        const current4 = this.current;
+        const font = current4.font;
+        const textRenderingMode = current4.textRenderingMode;
+        const fontSize = current4.fontSize / current4.fontSizeScale;
         const fillStrokeMode = textRenderingMode & TextRenderingMode.FILL_STROKE_MASK;
         const isAddToPathSet = !!(textRenderingMode & TextRenderingMode.ADD_TO_PATH_FLAG);
-        const patternFill = current3.patternFill && !font.missingFile;
-        const patternStroke = current3.patternStroke && !font.missingFile;
+        const patternFill = current4.patternFill && !font.missingFile;
+        const patternStroke = current4.patternStroke && !font.missingFile;
         let path;
         if ((font.disableFontFace || isAddToPathSet || patternFill || patternStroke) && !font.missingFile) {
           path = font.getPathGenerator(this.commonObjs, character);
@@ -23255,48 +23255,48 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
             this.dependencyTracker.recordFutureForcedDependency("textClip", opIdx).inheritPendingDependenciesAsFutureForcedDependencies();
           }
         }
-        const current3 = this.current;
-        const font = current3.font;
+        const current4 = this.current;
+        const font = current4.font;
         if (font.isType3Font) {
-          const started2 = this.#beginKnockoutElement(current3.fillAlpha);
+          const started2 = this.#beginKnockoutElement(current4.fillAlpha);
           this.showType3Text(opIdx, glyphs);
           this.dependencyTracker?.recordShowTextOperation(opIdx);
           this.#endKnockoutElement(started2);
           return;
         }
-        const fontSize = current3.fontSize;
+        const fontSize = current4.fontSize;
         if (fontSize === 0) {
           this.dependencyTracker?.recordOperation(opIdx);
           return;
         }
-        const started = this.#beginKnockoutElement(current3.fillAlpha);
+        const started = this.#beginKnockoutElement(current4.fillAlpha);
         const ctx = this.ctx;
-        const fontSizeScale = current3.fontSizeScale;
-        const charSpacing = current3.charSpacing;
-        const wordSpacing = current3.wordSpacing;
-        const fontDirection = current3.fontDirection;
-        const textHScale = current3.textHScale * fontDirection;
+        const fontSizeScale = current4.fontSizeScale;
+        const charSpacing = current4.charSpacing;
+        const wordSpacing = current4.wordSpacing;
+        const fontDirection = current4.fontDirection;
+        const textHScale = current4.textHScale * fontDirection;
         const glyphsLength = glyphs.length;
         const vertical = font.vertical;
         const spacingDir = vertical ? 1 : -1;
-        const widthAdvanceScale = fontSize * current3.fontMatrix[0];
-        const simpleFillText = current3.textRenderingMode === TextRenderingMode.FILL && !font.disableFontFace && !current3.patternFill;
+        const widthAdvanceScale = fontSize * current4.fontMatrix[0];
+        const simpleFillText = current4.textRenderingMode === TextRenderingMode.FILL && !font.disableFontFace && !current4.patternFill;
         ctx.save();
-        if (current3.textMatrix) {
-          ctx.transform(...current3.textMatrix);
+        if (current4.textMatrix) {
+          ctx.transform(...current4.textMatrix);
         }
-        ctx.translate(current3.x, current3.y + current3.textRise);
+        ctx.translate(current4.x, current4.y + current4.textRise);
         if (fontDirection > 0) {
           ctx.scale(textHScale, -1);
         } else {
           ctx.scale(textHScale, 1);
         }
         let patternFillTransform, patternStrokeTransform;
-        const fillStrokeMode = current3.textRenderingMode & TextRenderingMode.FILL_STROKE_MASK;
+        const fillStrokeMode = current4.textRenderingMode & TextRenderingMode.FILL_STROKE_MASK;
         const needsFill = fillStrokeMode === TextRenderingMode.FILL || fillStrokeMode === TextRenderingMode.FILL_STROKE;
         const needsStroke = fillStrokeMode === TextRenderingMode.STROKE || fillStrokeMode === TextRenderingMode.FILL_STROKE;
-        let lineWidth = current3.lineWidth;
-        const scale = current3.textMatrixScale;
+        let lineWidth = current4.lineWidth;
+        const scale = current4.textMatrixScale;
         if (scale === 0 || lineWidth === 0) {
           if (needsStroke) {
             lineWidth = this.getSinglePixelWidth();
@@ -23309,16 +23309,16 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           lineWidth /= fontSizeScale;
         }
         ctx.lineWidth = lineWidth;
-        if (needsFill && current3.patternFill) {
+        if (needsFill && current4.patternFill) {
           ctx.save();
-          const pattern = current3.fillColor.getPattern(ctx, this, getCurrentTransformInverse(ctx), PathType.FILL, opIdx);
+          const pattern = current4.fillColor.getPattern(ctx, this, getCurrentTransformInverse(ctx), PathType.FILL, opIdx);
           patternFillTransform = getCurrentTransform(ctx);
           ctx.restore();
           ctx.fillStyle = pattern;
         }
-        if (needsStroke && current3.patternStroke) {
+        if (needsStroke && current4.patternStroke) {
           ctx.save();
-          const pattern = current3.strokeColor.getPattern(ctx, this, getCurrentTransformInverse(ctx), PathType.STROKE, opIdx);
+          const pattern = current4.strokeColor.getPattern(ctx, this, getCurrentTransformInverse(ctx), PathType.STROKE, opIdx);
           patternStrokeTransform = getCurrentTransform(ctx);
           ctx.restore();
           ctx.strokeStyle = pattern;
@@ -23336,7 +23336,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
             const measure = ctx.measureText(joinedChars);
             this.dependencyTracker.recordBBox(opIdx, this.ctx, -measure.actualBoundingBoxLeft, measure.actualBoundingBoxRight, -measure.actualBoundingBoxAscent, measure.actualBoundingBoxDescent).recordShowTextOperation(opIdx);
           }
-          current3.x += width * widthAdvanceScale * textHScale;
+          current4.x += width * widthAdvanceScale * textHScale;
           ctx.restore();
           this.compose();
           this.#endKnockoutElement(started);
@@ -23402,9 +23402,9 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           }
         }
         if (vertical) {
-          current3.y -= x2;
+          current4.y -= x2;
         } else {
-          current3.x += x2 * textHScale;
+          current4.x += x2 * textHScale;
         }
         ctx.restore();
         this.compose();
@@ -23413,27 +23413,27 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
       }
       showType3Text(opIdx, glyphs) {
         const ctx = this.ctx;
-        const current3 = this.current;
-        const font = current3.font;
-        const fontSize = current3.fontSize;
-        const fontDirection = current3.fontDirection;
+        const current4 = this.current;
+        const font = current4.font;
+        const fontSize = current4.fontSize;
+        const fontDirection = current4.fontDirection;
         const spacingDir = font.vertical ? 1 : -1;
-        const charSpacing = current3.charSpacing;
-        const wordSpacing = current3.wordSpacing;
-        const textHScale = current3.textHScale * fontDirection;
-        const fontMatrix = current3.fontMatrix || FONT_IDENTITY_MATRIX;
+        const charSpacing = current4.charSpacing;
+        const wordSpacing = current4.wordSpacing;
+        const textHScale = current4.textHScale * fontDirection;
+        const fontMatrix = current4.fontMatrix || FONT_IDENTITY_MATRIX;
         const glyphsLength = glyphs.length;
-        const isTextInvisible = current3.textRenderingMode === TextRenderingMode.INVISIBLE;
+        const isTextInvisible = current4.textRenderingMode === TextRenderingMode.INVISIBLE;
         let i2, glyph, width, spacingLength;
         if (isTextInvisible || fontSize === 0) {
           return;
         }
         this._cachedScaleForStroking[0] = -1;
         ctx.save();
-        if (current3.textMatrix) {
-          ctx.transform(...current3.textMatrix);
+        if (current4.textMatrix) {
+          ctx.transform(...current4.textMatrix);
         }
-        ctx.translate(current3.x, current3.y + current3.textRise);
+        ctx.translate(current4.x, current4.y + current4.textRise);
         ctx.scale(textHScale, fontDirection);
         const dependencyTracker = this.dependencyTracker;
         this.dependencyTracker = dependencyTracker ? new CanvasNestedDependencyTracker(dependencyTracker, opIdx) : null;
@@ -23442,7 +23442,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           if (typeof glyph === "number") {
             spacingLength = spacingDir * glyph * fontSize / 1e3;
             this.ctx.translate(spacingLength, 0);
-            current3.x += spacingLength * textHScale;
+            current4.x += spacingLength * textHScale;
             continue;
           }
           const spacing = (glyph.isSpace ? wordSpacing : 0) + charSpacing;
@@ -23452,7 +23452,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           } else if (this.contentVisible) {
             this.save();
             if (operatorList.fnArray[0] === OPS.setCharWidth) {
-              current3.fillAlpha = current3.strokeAlpha = 1;
+              current4.fillAlpha = current4.strokeAlpha = 1;
               ctx.globalAlpha = 1;
             }
             ctx.scale(fontSize, fontSize);
@@ -23464,7 +23464,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           Util.applyTransform(p, fontMatrix);
           width = p[0] * fontSize + spacing;
           ctx.translate(width, 0);
-          current3.x += width * textHScale;
+          current4.x += width * textHScale;
         }
         ctx.restore();
         if (dependencyTracker) {
@@ -38595,7 +38595,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   }
 });
 
-// node_modules/fflate/esm/browser.js
+// ../handover-review/node_modules/fflate/esm/browser.js
 var u8 = Uint8Array;
 var u16 = Uint16Array;
 var i32 = Int32Array;
@@ -39406,7 +39406,7 @@ var LIMITS = Object.freeze({
   rangeDays: 3660,
   offsetDays: 36600
 });
-var CURRENT_SCHEMA_VERSION = 3;
+var CURRENT_SCHEMA_VERSION = 4;
 var PDF_LIMITS = Object.freeze({ bytes: 10 * 1024 * 1024, pages: 200 });
 var BAD_KEYS = /* @__PURE__ */ new Set(["__proto__", "prototype", "constructor"]);
 var BAD_CONTROLS2 = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/u;
@@ -39554,23 +39554,23 @@ function createDocument(overrides = {}) {
   };
 }
 function inspectPdfEvidence(pdf) {
-  const check6 = (condition, message) => {
+  const check7 = (condition, message) => {
     if (!condition) throw new Error(message);
   };
-  check6(isRecord(pdf) && [Object.prototype, null].includes(Object.getPrototypeOf(pdf)), "PDF \uADFC\uAC70 \uAC1D\uCCB4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.");
+  check7(isRecord(pdf) && [Object.prototype, null].includes(Object.getPrototypeOf(pdf)), "PDF \uADFC\uAC70 \uAC1D\uCCB4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.");
   const descriptors = Object.getOwnPropertyDescriptors(pdf);
-  check6(Reflect.ownKeys(descriptors).length === 2 && ["data", "pageCount"].every((key) => descriptors[key]?.enumerable && owns(descriptors[key], "value")), "PDF \uADFC\uAC70\uC5D0\uB294 data\uC640 pageCount\uB9CC \uC800\uC7A5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+  check7(Reflect.ownKeys(descriptors).length === 2 && ["data", "pageCount"].every((key) => descriptors[key]?.enumerable && owns(descriptors[key], "value")), "PDF \uADFC\uAC70\uC5D0\uB294 data\uC640 pageCount\uB9CC \uC800\uC7A5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
   const { data, pageCount } = pdf;
-  check6(Number.isInteger(pageCount) && pageCount >= 1 && pageCount <= PDF_LIMITS.pages, "PDF\uB294 1~200\uCABD\uAE4C\uC9C0 \uC9C0\uC6D0\uD569\uB2C8\uB2E4.");
-  check6(typeof data === "string" && data.length >= 12 && data.length % 4 === 0 && data.length <= 4 * Math.ceil(PDF_LIMITS.bytes / 3), "PDF base64\uB294 \uBE44\uC5B4 \uC788\uC9C0 \uC54A\uC740 10 MiB \uC774\uB0B4 \uB370\uC774\uD130\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+  check7(Number.isInteger(pageCount) && pageCount >= 1 && pageCount <= PDF_LIMITS.pages, "PDF\uB294 1~200\uCABD\uAE4C\uC9C0 \uC9C0\uC6D0\uD569\uB2C8\uB2E4.");
+  check7(typeof data === "string" && data.length >= 12 && data.length % 4 === 0 && data.length <= 4 * Math.ceil(PDF_LIMITS.bytes / 3), "PDF base64\uB294 \uBE44\uC5B4 \uC788\uC9C0 \uC54A\uC740 10 MiB \uC774\uB0B4 \uB370\uC774\uD130\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
   const bytes = data.length / 4 * 3 - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
-  check6(bytes <= PDF_LIMITS.bytes, "PDF \uD55C \uD30C\uC77C\uC740 10 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+  check7(bytes <= PDF_LIMITS.bytes, "PDF \uD55C \uD30C\uC77C\uC740 10 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  check6(
+  check7(
     /^[A-Za-z0-9+/]*={0,2}$/u.test(data) && (!data.endsWith("==") || (alphabet.indexOf(data.at(-3)) & 15) === 0) && (!data.endsWith("=") || data.endsWith("==") || (alphabet.indexOf(data.at(-2)) & 3) === 0),
     "PDF\uB294 data URL\xB7\uACF5\uBC31\uC774 \uC5C6\uB294 \uC815\uADDC base64 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."
   );
-  check6(atob(data.slice(0, 12)).startsWith("%PDF-"), "\uC815\uC0C1\uC801\uC778 PDF \uD5E4\uB354\uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
+  check7(atob(data.slice(0, 12)).startsWith("%PDF-"), "\uC815\uC0C1\uC801\uC778 PDF \uD5E4\uB354\uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
   return { bytes, pageCount };
 }
 function inspectJSON(value, addError) {
@@ -39637,9 +39637,9 @@ function inspectJSON(value, addError) {
     }
     if (depth === 0 && !array2) {
       const version = Object.getOwnPropertyDescriptor(node, "schemaVersion")?.value;
-      if (version === 2 || version === 3) {
+      if ([2, 3, 4].includes(version)) {
         maximumString = 4 * Math.ceil(IMAGE_LIMITS.imageBytes / 3);
-        pdfStringAllowed = version === 3;
+        pdfStringAllowed = version === 3 || version === 4;
         graphBudget = LIMITS.imageJsonBytes;
         graphVersion = version;
       }
@@ -39699,8 +39699,9 @@ function validateDocument(value) {
   inspectJSON(value, error);
   if (errors.length) return { ok: false, errors, warnings };
   const version = value?.schemaVersion;
-  const hasImages = version === 2 || version === 3;
-  const hasReviewFields = version === 3;
+  const hasImages = [2, 3, 4].includes(version);
+  const hasReviewFields = version === 3 || version === 4;
+  const hasSourcePages = version === 4;
   const jsonBudget = hasImages ? LIMITS.imageJsonBytes : LIMITS.jsonBytes;
   if (encoder.encode(JSON.stringify(value, null, 2)).byteLength > jsonBudget) {
     error(`v${hasImages ? version : 1} JSON \uBB38\uC11C\uB294 UTF-8 \uAE30\uC900 ${hasImages ? 24 : 5} MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.`);
@@ -39759,6 +39760,35 @@ function validateDocument(value) {
       refs.push({ reference, path: `${path}[${index}]` });
     });
   };
+  const sourcePages = (item, path) => {
+    if (!owns(item, "sourcePages")) return;
+    if (!list(item.sourcePages, path, LIMITS.references)) return;
+    const seenSources = /* @__PURE__ */ new Set();
+    item.sourcePages.forEach((entry, index) => {
+      const entryPath = `${path}[${index}]`;
+      if (!object(entry, entryPath, ["sourceId", "pages"])) return;
+      if (string(entry.sourceId, `${entryPath}.sourceId`, LIMITS.id, true)) {
+        if (seenSources.has(entry.sourceId)) error(`${entryPath}.sourceId: \uAC19\uC740 \uCD9C\uCC98\uC758 \uCABD \uAD00\uACC4\uAC00 \uC911\uBCF5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`);
+        seenSources.add(entry.sourceId);
+        if (!Array.isArray(item.sourceRefs) || !item.sourceRefs.includes(entry.sourceId)) {
+          error(`${entryPath}.sourceId: \uC774 \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uC758 sourceRefs\uC5D0 \uC5F0\uACB0\uB41C \uCD9C\uCC98\uC5EC\uC57C \uD569\uB2C8\uB2E4.`);
+        }
+      }
+      const source = Array.isArray(value.sourceFiles) ? value.sourceFiles.find((source2) => source2?.id === entry.sourceId) : void 0;
+      if (!source?.pdf || source.format !== "pdf") error(`${entryPath}.sourceId: \uCABD\uC744 \uC9C0\uC815\uD560 \uC218 \uC788\uB294 PDF \uCD9C\uCC98\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.`);
+      if (!list(entry.pages, `${entryPath}.pages`, PDF_LIMITS.pages)) return;
+      if (!entry.pages.length) error(`${entryPath}.pages: \uD568\uAED8 \uD655\uC778\uD560 \uC6D0\uBB38 \uCABD\uC744 \uD558\uB098 \uC774\uC0C1 \uC9C0\uC815\uD574 \uC8FC\uC138\uC694.`);
+      const seenPages = /* @__PURE__ */ new Set();
+      entry.pages.forEach((page, pageIndex) => {
+        const pagePath = `${entryPath}.pages[${pageIndex}]`;
+        if (!Number.isInteger(page) || page < 1 || page > PDF_LIMITS.pages || source?.pdf && page > source.pdf.pageCount) {
+          error(`${pagePath}: PDF\uC758 \uC2E4\uC81C \uCABD\uC218 \uBC94\uC704 \uC548\uC758 \uC815\uC218\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.`);
+        }
+        if (seenPages.has(page)) error(`${pagePath}: \uAC19\uC740 \uC6D0\uBB38 \uCABD\uC774 \uC911\uBCF5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`);
+        seenPages.add(page);
+      });
+    });
+  };
   const title = (node, path) => {
     if (string(node, path, LIMITS.title) && !nonblank(node)) warning(`${path}: \uC81C\uBAA9\uC744 \uC791\uC131\uD574 \uC8FC\uC138\uC694.`);
   };
@@ -39776,8 +39806,8 @@ function validateDocument(value) {
     for (const key of ["trigger", "startRule"]) if (owns(node, key)) string(node[key], `${path}.${key}`);
   };
   if (!object(value, "$", DOCUMENT_KEYS, DOCUMENT_KEYS.filter((key) => !["provenance", "groups"].includes(key)))) return { ok: false, errors, warnings };
-  if (![1, 2, 3].includes(version)) {
-    error("$.schemaVersion: \uC9C0\uC6D0\uD558\uB294 \uC2A4\uD0A4\uB9C8 \uBC84\uC804\uC740 \uC22B\uC790 1, 2, 3\uC785\uB2C8\uB2E4. \uC774 \uD30C\uC77C\uC740 \uCD5C\uC2E0 \uC778\uC218\uC778\uACC4 A to Z\uC5D0\uC11C \uC5F4\uC5B4 \uC8FC\uC138\uC694.");
+  if (![1, 2, 3, 4].includes(version)) {
+    error("$.schemaVersion: \uC9C0\uC6D0\uD558\uB294 \uC2A4\uD0A4\uB9C8 \uBC84\uC804\uC740 \uC22B\uC790 1, 2, 3, 4\uC785\uB2C8\uB2E4. \uC774 \uD30C\uC77C\uC740 \uCD5C\uC2E0 \uC778\uC218\uC778\uACC4 A to Z\uC5D0\uC11C \uC5F4\uC5B4 \uC8FC\uC138\uC694.");
     return { ok: false, errors, warnings };
   }
   let imageCount = 0, imageBytes = 0, imageBudgetExceeded = false;
@@ -39826,7 +39856,7 @@ function validateDocument(value) {
   });
   if (list(value.tasks, "$.tasks", LIMITS.tasks)) value.tasks.forEach((task, index) => {
     const path = `$.tasks[${index}]`;
-    const taskKeys = hasReviewFields ? TASK_KEYS : LEGACY_TASK_KEYS;
+    const taskKeys = hasSourcePages ? [...TASK_KEYS, "sourcePages"] : hasReviewFields ? TASK_KEYS : LEGACY_TASK_KEYS;
     if (!object(task, path, hasImages ? [...taskKeys, "images"] : taskKeys, LEGACY_TASK_KEYS.filter((key) => !OPTIONAL_TASK_KEYS.includes(key)))) return;
     id(task.id, `${path}.id`);
     title(task.title, `${path}.title`);
@@ -39843,6 +39873,7 @@ function validateDocument(value) {
     }
     ["accessChecked", "firstDay", "firstWeek"].forEach((key) => boolean(task[key], `${path}.${key}`));
     sourceRefs(task.sourceRefs, `${path}.sourceRefs`);
+    if (hasSourcePages) sourcePages(task, `${path}.sourcePages`);
     if (hasImages && owns(task, "images") && list(task.images, `${path}.images`, IMAGE_LIMITS.perTask)) {
       task.images.forEach((image, imageIndex) => {
         const imagePath = `${path}.images[${imageIndex}]`;
@@ -39859,7 +39890,7 @@ function validateDocument(value) {
   });
   if (list(value.cases, "$.cases", LIMITS.cases)) value.cases.forEach((item, index) => {
     const path = `$.cases[${index}]`;
-    if (!object(item, path, hasReviewFields ? CASE_KEYS : LEGACY_CASE_KEYS, LEGACY_CASE_KEYS)) return;
+    if (!object(item, path, hasSourcePages ? [...CASE_KEYS, "sourcePages"] : hasReviewFields ? CASE_KEYS : LEGACY_CASE_KEYS, LEGACY_CASE_KEYS)) return;
     id(item.id, `${path}.id`);
     title(item.title, `${path}.title`);
     if (!STATUSES.has(item.status) || !hasReviewFields && item.status === "unknown") error(`${path}.status: v${version}\uC5D0\uC11C \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uC9C4\uD589 \uC0C1\uD0DC\uC785\uB2C8\uB2E4.`);
@@ -39870,6 +39901,7 @@ function validateDocument(value) {
     ["nextAction", "waitingFor", "notes"].forEach((key) => string(item[key], `${path}.${key}`));
     civil(item.dueDate, `${path}.dueDate`);
     sourceRefs(item.sourceRefs, `${path}.sourceRefs`);
+    if (hasSourcePages) sourcePages(item, `${path}.sourcePages`);
   });
   const sourceIds = /* @__PURE__ */ new Set();
   if (list(value.sourceFiles, "$.sourceFiles", LIMITS.sources)) value.sourceFiles.forEach((source, index) => {
@@ -39937,9 +39969,9 @@ function rejectDuplicateJSONKeys(text) {
 }
 function parseImport(text) {
   if (typeof text !== "string") throw new TypeError("JSON \uD14D\uC2A4\uD2B8\uB97C \uC804\uB2EC\uD574 \uC8FC\uC138\uC694.");
-  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON \uD30C\uC77C\uC740 UTF-8 \uAE30\uC900 v1 5 MiB, v2/v3 24 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON \uD30C\uC77C\uC740 UTF-8 \uAE30\uC900 v1 5 MiB, v2/v3/v4 24 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
   const rawBytes = encoder.encode(text).byteLength;
-  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON \uD30C\uC77C\uC740 UTF-8 \uAE30\uC900 v1 5 MiB, v2/v3 24 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON \uD30C\uC77C\uC740 UTF-8 \uAE30\uC900 v1 5 MiB, v2/v3/v4 24 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
   let document2;
   try {
     rejectDuplicateJSONKeys(text);
@@ -39948,7 +39980,7 @@ function parseImport(text) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new Error("\uC62C\uBC14\uB978 JSON \uBB38\uC11C\uAC00 \uC544\uB2D9\uB2C8\uB2E4. \uD30C\uC77C\uC758 \uBB38\uBC95\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
   }
-  if (isRecord(document2) && owns(document2, "schemaVersion") && ![1, 2, 3].includes(document2.schemaVersion)) {
+  if (isRecord(document2) && owns(document2, "schemaVersion") && ![1, 2, 3, 4].includes(document2.schemaVersion)) {
     throw new Error("\uC774 \uD30C\uC77C\uC740 \uCD5C\uC2E0 \uC778\uC218\uC778\uACC4 A to Z\uC5D0\uC11C \uC5F4\uC5B4 \uC8FC\uC138\uC694. \uD604\uC7AC \uB0B4\uC6A9\uC740 \uBC14\uB00C\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.");
   }
   if (document2?.schemaVersion === 1 && rawBytes > LIMITS.jsonBytes) throw new Error("v1 JSON \uD30C\uC77C\uC740 UTF-8 \uAE30\uC900 5 MiB \uC774\uD558\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
@@ -39987,6 +40019,7 @@ function importAsCopy(document2) {
     sourceRefs: item.sourceRefs.map((reference) => map.get(reference)),
     ...owns(item, "groupId") ? { groupId: item.groupId === "" ? "" : map.get(item.groupId) } : {},
     ...owns(item, "taskId") ? { taskId: item.taskId === "" ? "" : map.get(item.taskId) } : {},
+    ...owns(item, "sourcePages") ? { sourcePages: item.sourcePages.map((entry) => ({ sourceId: map.get(entry.sourceId), pages: [...entry.pages] })) } : {},
     ...owns(item, "images") ? { images: item.images.map((image) => ({ ...image, id: fresh(image.id) })) } : {}
   });
   const tasks = source.tasks.map(remap);
@@ -40057,7 +40090,7 @@ function dueInRange(task, startISO, endISO) {
   if (timing.cadence === "yearly" && timing.day > monthDays(2e3, timing.month)) return unresolved("\uD574\uB2F9 \uC6D4\uC5D0\uB294 \uC9C0\uC815\uD55C \uB0A0\uC9DC\uAC00 \uC874\uC7AC\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
   const dates = [];
   for (let day = first2; day <= last; day++) {
-    const current3 = fromOrdinal(day);
+    const current4 = fromOrdinal(day);
     let matches2 = false;
     switch (timing.cadence) {
       case "daily":
@@ -40067,19 +40100,19 @@ function dueInRange(task, startISO, endISO) {
         matches2 = day % 7 + 1 === timing.weekday;
         break;
       case "monthly":
-        matches2 = current3.day === (dayRule === "monthEnd" ? monthDays(current3.year, current3.month) : timing.day);
+        matches2 = current4.day === (dayRule === "monthEnd" ? monthDays(current4.year, current4.month) : timing.day);
         break;
       case "quarterly":
-        matches2 = current3.day === timing.day && (current3.month - timing.month + 12) % 3 === 0;
+        matches2 = current4.day === timing.day && (current4.month - timing.month + 12) % 3 === 0;
         break;
       case "halfyear":
-        matches2 = current3.day === timing.day && (current3.month - timing.month + 12) % 6 === 0;
+        matches2 = current4.day === timing.day && (current4.month - timing.month + 12) % 6 === 0;
         break;
       case "yearly":
-        matches2 = current3.day === timing.day && current3.month === timing.month;
+        matches2 = current4.day === timing.day && current4.month === timing.month;
         break;
     }
-    if (matches2) dates.push(civilString(current3));
+    if (matches2) dates.push(civilString(current4));
   }
   return resolved(dates);
 }
@@ -40277,11 +40310,14 @@ function exampleDocument(todayISO = dateISO()) {
 }
 
 // src/storage.js
-var DATA_KEY = "handover.az.documents.v3";
+var DATA_KEY = "handover.az.documents.v4";
+var PREVIOUS_DATA_KEY = "handover.az.documents.v3";
 var LEGACY_DATA_KEY = "handover.az.documents.v1";
-var MIGRATION_KEY = "handover.az.migration.v3";
+var MIGRATION_KEY = "handover.az.migration.v4";
+var PREVIOUS_MIGRATION_KEY = "handover.az.migration.v3";
 var PROGRESS_KEY = "handover.az.progress.v1";
-var CURRENT_KEY = "handover.az.current.v3";
+var CURRENT_KEY = "handover.az.current.v4";
+var PREVIOUS_CURRENT_KEY = "handover.az.current.v3";
 var LEGACY_CURRENT_KEY = "handover.az.current.v1";
 function loadDocuments(storage2) {
   const raw = storage2.getItem(DATA_KEY);
@@ -40661,10 +40697,10 @@ function children(node) {
 function* walk(node, skip = () => false) {
   const stack = [node];
   while (stack.length) {
-    const current3 = stack.pop();
-    if (current3.nodeType !== 1 || skip(current3)) continue;
-    yield current3;
-    const nodes = children(current3);
+    const current4 = stack.pop();
+    if (current4.nodeType !== 1 || skip(current4)) continue;
+    yield current4;
+    const nodes = children(current4);
     for (let i2 = nodes.length - 1; i2 >= 0; i2--) stack.push(nodes[i2]);
   }
 }
@@ -40979,7 +41015,7 @@ async function extractDocument(file) {
   return { format: format2, blocks: state2.blocks, warnings: [...state2.warnings] };
 }
 
-// node_modules/docx/dist/index.mjs
+// ../handover-review/node_modules/docx/dist/index.mjs
 var __create2 = Object.create;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -45647,7 +45683,7 @@ var fillFields = (tree, elements, open, filling, within = "counted", inTextBox =
     const element2 = elements[index];
     const name = tree.nameOf(element2);
     if (name === void 0) continue;
-    const current3 = open[open.length - 1];
+    const current4 = open[open.length - 1];
     if (name === "w:fldChar") {
       const type = tree.attributeOf(element2, "w:fldCharType");
       if (type === "begin") open.push({
@@ -45655,21 +45691,21 @@ var fillFields = (tree, elements, open, filling, within = "counted", inTextBox =
         instruction: "",
         inResult: false
       });
-      else if (type === "separate" && current3) {
-        tree.writeClean(current3.begin, current3.instruction);
-        current3.inResult = true;
-        current3.result = filling.resultOf(current3.instruction, {
+      else if (type === "separate" && current4) {
+        tree.writeClean(current4.begin, current4.instruction);
+        current4.inResult = true;
+        current4.result = filling.resultOf(current4.instruction, {
           within,
           enclosing: open.slice(0, -1).map((field3) => field3.instruction),
           inTextBox
         });
-        if (current3.result !== void 0) {
-          elements.splice(index + 1, 0, tree.textElement(current3.result));
+        if (current4.result !== void 0) {
+          elements.splice(index + 1, 0, tree.textElement(current4.result));
           index++;
         }
       } else if (type === "end") open.pop();
-    } else if (name === "w:instrText" && current3 && !current3.inResult) current3.instruction += tree.textOf(element2);
-    else if ((name === "w:t" || name === "w:tab" || name === "w:br" || name === "w:cr") && (current3 === null || current3 === void 0 ? void 0 : current3.result) !== void 0) {
+    } else if (name === "w:instrText" && current4 && !current4.inResult) current4.instruction += tree.textOf(element2);
+    else if ((name === "w:t" || name === "w:tab" || name === "w:br" || name === "w:cr") && (current4 === null || current4 === void 0 ? void 0 : current4.result) !== void 0) {
       elements.splice(index, 1);
       index--;
     } else if (name === "w:fldSimple") {
@@ -55328,11 +55364,11 @@ var require__stream_writable = /* @__PURE__ */ __commonJSMin(((exports, module) 
     this.corkedRequestsFree = new CorkedRequest(this);
   }
   WritableState.prototype.getBuffer = function getBuffer() {
-    var current3 = this.bufferedRequest;
+    var current4 = this.bufferedRequest;
     var out = [];
-    while (current3) {
-      out.push(current3);
-      current3 = current3.next;
+    while (current4) {
+      out.push(current4);
+      current4 = current4.next;
     }
     return out;
   };
@@ -62613,7 +62649,7 @@ function distinctInstructions(task) {
 }
 function taskReadiness(task) {
   if (firstActionText(task)) return "\uCCAB \uD589\uB3D9 \uC548\uB0B4 \uC788\uC74C";
-  if ((task?.method || task?.steps || "").trim()) return "\uBCF8\uBB38\uC5D0\uC11C \uC2DC\uC791 \uD655\uC778";
+  if (distinctInstructions(task).length) return "\uBCF8\uBB38 \uC548\uB0B4 \uC788\uC74C";
   return task?.sourceRefs?.length ? "\uC6D0\uBB38\uC73C\uB85C \uBCF4\uAE30" : "\uC77D\uAE30 \uD655\uC778 \uD544\uC694";
 }
 
@@ -62668,6 +62704,84 @@ function checkedInput(document2, options) {
     cases: select2(document2.cases, options.caseIds),
     partial: options.taskIds !== void 0 || options.caseIds !== void 0
   };
+}
+function checkedEvidencePages(document2, tasks, cases, value = []) {
+  if (!Array.isArray(value) || value.length > 20) throw new Error("\uD568\uAED8 \uC804\uB2EC\uD560 \uADFC\uAC70 \uCABD\uC740 20\uCABD \uC774\uB0B4\uB85C \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
+  const used = new Set([...tasks, ...cases].flatMap((item) => item.sourceRefs));
+  const sources = document2.sourceFiles.filter((source) => used.has(source.id) && source.pdf);
+  const pages = [];
+  let totalBytes = 0;
+  for (const page of value) {
+    if (!page || typeof page !== "object") throw new Error("\uADFC\uAC70 \uCABD \uC815\uBCF4\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+    const source = sources.find((item) => item.id === page.sourceId);
+    if (!source) throw new Error("\uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB41C PDF \uCABD\uB9CC \uD568\uAED8 \uC804\uB2EC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+    if (!Number.isInteger(page.pageNumber) || page.pageNumber < 1 || page.pageNumber > source.pdf.pageCount) {
+      throw new Error(`${source.name}: \uC6D0\uBB38 \uCABD \uBC88\uD638\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.`);
+    }
+    const bytes = decodeBase64(page.data);
+    const details = inspectImageBytes(bytes);
+    if (details.mime !== "image/png" || details.width !== page.width || details.height !== page.height) {
+      throw new Error("\uADFC\uAC70 \uCABD\uC758 PNG \uC774\uBBF8\uC9C0\uC640 \uC800\uC7A5\uB41C \uD06C\uAE30\uAC00 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    }
+    const duplicate = pages.find((item) => item.sourceId === page.sourceId && item.pageNumber === page.pageNumber);
+    if (duplicate) {
+      if (duplicate.data !== page.data) throw new Error("\uAC19\uC740 \uC6D0\uBB38 \uCABD\uC758 \uC774\uBBF8\uC9C0\uAC00 \uC11C\uB85C \uB2E4\uB985\uB2C8\uB2E4. \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      continue;
+    }
+    totalBytes += bytes.length;
+    if (totalBytes > 32 * 1024 * 1024) throw new Error("\uADFC\uAC70 \uCABD \uC774\uBBF8\uC9C0 \uD569\uACC4\uAC00 32 MiB\uB97C \uB118\uC2B5\uB2C8\uB2E4. \uD544\uC694\uD55C \uCABD\uC744 \uB098\uB204\uC5B4 \uCD9C\uB825\uD574 \uC8FC\uC138\uC694.");
+    pages.push({ ...page, source, bytes, anchor: `handover_evidence_${pages.length + 1}` });
+  }
+  for (const source of sources) {
+    const included = pages.filter((page) => page.sourceId === source.id).map((page) => page.pageNumber);
+    if (!included.length) {
+      throw new Error(`${source.name}: \uD568\uAED8 \uC804\uB2EC\uD560 \uADFC\uAC70 \uCABD\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694. \uD544\uC694\uD55C \uD45C\xB7\uC0AC\uC9C4\uC774 \uBE60\uC9C4 \uBB38\uC11C\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.`);
+    }
+    for (const item of [...tasks, ...cases].filter((item2) => item2.sourceRefs.includes(source.id))) {
+      const saved2 = item.sourcePages?.find((reference) => reference.sourceId === source.id);
+      const required = saved2?.pages || (source.pdf.pageCount === 1 ? [1] : []);
+      if (required.some((pageNumber) => !included.includes(pageNumber))) {
+        throw new Error(`${item.title}: \uC5F0\uACB0\uD55C \uADFC\uAC70 \uCABD\uC774 \uBE60\uC838 \uBB38\uC11C\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. ${source.name}\uC758 ${required.join(", ")}\uCABD\uC744 \uD568\uAED8 \uC804\uB2EC\uD574 \uC8FC\uC138\uC694.`);
+      }
+    }
+  }
+  return pages;
+}
+function refersToPage(item, page) {
+  if (!item.sourceRefs.includes(page.sourceId)) return false;
+  const saved2 = item.sourcePages?.find((reference) => reference.sourceId === page.sourceId);
+  return saved2 ? saved2.pages.includes(page.pageNumber) : page.source.pdf.pageCount === 1 ? page.pageNumber === 1 : true;
+}
+function evidenceLinks(children2, item, pages) {
+  for (const page of pages.filter((page2) => refersToPage(item, page2))) {
+    children2.push(linkedParagraph(`\uADFC\uAC70 \uCABD: ${page.source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`, page.anchor));
+  }
+}
+function addEvidencePages(children2, pages, tasks, numbers) {
+  if (!pages.length) return;
+  children2.push(heading("\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD"));
+  pages.forEach((page, index) => {
+    children2.push(bookmarkedHeading(`${index + 1}. ${page.source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD / \uCD1D ${page.source.pdf.pageCount}\uCABD`, page.anchor, HeadingLevel.HEADING_2));
+    const ratio = Math.min(1, IMAGE_WIDTH / page.width, 760 / page.height);
+    children2.push(new Paragraph({
+      spacing: { before: 40, after: 60, line: 240, lineRule: LineRuleType.AUTO },
+      keepNext: true,
+      children: [new ImageRun({
+        type: "png",
+        data: page.bytes,
+        transformation: { width: page.width * ratio, height: page.height * ratio },
+        altText: {
+          name: `evidence_page_${index + 1}`,
+          title: `${page.source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`,
+          description: "\uC120\uD0DD\uD55C \uC6D0\uBB38 \uD398\uC774\uC9C0\uC758 \uD45C\xB7\uC0AC\uC9C4\xB7\uBC30\uCE58\uC785\uB2C8\uB2E4. \uC774 \uC774\uBBF8\uC9C0\uB294 \uAC80\uC0C9\uC6A9 \uD14D\uC2A4\uD2B8\uAC00 \uC544\uB2D9\uB2C8\uB2E4."
+        }
+      })]
+    }));
+    children2.push(paragraph("\uC120\uD0DD\uD55C \uC6D0\uBB38 \uCABD\uC744 \uADF8\uB300\uB85C \uB2F4\uC740 \uC774\uBBF8\uC9C0\uC785\uB2C8\uB2E4. \uD45C\xB7\uC0AC\uC9C4\uACFC \uC2E4\uD589 \uC548\uB0B4\uB97C \uD568\uAED8 \uD655\uC778\uD558\uC138\uC694.", {}, { size: 18, color: "475569" }));
+    for (const task of tasks.filter((task2) => refersToPage(task2, page))) {
+      children2.push(linkedParagraph(`\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30: ${task.title}`, `handover_task_${numbers.get(task.id)}`));
+    }
+  });
 }
 function textRuns(value, properties2 = {}) {
   return String(value).split(/(\r\n|\n|\r|\t)/).map((part) => {
@@ -62863,38 +62977,36 @@ function addImages(children2, task, section) {
     ));
   });
 }
-function addTask(children2, task, index, document2, level = HeadingLevel.HEADING_2) {
+function addTask(children2, task, index, document2, level = HeadingLevel.HEADING_2, evidencePages = []) {
   const start = timingText(task.timing);
-  const firstAction = filled(task.firstAction) ? task.firstAction : "\uD655\uC778 \uD544\uC694: \uBA3C\uC800 \uD560 \uC77C\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.";
+  const firstAction = String(task.firstAction || "").trim();
   const exceptions = filled(task.exceptions) ? task.exceptions : "\uD655\uC778 \uD544\uC694: \uC608\uC678 \uB300\uC751\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.";
   const doneWhen = filled(task.doneWhen) ? task.doneWhen : "\uD655\uC778 \uD544\uC694: \uC644\uB8CC \uAE30\uC900\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.";
-  const core = [start, firstAction, exceptions, doneWhen].join("\n");
-  const shortOpening = core.length <= 600 && core.split(/\r\n|\r|\n/).length <= 12;
   children2.push(bookmarkedHeading(`${index + 1}. ${task.title}`, `handover_task_${index + 1}`, level));
-  field(children2, "\uC5B8\uC81C \uC2DC\uC791\uD558\uB098\uC694", start, shortOpening);
-  field(children2, "\uBA3C\uC800 \uD560 \uC77C", firstAction, shortOpening);
-  field(children2, "\uB9C9\uD788\uAC70\uB098 \uC608\uC678\uAC00 \uC0DD\uAE30\uBA74", exceptions, shortOpening);
-  field(children2, "\uC5B4\uB514\uAE4C\uC9C0 \uD558\uBA74 \uC644\uB8CC\uC778\uAC00\uC694", doneWhen);
+  field(children2, "\uC5B8\uC81C \uC2DC\uC791\uD558\uB098\uC694", start);
+  if (firstAction) field(children2, "\uBA3C\uC800 \uD560 \uC77C", task.firstAction);
   if (filled(task.materials)) field(children2, "\uC2DC\uC791 \uC804\uC5D0 \uC900\uBE44\uD560 \uAC83 \xB7 \uC811\uADFC \uACBD\uB85C", task.materials);
-  const sameProcedure = filled(task.steps) && task.steps === task.method;
+  field(children2, "\uB9C9\uD788\uAC70\uB098 \uC608\uC678\uAC00 \uC0DD\uAE30\uBA74", exceptions);
+  const hasMethodText = String(task.method || "").trim().length > 0;
+  const hasStepsText = String(task.steps || "").trim().length > 0;
+  const sameProcedure = hasStepsText && task.steps === task.method;
   const hasStepsPhotos = task.images?.some((image) => image.section === "steps");
   const hasMethodPhotos = task.images?.some((image) => image.section === "method");
-  if (filled(task.steps) || hasStepsPhotos) {
-    if (filled(task.steps)) field(children2, "\uC9C0\uAE08 \uD560 \uC77C \xB7 \uC218\uD589 \uC808\uCC28", task.steps);
-    else children2.push(paragraph("\uC218\uD589 \uC808\uCC28 \xB7 \uC0AC\uC9C4 \uC548\uB0B4", { keepNext: true }, { bold: true }));
+  if (hasMethodText || hasMethodPhotos) {
+    if (hasMethodText) field(children2, "\uD558\uB294 \uBC29\uBC95 \xB7 \uC2E4\uD589 \uC548\uB0B4", task.method);
+    else children2.push(paragraph("\uD558\uB294 \uBC29\uBC95 \xB7 \uC0AC\uC9C4 \uC548\uB0B4", { keepNext: true }, { bold: true }));
+    addImages(children2, task, "method");
+  }
+  if (!sameProcedure && hasStepsText || hasStepsPhotos) {
+    if (!sameProcedure && hasStepsText) field(children2, hasMethodText ? "\uC9C4\uD589 \uC21C\uC11C \xB7 \uCD94\uAC00 \uC548\uB0B4" : "\uC9C4\uD589 \uC21C\uC11C \xB7 \uC2E4\uD589 \uC548\uB0B4", task.steps);
+    else if (hasStepsPhotos) children2.push(paragraph("\uC9C4\uD589 \uC21C\uC11C \xB7 \uC0AC\uC9C4 \uC548\uB0B4", { keepNext: true }, { bold: true }));
     addImages(children2, task, "steps");
   }
-  if (!sameProcedure && (filled(task.method) || hasMethodPhotos)) {
-    const label = filled(task.steps) ? "\uCC38\uACE0 \uC124\uBA85 \xB7 \uC5B4\uB5A4 \uBC29\uC2DD\uC73C\uB85C \uD558\uB098\uC694" : "\uC9C0\uAE08 \uD560 \uC77C \xB7 \uC5B4\uB5A4 \uBC29\uC2DD\uC73C\uB85C \uD558\uB098\uC694";
-    if (filled(task.method)) field(children2, label, task.method);
-    else children2.push(paragraph(label, { keepNext: true }, { bold: true }));
-    addImages(children2, task, "method");
-  } else if (sameProcedure) {
-    addImages(children2, task, "method");
+  if (!hasStepsText && !hasMethodText && !hasStepsPhotos && !hasMethodPhotos) {
+    field(children2, "\uD558\uB294 \uBC29\uBC95 \xB7 \uC2E4\uD589 \uC548\uB0B4", "\uD655\uC778 \uD544\uC694: \uC2E4\uD589 \uBC29\uBC95\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
   }
-  if (!filled(task.steps) && !filled(task.method) && !hasStepsPhotos && !hasMethodPhotos) {
-    field(children2, "\uC9C0\uAE08 \uD560 \uC77C \xB7 \uC218\uD589 \uC808\uCC28", "\uD655\uC778 \uD544\uC694: \uC2E4\uD589 \uBC29\uBC95\uC774 \uC544\uC9C1 \uC801\uD600 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
-  }
+  evidenceLinks(children2, task, evidencePages);
+  field(children2, "\uC5B4\uB514\uAE4C\uC9C0 \uD558\uBA74 \uC644\uB8CC\uC778\uAC00\uC694", doneWhen);
   if (/\t/.test(`${task.method}${task.steps}`)) {
     children2.push(paragraph("\uD0ED\uC73C\uB85C \uAD6C\uBD84\uD55C \uBCF8\uBB38\uC740 \uC6D0\uB798 \uD45C\uC758 \uC5F4 \uBC30\uCE58\uC640 \uB2E4\uB974\uAC8C \uBCF4\uC77C \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC870\uAC74\uACFC \uB300\uC751\uC758 \uAD00\uACC4\uB294 \uADFC\uAC70 \uC6D0\uBB38\uC744 \uD568\uAED8 \uD655\uC778\uD558\uC138\uC694.", {}, { size: 20, color: "475569" }));
   }
@@ -62916,7 +63028,7 @@ function addTask(children2, task, index, document2, level = HeadingLevel.HEADING
   field(children2, "\uADFC\uAC70 \uCD9C\uCC98", sourceText(task.sourceRefs, document2));
   children2.push(linkedParagraph("\uC5C5\uBB34 \uC9C0\uB3C4\uB85C \uB3CC\uC544\uAC00\uAE30", "handover_map"));
 }
-function addCase(children2, item, index, document2, taskNumbers) {
+function addCase(children2, item, index, document2, taskNumbers, evidencePages = []) {
   children2.push(heading(`${index + 1}. ${item.title}`, HeadingLevel.HEADING_2));
   if (item.taskId) {
     const task = document2.tasks.find((task2) => task2.id === item.taskId);
@@ -62933,6 +63045,7 @@ function addCase(children2, item, index, document2, taskNumbers) {
   if (filled(item.waitingFor)) field(children2, "\uAE30\uB2E4\uB9AC\uB294 \uB300\uC0C1\xB7\uD68C\uC2E0", item.waitingFor);
   if (filled(item.notes)) field(children2, "\uC804\uB2EC \uBA54\uBAA8", item.notes);
   field(children2, "\uADFC\uAC70 \uCD9C\uCC98", sourceText(item.sourceRefs, document2));
+  evidenceLinks(children2, item, evidencePages);
 }
 function taskGroups(document2, tasks, partial) {
   if (!document2.groups?.length) return [{ title: "", tasks }];
@@ -62946,21 +63059,19 @@ function taskGroups(document2, tasks, partial) {
 }
 async function exportDocx(document2, options = {}) {
   const { tasks, cases, partial } = checkedInput(document2, options);
+  const evidencePages = checkedEvidencePages(document2, tasks, cases, options.evidencePages);
   const groups = taskGroups(document2, tasks, partial);
   const numbers = new Map(groups.flatMap((group) => group.tasks).map((task, index) => [task.id, index + 1]));
   const usedSources = new Set([...tasks, ...cases].flatMap((item) => item.sourceRefs));
   const sources = partial ? document2.sourceFiles.filter((source) => usedSources.has(source.id)) : document2.sourceFiles;
-  const hasPDF = sources.some((source) => source.pdf);
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
   const children2 = [
     paragraph("\uC5C5\uBB34 \uC778\uC218\uC778\uACC4\uC11C", { spacing: { after: 100 } }, { size: 22, color: "475569", bold: true }),
     heading(document2.title, HeadingLevel.TITLE),
     paragraph(`\uBB38\uC11C \uC0DD\uC131\uC77C: ${generatedAt} (UTC)`, {}, { size: 18, color: "475569" }),
     paragraph(`\uB0B4\uBCF4\uB0B4\uAE30 \uBC94\uC704: ${partial ? "\uC120\uD0DD \uD56D\uBAA9" : "\uC804\uCCB4 \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74"} \xB7 \uC5C5\uBB34 ${tasks.length}\uAC1C \xB7 \uC9C4\uD589 \uAC74 ${cases.length}\uAC1C`),
-    paragraph(`\uC77D\uB294 \uBC94\uC704: \uC5C5\uBB34 \uC548\uB0B4\uC640 \uC0AC\uC9C4, \uC9C4\uD589 \uAC74, \uCD9C\uCC98 \uC774\uB984\xB7\uD655\uC778 \uACBD\uACE0\uB97C \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC804\uCCB4 \uC6D0\uBB38 \uBC1C\uCDCC\uC640 \uBCF5\uC0AC \uC774\uB825\uC740 \uC774 DOCX\uC5D0 \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBCF4\uC874\uB41C \uC790\uB8CC\uB294 \uC778\uC218\uC778\uACC4 JSON\uC744 \uC5F4\uC5B4 \uD655\uC778\uD558\uC138\uC694.${hasPDF ? " \uADFC\uAC70 PDF\uB3C4 \uC774 DOCX\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uD45C\xB7\uD398\uC774\uC9C0 \uD655\uC778\uC5D0\uB294 JSON\uC758 \uADFC\uAC70 PDF\uB97C \uD568\uAED8 \uC5EC\uC138\uC694." : ""}`, {}, { size: 20, color: "475569" }),
-    paragraph(SECURITY_NOTICE, {}, { size: 20, color: "9A3412" }),
     bookmarkedHeading("\uC5C5\uBB34 \uC9C0\uB3C4 \xB7 \uB0B4 \uC5C5\uBB34 \uD55C\uB208\uC5D0 \uBCF4\uAE30", "handover_map"),
-    paragraph(`${partial ? "\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uD45C\uC2DC" : "\uC804\uCCB4 \uC5C5\uBB34 \uD45C\uC2DC"} \xB7 ${tasks.length}\uAC1C. \uD070 \uC5C5\uBB34 \uC544\uB798\uC5D0\uC11C \uC81C\uBAA9\uC744 \uB204\uB974\uBA74 \uC2E4\uD589 \uC548\uB0B4\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4. \uC778\uC1C4\uBCF8\uC5D0\uC11C\uB294 \uAC19\uC740 \uBC88\uD638\uC640 \uC81C\uBAA9\uC744 \uCC3E\uC73C\uC138\uC694.`)
+    paragraph(`${partial ? "\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uD45C\uC2DC" : "\uC804\uCCB4 \uC5C5\uBB34 \uD45C\uC2DC"} \xB7 ${tasks.length}\uAC1C. \uC81C\uBAA9\uC744 \uB204\uB974\uBA74 \uC2E4\uD589 \uC548\uB0B4\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.`)
   ];
   for (const group of groups) {
     if (group.title) children2.push(heading(`\uD070 \uC5C5\uBB34: ${group.title}`, HeadingLevel.HEADING_2));
@@ -62968,35 +63079,42 @@ async function exportDocx(document2, options = {}) {
     else if (group.title) children2.push(paragraph("\uB4F1\uB85D\uB41C \uC138\uBD80 \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   }
   if (!tasks.length) children2.push(paragraph("\uD45C\uC2DC\uD560 \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
-  children2.push(heading("\uCC98\uC74C \uC2DC\uC791\uD558\uB294 \uC0AC\uB78C\uC744 \uC704\uD55C \uC548\uB0B4"));
-  if (partial) children2.push(paragraph("\uC544\uB798 \uCCAB\uB0A0\xB7\uCCAB \uC8FC \uC548\uB0B4\uB294 \uBB38\uC11C \uC804\uCCB4\uC5D0 \uACF5\uD1B5\uC73C\uB85C \uC791\uC131\uB41C \uB0B4\uC6A9\uC785\uB2C8\uB2E4. \uC120\uD0DD\uD55C \uC5C5\uBB34\uC5D0 \uB9DE\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694."));
-  field(children2, "\uCCAB\uB0A0 \uD655\uC778\uD560 \uC77C", document2.onboarding.dayOne);
-  field(children2, "\uCCAB \uC8FC \uD655\uC778\uD560 \uC77C", document2.onboarding.firstWeek);
-  children2.push(heading("\uD604\uC7AC \uC9C4\uD589 \uAC74 \xB7 \uB2E4\uC74C \uD589\uB3D9"));
-  children2.push(paragraph("\uBC18\uBCF5 \uC5C5\uBB34\uC758 \uC2E4\uD589 \uBC29\uBC95\uACFC \uBCC4\uB3C4\uB85C, \uC9C0\uAE08 \uB118\uACA8\uBC1B\uC744 \uAC74\uC744 \uD655\uC778\uD558\uC138\uC694. \uC0C1\uD0DC \uBBF8\uD655\uC778\uC740 \uC544\uC9C1 \uD604\uC7AC \uC0C1\uD669\uC744 \uD655\uC778\uD558\uC9C0 \uBABB\uD588\uB2E4\uB294 \uB73B\uC785\uB2C8\uB2E4."));
-  cases.forEach((item, index) => addCase(children2, item, index, document2, numbers));
-  if (!cases.length) children2.push(paragraph("\uB0B4\uBCF4\uB0B4\uAE30\uC5D0 \uD3EC\uD568\uB41C \uC9C4\uD589 \uAC74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."));
   children2.push(heading("\uC5C5\uBB34 \uC0C1\uC138 \xB7 \uC2E4\uD589 \uC548\uB0B4"));
   for (const group of groups) {
-    if (group.title) children2.push(heading(`\uD070 \uC5C5\uBB34: ${group.title}`, HeadingLevel.HEADING_2));
+    if (group.title && tasks.length > 1) children2.push(heading(`\uD070 \uC5C5\uBB34: ${group.title}`, HeadingLevel.HEADING_2));
     group.tasks.forEach((task) => addTask(
       children2,
       task,
       numbers.get(task.id) - 1,
       document2,
-      group.title ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2
+      group.title ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2,
+      evidencePages
     ));
     if (group.title && !group.tasks.length) children2.push(paragraph("\uB4F1\uB85D\uB41C \uC138\uBD80 \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   }
   if (!tasks.length) children2.push(paragraph("\uB0B4\uBCF4\uB0B4\uAE30\uC5D0 \uD3EC\uD568\uB41C \uC5C5\uBB34\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
+  if (cases.length) {
+    children2.push(heading("\uD604\uC7AC \uC9C4\uD589 \uAC74 \xB7 \uB2E4\uC74C \uD589\uB3D9"));
+    children2.push(paragraph("\uC5C5\uBB34 \uC124\uBA85\uACFC \uBCC4\uB3C4\uB85C \uC9C0\uAE08 \uC774\uC5B4\uBC1B\uC744 \uAC74\uC785\uB2C8\uB2E4. \uC0C1\uD0DC \uBBF8\uD655\uC778\uC740 \uD604\uC7AC \uC0C1\uD669\uC744 \uC544\uC9C1 \uD655\uC778\uD558\uC9C0 \uBABB\uD588\uB2E4\uB294 \uB73B\uC785\uB2C8\uB2E4."));
+    cases.forEach((item, index) => addCase(children2, item, index, document2, numbers, evidencePages));
+  }
+  if (!partial && (filled(document2.onboarding.dayOne) || filled(document2.onboarding.firstWeek))) {
+    children2.push(heading("\uCC98\uC74C \uC2DC\uC791\uD558\uB294 \uC0AC\uB78C\uC744 \uC704\uD55C \uC548\uB0B4"));
+    if (filled(document2.onboarding.dayOne)) field(children2, "\uCCAB\uB0A0 \uD655\uC778\uD560 \uC77C", document2.onboarding.dayOne);
+    if (filled(document2.onboarding.firstWeek)) field(children2, "\uCCAB \uC8FC \uD655\uC778\uD560 \uC77C", document2.onboarding.firstWeek);
+  }
+  addEvidencePages(children2, evidencePages, tasks, numbers);
   children2.push(heading("\uCD9C\uCC98\uC640 \uD655\uC778 \uC0AC\uD56D"));
+  children2.push(paragraph(`\uC77D\uB294 \uBC94\uC704: \uC5C5\uBB34 \uC548\uB0B4\uC640 \uC0AC\uC9C4, \uC9C4\uD589 \uAC74, \uCD9C\uCC98 \uC774\uB984\xB7\uD655\uC778 \uACBD\uACE0\uB97C \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC804\uCCB4 \uC6D0\uBB38 \uBC1C\uCDCC\uC640 \uBCF5\uC0AC \uC774\uB825\uC740 \uC774 DOCX\uC5D0 \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBCF4\uC874\uB41C \uC790\uB8CC\uB294 \uC778\uC218\uC778\uACC4 JSON\uC744 \uC5F4\uC5B4 \uD655\uC778\uD558\uC138\uC694.${evidencePages.length ? " \uC120\uD0DD\uD55C \uADFC\uAC70 PDF \uCABD\uC740 \u2018\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD\u2019\uC5D0 \uC774\uBBF8\uC9C0\uB85C \uB2F4\uC558\uC2B5\uB2C8\uB2E4. \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uCABD\uACFC \uC6D0\uBCF8 PDF \uD30C\uC77C\uC740 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4." : ""}`, {}, { size: 20, color: "475569" }));
+  children2.push(paragraph(SECURITY_NOTICE, {}, { size: 20, color: "9A3412" }));
   children2.push(paragraph("\uC6D0\uBB38\uC5D0\uC11C \uAC00\uC838\uC628 \uB0B4\uC6A9\uACFC \uC2E4\uC81C \uC5C5\uBB34 \uC808\uCC28\uAC00 \uC77C\uCE58\uD558\uB294\uC9C0 \uC778\uACC4 \uB2F4\uB2F9\uC790\uAC00 \uD655\uC778\uD558\uC138\uC694. \uC6D0\uBB38 \uCD94\uCD9C \uACBD\uACE0\uAC00 \uC788\uC73C\uBA74 \uC6D0\uBCF8 \uD30C\uC77C\uACFC \uB300\uC870\uD558\uC138\uC694. \uBB38\uC11C\uC758 \uD45C\xB7\uC0AC\uC9C4 \uBC30\uCE58\uAC00 \uC2E4\uD589 \uC548\uB0B4\uC640 \uB2E4\uB97C \uC218 \uC788\uC2B5\uB2C8\uB2E4."));
   if (partial) children2.push(paragraph("\uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uC5D0 \uC5F0\uACB0\uB41C \uCD9C\uCC98\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uBC1C\uCDCC\uC5D0\uB294 \uC120\uD0DD\uD558\uC9C0 \uC54A\uC740 \uB0B4\uC6A9\uC774 \uC11E\uC77C \uC218 \uC788\uC5B4 \uC0DD\uB7B5\uD588\uC2B5\uB2C8\uB2E4."));
   if (!sources.length) children2.push(paragraph("\uD3EC\uD568\uB41C \uCD9C\uCC98 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."));
   sources.forEach((source, index) => {
     children2.push(heading(`${index + 1}. ${source.name}`, HeadingLevel.HEADING_2));
     const linked = usedSources.has(source.id);
-    field(children2, "\uC77D\uB294 \uBC94\uC704", source.pdf ? `\uADFC\uAC70 PDF ${source.pdf.pageCount}\uCABD\uC740 \uC774 DOCX\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uADFC\uAC70 PDF\uB294 \uC778\uC218\uC778\uACC4 JSON\uC5D0\uC11C \uC5F4\uB78C\uD558\uC138\uC694.${linked ? "" : " \uC120\uD0DD\uB41C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}` : `\uCD9C\uCC98 \uC774\uB984\uACFC \uD655\uC778 \uACBD\uACE0\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uBCF4\uC874\uB41C \uC6D0\uBB38 \uBC1C\uCDCC\uB294 \uC778\uC218\uC778\uACC4 JSON\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.${linked ? "" : " \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}`);
+    const included = evidencePages.filter((page) => page.sourceId === source.id).map((page) => page.pageNumber).sort((a, b) => a - b);
+    field(children2, "\uC77D\uB294 \uBC94\uC704", source.pdf ? included.length ? `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD \uC911 ${included.join(", ")}\uCABD\uC744 \u2018\uD568\uAED8 \uC804\uB2EC\uD55C \uADFC\uAC70 \uCABD\u2019\uC5D0 \uC774\uBBF8\uC9C0\uB85C \uD3EC\uD568\uD588\uC2B5\uB2C8\uB2E4. \uC6D0\uBCF8 PDF \uD30C\uC77C\uACFC \uB098\uBA38\uC9C0 \uCABD\uC740 \uC778\uC218\uC778\uACC4 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4.` : `\uC6D0\uBB38 \uCD1D ${source.pdf.pageCount}\uCABD\uC778 \uBCF4\uAD00 PDF\uC785\uB2C8\uB2E4. \uC120\uD0DD\uD55C \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544 \uC774 DOCX\uC5D0\uB294 \uD398\uC774\uC9C0\uB97C \uB123\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.` : `\uCD9C\uCC98 \uC774\uB984\uACFC \uD655\uC778 \uACBD\uACE0\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uBCF4\uC874\uB41C \uC6D0\uBB38 \uBC1C\uCDCC\uB294 \uC778\uC218\uC778\uACC4 JSON\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.${linked ? "" : " \uC5C5\uBB34\xB7\uC9C4\uD589 \uAC74\uACFC \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uBCF4\uAD00 \uC790\uB8CC\uC785\uB2C8\uB2E4."}`);
     field(children2, "\uCD94\uCD9C\xB7\uD655\uC778 \uACBD\uACE0", source.warnings.length ? source.warnings.join("\n") : "\uAE30\uB85D\uB41C \uACBD\uACE0 \uC5C6\uC74C \xB7 \uC6D0\uBCF8\uACFC\uC758 \uC77C\uCE58\uAC00 \uBCF4\uC99D\uB41C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4.");
   });
   const file = new File2({
@@ -64001,7 +64119,8 @@ function createPhotoUI({ el: el2, button: button3, field: field3, note: note2, m
 var DATABASE_NAME = "handover.az.documents";
 var DATABASE_VERSION = 1;
 var STORE_NAME = "documents";
-var RECORD_KEY = "current-v3";
+var RECORD_KEY = "current-v4";
+var PREVIOUS_RECORD_KEY = "current-v3";
 var LEGACY_RECORD_KEY = "current";
 var MAX_STORED_BYTES = 64 * 1024 * 1024;
 var LEGACY_MAX_LENGTH = 20 * 1024 * 1024;
@@ -64079,9 +64198,10 @@ function parseDocuments(raw, legacy = false) {
   }
   return documents;
 }
-function parseRecord(record, modern = false) {
+function parseRecord(record, modern = false, newest = modern) {
   if (!record || record.version !== 1 || !(record.raw === null || typeof record.raw === "string") || !(record.legacyRaw === null || typeof record.legacyRaw === "string")) throw invalid();
   if (modern && (typeof record.previousExists !== "boolean" || !(record.previousRaw === null || typeof record.previousRaw === "string") || !(record.fallbackRaw === null || typeof record.fallbackRaw === "string"))) throw invalid();
+  if (newest && (typeof record.priorV3Exists !== "boolean" || !(record.priorV3Raw === null || typeof record.priorV3Raw === "string") || !(record.previousFallbackRaw === null || typeof record.previousFallbackRaw === "string"))) throw invalid();
   return { ...record, documents: parseDocuments(record.raw) };
 }
 function readStorage(storage2, key) {
@@ -64099,13 +64219,14 @@ function readStorage(storage2, key) {
 }
 var readLegacy = (storage2) => readStorage(storage2, LEGACY_DATA_KEY);
 var readFallback = (storage2) => readStorage(storage2, DATA_KEY);
+var readPreviousFallback = (storage2) => readStorage(storage2, PREVIOUS_DATA_KEY);
 async function legacyHash(raw) {
   if (raw === null) return "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b";
   if (!globalThis.crypto?.subtle) throw problem("STORAGE_UNAVAILABLE", "\uC774\uC804 \uC800\uC7A5 \uC6D0\uBCF8\uC758 \uBCC0\uACBD \uC5EC\uBD80\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC5B4 \uC784\uC2DC\uC800\uC7A5\uC744 \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uB85C \uBCF4\uAD00\uD574 \uC8FC\uC138\uC694.");
   const digest = await globalThis.crypto.subtle.digest("SHA-256", encoder4.encode(raw === null ? "null" : `string:${raw}`));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-function parseMigration(raw) {
+function parseMigration(raw, newest = false) {
   if (raw === null) return null;
   let value;
   try {
@@ -64114,6 +64235,7 @@ function parseMigration(raw) {
     throw invalid();
   }
   if (!value || value.version !== 1 || typeof value.legacyHash !== "string" || !/^[0-9a-f]{64}$/.test(value.legacyHash)) throw invalid();
+  if (newest && (typeof value.previousHash !== "string" || !/^[0-9a-f]{64}$/.test(value.previousHash))) throw invalid();
   return value;
 }
 function openDatabase(factory, timeoutMs) {
@@ -64213,22 +64335,26 @@ function transaction(database, mode, timeoutMs, action) {
       }, timeoutMs);
       const store = tx.objectStore(STORE_NAME);
       const previous = store.get(LEGACY_RECORD_KEY);
+      const priorV3 = store.get(PREVIOUS_RECORD_KEY);
       const request = store.get(RECORD_KEY);
       let reads = 0;
       const completeRead = () => {
-        if (settled || failure || ++reads !== 2) return;
+        if (settled || failure || ++reads !== 3) return;
         try {
-          value = action(request.result, store, previous.result);
+          value = action(request.result, store, previous.result, priorV3.result);
         } catch (cause) {
           abort2(cause);
         }
       };
-      request.onsuccess = previous.onsuccess = completeRead;
+      request.onsuccess = previous.onsuccess = priorV3.onsuccess = completeRead;
       request.onerror = () => {
         failure ||= storageProblem(request.error);
       };
       previous.onerror = () => {
         failure ||= storageProblem(previous.error);
+      };
+      priorV3.onerror = () => {
+        failure ||= storageProblem(priorV3.error);
       };
     } catch (cause) {
       finish(storageProblem(cause));
@@ -64246,6 +64372,8 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
   let legacyRaw = null;
   let fallbackRaw = null;
   let fallbackBaselineHash = null;
+  let previousFallbackRaw = null;
+  let previousBaselineHash = null;
   let legacyError = null;
   let baseline;
   const recovery = /* @__PURE__ */ new Map();
@@ -64273,39 +64401,64 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
     return failure;
   }
   function confirmLegacy(expected) {
-    const current3 = readLegacy(storage2);
-    remember2("localStorage", current3);
-    if (current3 !== expected) {
+    const current4 = readLegacy(storage2);
+    remember2("localStorage", current4);
+    if (current4 !== expected) {
       throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uBC84\uC804\uC758 \uB2E4\uB978 \uCC3D\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC0C8 \uC800\uC7A5\uC18C\uC640 \uC774\uC804 \uC800\uC7A5\uC18C\uC758 \uC6D0\uBCF8\uC744 \uBAA8\uB450 \uBC31\uC5C5\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
     }
   }
   function confirmFallback(expected) {
-    const current3 = readFallback(storage2);
-    remember2("localStorage-v3", current3);
-    if (current3 !== expected) throw problem("STORAGE_LEGACY_CHANGED", "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uBCC4\uB3C4 \uAE30\uAE30 \uC800\uC7A5\uC18C\uC758 \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB450 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBC31\uC5C5\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+    const current4 = readFallback(storage2);
+    remember2("localStorage-v4", current4);
+    if (current4 !== expected) throw problem("STORAGE_LEGACY_CHANGED", "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uBCC4\uB3C4 \uAE30\uAE30 \uC800\uC7A5\uC18C\uC758 \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB450 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBC31\uC5C5\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
   }
-  function confirmPrevious(record, previous) {
+  function confirmPreviousFallback(expected) {
+    const current4 = readPreviousFallback(storage2);
+    remember2("localStorage-v3", current4);
+    if (current4 !== expected) throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uBC84\uC804\uC758 \uAC04\uC774 \uC800\uC7A5\uC18C\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774\uC804\xB7\uC0C8 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBAA8\uB450 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+  }
+  function confirmOldRecord(record, previous) {
     remember2("indexedDB-previous", previous?.raw ?? null);
     const unchangedCreation = !record.previousExists && previous?.version === 1 && previous.raw === record.legacyRaw && previous.legacyRaw === record.legacyRaw;
     if (!unchangedCreation && (previous !== void 0 !== record.previousExists || (previous?.raw ?? null) !== record.previousRaw)) {
       throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uBC84\uC804\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774\uC804\xB7\uC0C8 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBAA8\uB450 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uC0C8 \uBB38\uC11C\uB97C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.");
     }
     confirmLegacy(record.legacyRaw);
+  }
+  function confirmPrevious(record, previous, priorV3) {
+    confirmOldRecord(record, previous);
+    remember2("indexedDB-v3", priorV3?.raw ?? null);
+    if (priorV3 !== void 0) {
+      const old = parseRecord(priorV3, true, false);
+      confirmOldRecord(old, previous);
+      confirmPreviousFallback(old.fallbackRaw);
+    }
+    const oldInitialRaw = record.previousFallbackRaw ?? record.previousRaw ?? record.legacyRaw;
+    const unchangedCreation = !record.priorV3Exists && priorV3?.raw === oldInitialRaw;
+    if (!unchangedCreation && (priorV3 !== void 0 !== record.priorV3Exists || (priorV3?.raw ?? null) !== record.priorV3Raw)) {
+      throw problem("STORAGE_LEGACY_CHANGED", "0.3.0 \uBC84\uC804\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774\uC804\xB7\uC0C8 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBAA8\uB450 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+    }
+    confirmPreviousFallback(record.previousFallbackRaw);
     confirmFallback(record.fallbackRaw);
   }
   async function fallbackSnapshot() {
-    const oldRaw = readLegacy(storage2);
-    const raw = readFallback(storage2);
+    const oldRaw = readLegacy(storage2), priorRaw = readPreviousFallback(storage2), raw = readFallback(storage2);
     remember2("localStorage", oldRaw);
-    remember2("localStorage-v3", raw);
-    const documents = parseDocuments(raw ?? oldRaw, true);
-    if (raw !== null) snapshot = { raw, documents };
-    const meta = raw === null ? null : parseMigration(readStorage(storage2, MIGRATION_KEY));
-    const hash = meta ? await legacyHash(oldRaw) : null;
-    if (meta && meta.legacyHash !== hash) throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uBC84\uC804\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774\uC804\xB7\uC0C8 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBAA8\uB450 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+    remember2("localStorage-v3", priorRaw);
+    remember2("localStorage-v4", raw);
+    const documents = parseDocuments(raw ?? priorRaw ?? oldRaw, true);
+    if (raw !== null || priorRaw !== null) snapshot = { raw: raw ?? priorRaw, documents };
+    const meta = raw === null ? null : parseMigration(readStorage(storage2, MIGRATION_KEY), true);
+    const priorMeta = priorRaw === null ? null : parseMigration(readStorage(storage2, PREVIOUS_MIGRATION_KEY));
+    const hash = meta || priorMeta ? await legacyHash(oldRaw) : null;
+    const priorHash = meta ? await legacyHash(priorRaw) : null;
+    if (meta && (meta.legacyHash !== hash || meta.previousHash !== priorHash) || priorMeta && priorMeta.legacyHash !== hash) {
+      throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uBC84\uC804\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774\uC804\xB7\uC0C8 \uC800\uC7A5 \uC6D0\uBCF8\uC744 \uBAA8\uB450 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uB36E\uC5B4\uC4F0\uAE30\uB97C \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+    }
     confirmLegacy(oldRaw);
+    confirmPreviousFallback(priorRaw);
     confirmFallback(raw);
-    return { oldRaw, fallbackRaw: raw, raw: raw ?? oldRaw, documents, hash };
+    return { oldRaw, previousFallbackRaw: priorRaw, fallbackRaw: raw, raw: raw ?? priorRaw ?? oldRaw, documents, hash, priorHash };
   }
   function adopt(raw, documents) {
     snapshot = { raw, documents };
@@ -64348,15 +64501,16 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
         }
         try {
           confirmLegacy(legacyRaw);
+          confirmPreviousFallback(previousFallbackRaw);
           if (readFallback(storage2) !== fallbackRaw || snapshot.raw !== expectedRaw) {
             throw problem("STORAGE_CONFLICT", "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBC14\uB00C\uC5C8\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB0B4\uC6A9\uC744 JSON\uC73C\uB85C \uBC31\uC5C5\uD558\uACE0 \uBCC0\uACBD\uB41C \uC800\uC7A5\uC744 \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.");
           }
-          const migration = JSON.stringify({ version: 1, legacyHash: fallbackBaselineHash });
+          const migration = JSON.stringify({ version: 1, legacyHash: fallbackBaselineHash, previousHash: previousBaselineHash });
           if (readStorage(storage2, MIGRATION_KEY) !== migration) storage2.setItem(MIGRATION_KEY, migration);
           storage2.setItem(DATA_KEY, raw);
           fallbackRaw = raw;
           snapshot = { raw, documents: JSON.parse(raw) };
-          remember2("localStorage-v3", raw);
+          remember2("localStorage-v4", raw);
           failure = null;
           warning = FALLBACK_WARNING;
           return raw;
@@ -64366,19 +64520,20 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
         }
       }
       try {
-        await transaction(database, "readwrite", timeoutMs, (record, store, previous) => {
+        await transaction(database, "readwrite", timeoutMs, (record, store, previous, priorV3) => {
           remember2("indexedDB", record?.raw);
-          const current3 = parseRecord(record, true);
-          confirmPrevious(current3, previous);
-          if (current3.raw !== expectedRaw) {
+          const current4 = parseRecord(record, true);
+          confirmPrevious(current4, previous, priorV3);
+          if (current4.raw !== expectedRaw) {
             throw problem("STORAGE_CONFLICT", "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uBB38\uC11C\uAC00 \uBC14\uB00C\uC5C8\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB0B4\uC6A9\uC744 JSON\uC73C\uB85C \uBC31\uC5C5\uD558\uACE0 \uBCC0\uACBD\uB41C \uC800\uC7A5\uC744 \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.");
           }
-          const { documents: _documents, ...persisted } = current3;
+          const { documents: _documents, ...persisted } = current4;
           store.put({ ...persisted, raw }, RECORD_KEY);
         });
         adopt(raw, JSON.parse(raw));
         assertWritable();
         confirmLegacy(baseline);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         failure = null;
         warning = "";
@@ -64394,9 +64549,12 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
         try {
           const next = await fallbackSnapshot();
           legacyRaw = next.oldRaw;
+          previousFallbackRaw = next.previousFallbackRaw;
           fallbackRaw = next.fallbackRaw;
           fallbackBaselineHash = next.hash ?? await legacyHash(next.oldRaw);
+          previousBaselineHash = next.priorHash ?? await legacyHash(next.previousFallbackRaw);
           confirmLegacy(legacyRaw);
+          confirmPreviousFallback(previousFallbackRaw);
           confirmFallback(fallbackRaw);
           snapshot = { raw: next.raw, documents: next.documents };
           warning = FALLBACK_WARNING;
@@ -64407,16 +64565,18 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
         }
       }
       try {
-        await transaction(database, "readonly", timeoutMs, (record, _store, previous) => {
+        await transaction(database, "readonly", timeoutMs, (record, _store, previous, priorV3) => {
           remember2("indexedDB", record?.raw);
-          const current3 = parseRecord(record, true);
-          adopt(current3.raw, current3.documents);
-          baseline = current3.legacyRaw;
-          fallbackRaw = current3.fallbackRaw;
-          confirmPrevious(current3, previous);
+          const current4 = parseRecord(record, true);
+          adopt(current4.raw, current4.documents);
+          baseline = current4.legacyRaw;
+          fallbackRaw = current4.fallbackRaw;
+          previousFallbackRaw = current4.previousFallbackRaw;
+          confirmPrevious(current4, previous, priorV3);
         });
         assertWritable();
         confirmLegacy(baseline);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         failure = null;
         warning = "";
@@ -64432,14 +64592,17 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
   try {
     const initial = await fallbackSnapshot();
     legacyRaw = initial.oldRaw;
+    previousFallbackRaw = initial.previousFallbackRaw;
     fallbackRaw = initial.fallbackRaw;
     fallbackBaselineHash = initial.hash;
+    previousBaselineHash = initial.priorHash;
     snapshot = { raw: initial.raw, documents: initial.documents };
   } catch (cause) {
     legacyError = cause;
     legacyRaw = recovery.get("localStorage") ?? null;
-    fallbackRaw = recovery.get("localStorage-v3") ?? null;
-    snapshot.raw = fallbackRaw ?? legacyRaw;
+    fallbackRaw = recovery.get("localStorage-v4") ?? null;
+    previousFallbackRaw = recovery.get("localStorage-v3") ?? null;
+    snapshot.raw = fallbackRaw ?? previousFallbackRaw ?? legacyRaw;
   }
   if (indexedDB === void 0) {
     try {
@@ -64454,7 +64617,9 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
     else {
       try {
         fallbackBaselineHash ??= await legacyHash(legacyRaw);
+        previousBaselineHash ??= await legacyHash(previousFallbackRaw);
         confirmLegacy(legacyRaw);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         kind = "localStorage";
         warning = FALLBACK_WARNING;
@@ -64470,27 +64635,41 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
     database.onclose = () => {
       if (!readOnly) stop(problem("STORAGE_CLOSED", `\uAE30\uAE30 \uC800\uC7A5\uC18C \uC5F0\uACB0\uC774 \uC608\uAE30\uCE58 \uC54A\uAC8C \uB2EB\uD614\uC2B5\uB2C8\uB2E4. ${BACKUP_NOTICE}`));
     };
-    await transaction(database, "readwrite", timeoutMs, (record, store, previous) => {
+    await transaction(database, "readwrite", timeoutMs, (record, store, previous, priorV3) => {
       remember2("indexedDB-previous", previous?.raw ?? null);
+      remember2("indexedDB-v3", priorV3?.raw ?? null);
       if (record !== void 0) {
         remember2("indexedDB", record?.raw);
-        const current3 = parseRecord(record, true);
-        adopt(current3.raw, current3.documents);
-        baseline = current3.legacyRaw;
-        fallbackRaw = current3.fallbackRaw;
-        confirmPrevious(current3, previous);
+        const current4 = parseRecord(record, true);
+        adopt(current4.raw, current4.documents);
+        baseline = current4.legacyRaw;
+        fallbackRaw = current4.fallbackRaw;
+        previousFallbackRaw = current4.previousFallbackRaw;
+        confirmPrevious(current4, previous, priorV3);
       } else {
+        if (priorV3 !== void 0 && fallbackRaw === null) {
+          const old = parseRecord(priorV3, true, false);
+          adopt(old.raw, old.documents);
+        }
         if (legacyError) throw legacyError;
         confirmLegacy(legacyRaw);
+        confirmPreviousFallback(previousFallbackRaw);
         confirmFallback(fallbackRaw);
         let raw = snapshot.raw;
-        if (previous !== void 0) {
+        remember2("indexedDB-v3", priorV3?.raw ?? null);
+        if (priorV3 !== void 0) {
+          const old = parseRecord(priorV3, true, false);
+          confirmOldRecord(old, previous);
+          confirmPreviousFallback(old.fallbackRaw);
+          if (fallbackRaw !== null && fallbackRaw !== old.raw) throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uC800\uC7A5\uC18C\uC640 \uC0C8 \uAC04\uC774 \uC800\uC7A5\uC18C\uC5D0 \uC11C\uB85C \uB2E4\uB978 \uBB38\uC11C\uAC00 \uC788\uC2B5\uB2C8\uB2E4. \uB450 \uC6D0\uBCF8\uC744 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uC790\uB3D9\uC73C\uB85C \uD569\uCE58\uAC70\uB098 \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.");
+          raw = fallbackRaw ?? old.raw;
+        } else if (previous !== void 0) {
           const old = parseRecord(previous);
           confirmLegacy(old.legacyRaw);
-          if (fallbackRaw !== null && fallbackRaw !== old.raw && old.raw !== legacyRaw) {
+          if ((fallbackRaw ?? previousFallbackRaw) !== null && (fallbackRaw ?? previousFallbackRaw) !== old.raw && old.raw !== legacyRaw) {
             throw problem("STORAGE_LEGACY_CHANGED", "\uC774\uC804 \uC800\uC7A5\uC18C\uC640 \uC0C8 \uAC04\uC774 \uC800\uC7A5\uC18C\uC5D0 \uC11C\uB85C \uB2E4\uB978 \uBB38\uC11C\uAC00 \uC788\uC2B5\uB2C8\uB2E4. \uB450 \uC6D0\uBCF8\uC744 \uBCF4\uAD00\uD55C \uB4A4 \uD655\uC778\uD574 \uC8FC\uC138\uC694. \uC790\uB3D9\uC73C\uB85C \uD569\uCE58\uAC70\uB098 \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.");
           }
-          raw = fallbackRaw ?? old.raw;
+          raw = fallbackRaw ?? previousFallbackRaw ?? old.raw;
         }
         const documents = parseDocuments(raw);
         adopt(raw, documents);
@@ -64500,14 +64679,18 @@ async function openDocumentStore({ storage: storage2, indexedDB, timeoutMs = 5e3
           raw,
           legacyRaw,
           fallbackRaw,
+          previousFallbackRaw,
           previousExists: previous !== void 0,
-          previousRaw: previous?.raw ?? null
+          previousRaw: previous?.raw ?? null,
+          priorV3Exists: priorV3 !== void 0,
+          priorV3Raw: priorV3?.raw ?? null
         }, RECORD_KEY);
       }
     });
     remember2("indexedDB", snapshot.raw);
     assertWritable();
     confirmLegacy(baseline);
+    confirmPreviousFallback(previousFallbackRaw);
     confirmFallback(fallbackRaw);
     kind = "indexedDB";
     warning = "";
@@ -65516,6 +65699,131 @@ async function createPdfEvidenceViewer(pdf, container, { initialPage = 1, isCurr
   }
 }
 
+// src/output-evidence.js
+var OUTPUT_EVIDENCE_LIMITS = Object.freeze({ pages: 20, pageBytes: 8 * 1024 * 1024, totalBytes: 32 * 1024 * 1024 });
+var check5 = (value, message) => {
+  if (!value) throw new Error(message);
+};
+var current2 = (isCurrent) => {
+  if (!isCurrent()) throw Object.assign(new Error("\uADFC\uAC70 \uCABD \uC900\uBE44\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."), { name: "AbortError" });
+};
+function selectedItems(doc, selection) {
+  check5(doc && Array.isArray(doc.tasks) && Array.isArray(doc.cases) && Array.isArray(doc.sourceFiles), "\uCD9C\uB825\uD560 \uBB38\uC11C\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+  check5(selection && typeof selection === "object" && !Array.isArray(selection), "\uCD9C\uB825\uD560 \uC5C5\uBB34 \uC120\uD0DD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+  const selected = (items, ids) => {
+    if (ids === void 0) return items;
+    check5(Array.isArray(ids) && ids.every((id) => typeof id === "string" && items.some((item) => item.id === id)), "\uCD9C\uB825\uD560 \uC5C5\uBB34 \uB610\uB294 \uC9C4\uD589 \uAC74\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+    const wanted = new Set(ids);
+    return items.filter((item) => wanted.has(item.id));
+  };
+  return [...selected(doc.tasks, selection.taskIds), ...selected(doc.cases, selection.caseIds)];
+}
+function linkedPdfSources(doc, selection = {}) {
+  const refs = new Set(selectedItems(doc, selection).flatMap((item) => item.sourceRefs || []));
+  check5([...refs].every((id) => doc.sourceFiles.some((source) => source.id === id)), "\uC5F0\uACB0\uB41C \uADFC\uAC70 \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4 \uCD9C\uB825\uC744 \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+  return doc.sourceFiles.filter((source) => refs.has(source.id) && source.pdf);
+}
+function storedOutputPages(doc, selection = {}) {
+  const items = selectedItems(doc, selection);
+  const choices = [];
+  for (const source of linkedPdfSources(doc, selection)) {
+    const pages = /* @__PURE__ */ new Set();
+    let complete = true;
+    for (const item of items.filter((item2) => item2.sourceRefs?.includes(source.id))) {
+      const entry = item.sourcePages?.find((link) => link.sourceId === source.id);
+      const chosen = entry?.pages?.length ? entry.pages : source.pdf.pageCount === 1 ? [1] : null;
+      if (!chosen) {
+        complete = false;
+        break;
+      }
+      check5(Array.isArray(chosen) && chosen.every((page) => Number.isInteger(page)), "\uC800\uC7A5\uB41C \uADFC\uAC70 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      for (const page of parseEvidencePages(chosen.join(","), source.pdf.pageCount)) pages.add(page);
+    }
+    if (complete) choices.push([source.id, [...pages].sort((a, b) => a - b).join(", ")]);
+  }
+  return Object.fromEntries(choices);
+}
+function parseEvidencePages(text, pageCount) {
+  check5(Number.isInteger(pageCount) && pageCount >= 1 && pageCount <= 200, "PDF\uC758 \uCABD\uC218\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  check5(typeof text === "string" && text.trim() && text.length <= 2e3, "\uD568\uAED8 \uB123\uC744 \uADFC\uAC70 \uCABD\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694. \uC608: 1, 3-4");
+  const pages = /* @__PURE__ */ new Set();
+  for (const part of text.split(",")) {
+    const match = /^\s*([1-9]\d*)(?:\s*-\s*([1-9]\d*))?\s*$/u.exec(part);
+    check5(match, "\uCABD \uBC88\uD638\uB294 1, 3-4\uCC98\uB7FC \uC27C\uD45C\uC640 \uBC94\uC704\uB85C \uC801\uC5B4 \uC8FC\uC138\uC694.");
+    const start = Number(match[1]), end = Number(match[2] || match[1]);
+    check5(Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end && end <= pageCount, `\uADFC\uAC70 \uCABD\uC740 1~${pageCount}\uCABD \uC0AC\uC774\uB85C \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.`);
+    check5(end - start + 1 <= OUTPUT_EVIDENCE_LIMITS.pages, "\uADFC\uAC70 \uCABD\uC740 \uD55C \uBC88\uC5D0 \uCD1D 20\uCABD\uAE4C\uC9C0 \uB123\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+    for (let page = start; page <= end; page++) pages.add(page);
+    check5(pages.size <= OUTPUT_EVIDENCE_LIMITS.pages, "\uADFC\uAC70 \uCABD\uC740 \uD55C \uBC88\uC5D0 \uCD1D 20\uCABD\uAE4C\uC9C0 \uB123\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+  }
+  return [...pages].sort((a, b) => a - b);
+}
+function readCanvas(canvas) {
+  check5(Number.isInteger(canvas.width) && Number.isInteger(canvas.height) && canvas.width > 0 && canvas.height > 0, "\uADFC\uAC70 \uCABD\uC774 \uBE44\uC5B4 \uC788\uC5B4 \uCD9C\uB825\uC744 \uC911\uB2E8\uD588\uC2B5\uB2C8\uB2E4.");
+  const context = canvas.getContext("2d");
+  check5(context && typeof context.getImageData === "function", "\uADFC\uAC70 \uCABD\uC758 \uD45C\uC2DC \uACB0\uACFC\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  let visible = false;
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    if (pixels[offset + 3] !== 0 && (pixels[offset] !== 255 || pixels[offset + 1] !== 255 || pixels[offset + 2] !== 255)) {
+      visible = true;
+      break;
+    }
+  }
+  check5(visible, "\uC120\uD0DD\uD55C \uADFC\uAC70 \uCABD\uC5D0 \uD45C\uC2DC\uB41C \uB0B4\uC6A9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC6D0\uBB38 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+  const url = canvas.toDataURL("image/png");
+  check5(typeof url === "string" && url.startsWith("data:image/png;base64,"), "\uADFC\uAC70 \uCABD\uC744 PNG\uB85C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+  const data = url.slice("data:image/png;base64,".length);
+  const bytes = decodeBase64(data);
+  check5(bytes.length <= OUTPUT_EVIDENCE_LIMITS.pageBytes, "\uADFC\uAC70 \uD55C \uCABD\uC758 \uC774\uBBF8\uC9C0\uAC00 8 MiB\uB97C \uB118\uC2B5\uB2C8\uB2E4. \uC6D0\uBB38 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+  const image = inspectImageBytes(bytes);
+  check5(image.mime === "image/png" && image.width === canvas.width && image.height === canvas.height, "\uADFC\uAC70 \uCABD\uC758 \uC2E4\uC81C \uC774\uBBF8\uC9C0\uC640 \uD45C\uC2DC \uD06C\uAE30\uAC00 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+  return { data, width: image.width, height: image.height, bytes: bytes.length };
+}
+async function prepareOutputEvidence(doc, selection = {}, pageChoices = {}, {
+  dom = globalThis.document,
+  isCurrent = () => true,
+  openEvidence = openPdfEvidence
+} = {}) {
+  current2(isCurrent);
+  const sources = linkedPdfSources(doc, selection);
+  check5(pageChoices && typeof pageChoices === "object" && !Array.isArray(pageChoices), "\uD568\uAED8 \uB123\uC744 \uADFC\uAC70 \uCABD\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+  const allowed = new Set(sources.map((source) => source.id));
+  check5(Object.keys(pageChoices).every((id) => allowed.has(id)), "\uC120\uD0DD\uD55C \uC5C5\uBB34\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC740 \uADFC\uAC70 \uCABD\uC774 \uC788\uC2B5\uB2C8\uB2E4.");
+  const plan = sources.map((source) => ({ source, pages: parseEvidencePages(Object.hasOwn(pageChoices, source.id) ? pageChoices[source.id] : "", source.pdf.pageCount) }));
+  check5(plan.reduce((total, item) => total + item.pages.length, 0) <= OUTPUT_EVIDENCE_LIMITS.pages, "\uADFC\uAC70 \uCABD\uC740 \uD55C \uBC88\uC5D0 \uCD1D 20\uCABD\uAE4C\uC9C0 \uB123\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+  if (!plan.length) return [];
+  check5(dom && typeof dom.createElement === "function", "\uC774 \uD658\uACBD\uC5D0\uC11C\uB294 \uADFC\uAC70 \uCABD \uC774\uBBF8\uC9C0\uB97C \uB9CC\uB4E4 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  const result = [];
+  let totalBytes = 0;
+  for (const { source, pages } of plan) {
+    current2(isCurrent);
+    const handle = await openEvidence(source.pdf, { isCurrent });
+    try {
+      current2(isCurrent);
+      for (const pageNumber of pages) {
+        current2(isCurrent);
+        const canvas = dom.createElement("canvas");
+        try {
+          await handle.renderPage(canvas, pageNumber, { width: 1400, pixelRatio: 1 });
+          current2(isCurrent);
+          const image = readCanvas(canvas);
+          totalBytes += image.bytes;
+          check5(totalBytes <= OUTPUT_EVIDENCE_LIMITS.totalBytes, "\uC120\uD0DD\uD55C \uADFC\uAC70 \uC774\uBBF8\uC9C0\uAC00 \uCD1D 32 MiB\uB97C \uB118\uC2B5\uB2C8\uB2E4. \uD544\uC694\uD55C \uCABD\uC744 \uB098\uB204\uC5B4 \uCD9C\uB825\uD574 \uC8FC\uC138\uC694.");
+          result.push({ sourceId: source.id, pageNumber, data: image.data, width: image.width, height: image.height });
+        } finally {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+      }
+    } finally {
+      await handle.destroy();
+    }
+  }
+  current2(isCurrent);
+  return result;
+}
+
 // src/review-example.js
 var REVIEW_PDF_BASE64 = "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MDAg1ViuMCkKL0NyZWF0b3IgKEhhbmRvdmVyIEEgdG8gWiBzeW50aGV0aWMgZml4dHVyZSBnZW5lcmF0b3IpIC9DcmVhdGlvbkRhdGUgKEQ6MjAyNjEwMjEwMDAwNDVaMDAnMDAnKQo+PgplbmRvYmoKNyAwIG9iago8PCAvVHlwZSAvRm9udCAvU3VidHlwZSAvVHJ1ZVR5cGUgL0Jhc2VGb250IC9BQUFBQUMrQXJpYWxVbmljb2RlTVMgL0ZvbnREZXNjcmlwdG9yCjE2IDAgUiAvVG9Vbmljb2RlIDE3IDAgUiAvRmlyc3RDaGFyIDMzIC9MYXN0Q2hhciAyMzQgL1dpZHRocyBbIDEwMDAgMTAwMCAxMDAwCjEwMDAgMjc4IDI3OCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwCjEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwCjEwMDAgMTAwMCAxMDAwIDI3OCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAKMTAwMCAyNjAgNjY3IDY2NyA3MjIgNjExIDcyMiA2NjcgMjc4IDcyMiA3MjIgNjY3IDk0NCA3NzggNTU2IDU1NiAyNzggNTU2IDEwMDAKNjY3IDEwMDAgMTAwMCAxMDAwIDEwMDAgMjIyIDEwMDAgMTAwMCAxMDAwIDIyMiAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMAoxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMAoxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMAoxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMCAxMDAwIDEwMDAgMTAwMAoxMDAwIDEwMDAg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0qxf3TdppmUzjy/gMxby2ITq6gn3Vi26r6R375KLLpcUSOL6ZgqYW29GGiEKnIGRQzd7t8DI+Y9SQGiyH0+Brk2rbUPuP4MCCVafXMPHLuQuQYLKRZMsEkgeaO5EOg21pkDwQA4UGFjBAQ6H2fPnOE5DrSFWOBtqDbCWzkStAUf8S6g1yNglUGvIYfhB7rBQa0bzfPYhizZ9bQvcQLSJN5jcMWvSpJmImF/mI7RvcAPvkSPz+ZOzeMbE6uqJ91SBPL16d+rcu7eQETN/Izu1iD5J9wub9KEmM0mfQQiM/cD1wfxuC2AfUhZEIlSlvC7m9iF3fAVd4FEkyzeUOCBInwRxzMy9CUxDjcaJcluGLFCdpUj1Y8gCjAWJUXMrL2CHWbDpe5vr+vjatfGm9VuOrZ456d6ZT/580kxUduqqn61mfz1isc3iifdWLkyWnGSfKh0Il+cpK9dpthgo0h9XWZkSVCy+oju7B8AAwqprXtxRKz0mHdEnCrpwNwcg1+CU+CuAm/Ir/tbQlCh35Eu7Gchpa8GvoK0Go03+tkLBYrQJzpJo1kqgf8A9p8wCfRDBhNcEtwmpB/IU5B9QM8lVMlmJACxFAYiwqCTqSutY54vyY6Gg5Z7HR/C27CBr17TN1qstHCRVfWHLV9v3/GXdc+yY8TLCuTiPWy7TiUf5q48ZhWXPZA91jh84bMLd1/Uf576yoGLIFVcMUfCByjde9KErIUXpRR+Xt+t1z5hb7rp23Jifjb/1tkE/Uf4ffL4I9gplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCAxOQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDExMjIgMDAwMDAgbiAKMDAwMDAwNTAyMyAwMDAwMCBuIAowMDAwMDAwMDIyIDAwMDAwIG4gCjAwMDAwMDEyMDIgMDAwMDAgbiAKMDAwMDAwMjQ4MiAwMDAwMCBuIAowMDAwMDAwMDAwIDAwMDAwIG4gCjAwMDAwMDU1MTQgMDAwMDAgbiAKMDAwMDAwMzczMiAwMDAwMCBuIAowMDAwMDAxMzEwIDAwMDAwIG4gCjAwMDAwMDI1MTcgMDAwMDAgbiAKMDAwMDAwNDgzMSAwMDAwMCBuIAowMDAwMDAzNzY4IDAwMDAwIG4gCjAwMDAwMDQ5MTQgMDAwMDAgbiAKMDAwMDAwNTExOSAwMDAwMCBuIAowMDAwMDA1MTY5IDAwMDAwIG4gCjAwMDAwMDgyNDkgMDAwMDAgbiAKMDAwMDAwNjY2NCAwMDAwMCBuIAowMDAwMDA4NDk0IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgMTkgL1Jvb3QgMTQgMCBSIC9JbmZvIDE1IDAgUiAvSUQgWyA8MmYwZDQzNWI2OTRlYWY1ZDNjZjc0MTVmNjE1OWI4ZGU+CjwyZjBkNDM1YjY5NGVhZjVkM2NmNzQxNWY2MTU5YjhkZT4gXSA+PgpzdGFydHhyZWYKNDI4OTUKJSVFT0YK";
 var SNAPSHOT_DATE = "2026-10-20";
@@ -65664,7 +65972,7 @@ try {
   documentStore = await openDocumentStore({ storage, indexedDB: window.indexedDB });
   state.documents = documentStore.documents;
   lastDocumentsRaw = documentStore.raw;
-  state.current = storage.getItem(CURRENT_KEY) || storage.getItem(LEGACY_CURRENT_KEY);
+  state.current = storage.getItem(CURRENT_KEY) || storage.getItem(PREVIOUS_CURRENT_KEY) || storage.getItem(LEGACY_CURRENT_KEY);
   if (state.documents.length) state.saveMessage = "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC758 \uC784\uC2DC\uC800\uC7A5\uC744 \uC5F4\uC5C8\uC2B5\uB2C8\uB2E4";
   state.storageWarning = documentStore.warning || "";
   if (documentStore.readOnly) {
@@ -65689,7 +65997,19 @@ if (!state.documents.some((d) => d.id === state.current)) state.current = state.
 var fieldCount = 0;
 var dialogCount = 0;
 var openSections = /* @__PURE__ */ new Set();
-var photos = createPhotoUI({ el, button: button2, field: field2, note, modal, notice, confirmAction, isCurrent: (id) => current2()?.id === id, changed: (taskId, redraw = true) => {
+var readerContexts = /* @__PURE__ */ new Map();
+function readerContextKey(tab = state.readerTab) {
+  return JSON.stringify([state.current, state.query, state.roleQuery, tab]);
+}
+function changeReaderTab(tab) {
+  readerContexts.set(readerContextKey(), { scrollY: window.scrollY || 0, limit: state.limit });
+  state.readerTab = tab;
+  const context = readerContexts.get(readerContextKey());
+  state.limit = context?.limit || 12;
+  render();
+  queueMicrotask(() => window.scrollTo?.(0, context?.scrollY || 0));
+}
+var photos = createPhotoUI({ el, button: button2, field: field2, note, modal, notice, confirmAction, isCurrent: (id) => current3()?.id === id, changed: (taskId, redraw = true) => {
   state.selected = taskId;
   saved();
   if (redraw) {
@@ -65707,7 +66027,7 @@ function disclosure(key, label, ...children2) {
   return node;
 }
 var today = () => dateISO();
-var current2 = () => state.documents.find((d) => d.id === state.current);
+var current3 = () => state.documents.find((d) => d.id === state.current);
 var short = (s, n = 110) => String(s || "").length > n ? String(s).slice(0, n) + "\u2026" : String(s || "");
 function el(tag3, attrs = {}, ...children2) {
   const node = document.createElement(tag3);
@@ -65758,12 +66078,12 @@ function select(label, value, options, onChange) {
   control.value = value ?? "";
   return el("div", { class: "field" }, el("label", { for: id }, label), control);
 }
-function check5(label, value, onChange, attrs = {}) {
+function check6(label, value, onChange, attrs = {}) {
   return el("label", { class: "checkbox" }, el("input", { type: "checkbox", checked: value, onchange: (e) => onChange(e.target.checked, e.target), ...attrs }), el("span", {}, label));
 }
 function updateSaveStatus() {
   document.querySelectorAll("[data-file-status]").forEach((n) => {
-    const doc = current2();
+    const doc = current3();
     const last = state.fileExports.get(doc?.id);
     n.textContent = !last ? "\uD30C\uC77C \uBC31\uC5C5 \uC5EC\uBD80\uB294 \uC544\uC9C1 \uD655\uC778\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4." : last === doc.updatedAt ? "\uD30C\uC77C \uB0B4\uB824\uBC1B\uAE30\uB97C \uC694\uCCAD\uD588\uC2B5\uB2C8\uB2E4 \xB7 \uC2E4\uC81C \uD30C\uC77C\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694." : "\uB9C8\uC9C0\uB9C9 \uD30C\uC77C \uB0B4\uBCF4\uB0B4\uAE30 \uC774\uD6C4 \uBCC0\uACBD\uC774 \uC788\uC2B5\uB2C8\uB2E4.";
   });
@@ -65805,7 +66125,7 @@ async function flushSave() {
   }
 }
 function saved({ upgrade = true } = {}) {
-  const doc = current2();
+  const doc = current3();
   if (doc) {
     if (upgrade) doc.schemaVersion = CURRENT_SCHEMA_VERSION;
     doc.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -65886,7 +66206,7 @@ function safeName(s) {
 }
 function backup() {
   try {
-    const doc = current2();
+    const doc = current3();
     const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     download(stringifyDocument(doc), `${safeName(doc.title)}-${stamp}.json`);
     state.fileExports.set(doc.id, doc.updatedAt);
@@ -65970,7 +66290,7 @@ function render(focus = false) {
     state.view = state.guideFrom || "home";
     render(true);
   } }));
-  else if (state.view === "home" || !current2()) main.append(home());
+  else if (state.view === "home" || !current3()) main.append(home());
   else {
     main.append(documentBar());
     if (state.view === "author") main.append(authorView());
@@ -65987,7 +66307,7 @@ function render(focus = false) {
   });
 }
 function header() {
-  const doc = current2();
+  const doc = current3();
   return el("header", { class: "header" }, el(
     "div",
     { class: "header-inner" },
@@ -66033,7 +66353,7 @@ function startCard(num, title, desc, action, primary = false) {
   return el("button", { type: "button", class: `start-card${primary ? " featured" : ""}`, onclick: action, disabled: state.storageBlocked }, el("span", { class: "card-number" }, num), el("strong", {}, title), el("span", {}, desc), el("span", { class: "card-arrow", "aria-hidden": "true" }, "\u2197"));
 }
 function documentBar() {
-  const doc = current2();
+  const doc = current3();
   return el(
     "div",
     {},
@@ -66063,7 +66383,7 @@ function documentBar() {
         state.storageConflict = false;
         state.storageError = "";
         state.saveMessage = "\uBCC0\uACBD\uB41C \uAE30\uAE30 \uC800\uC7A5\uC744 \uBD88\uB7EC\uC654\uC2B5\uB2C8\uB2E4";
-        if (!current2()) state.current = state.documents[0]?.id || null;
+        if (!current3()) state.current = state.documents[0]?.id || null;
         state.selected = null;
         render();
       } catch (e) {
@@ -66088,7 +66408,7 @@ function returnToOverview() {
   });
 }
 function overviewView() {
-  return el("section", { class: "overview-screen" }, el("div", { class: "actions" }, button2(state.overviewFrom === "author" ? "\uC791\uC131 \uD654\uBA74\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30" : "\uC778\uC218\uC790 \uD654\uBA74\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30", () => switchView(state.overviewFrom || "reader"))), note("\uC801\uC5B4 \uB454 \uB2F4\uB2F9\xB7\uD070 \uC5C5\uBB34\xB7\uC791\uC740 \uC5C5\uBB34 \uC81C\uBAA9\uC744 \uC790\uB3D9\uC73C\uB85C \uBAA8\uC558\uC2B5\uB2C8\uB2E4. \uBE60\uC9C4 \uC77C\uC774 \uBCF4\uC774\uBA74 \uC81C\uBAA9\uC744 \uB20C\uB7EC \uB0B4\uC6A9\uC744 \uD655\uC778\uD558\uAC70\uB098 \uACE0\uCE58\uC138\uC694."), renderWorkOverview({ doc: current2(), el, button: button2, onSelect: (id) => {
+  return el("section", { class: "overview-screen" }, el("div", { class: "actions" }, button2(state.overviewFrom === "author" ? "\uC791\uC131 \uD654\uBA74\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30" : "\uC778\uC218\uC790 \uD654\uBA74\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30", () => switchView(state.overviewFrom || "reader"))), note("\uC801\uC5B4 \uB454 \uB2F4\uB2F9\xB7\uD070 \uC5C5\uBB34\xB7\uC791\uC740 \uC5C5\uBB34 \uC81C\uBAA9\uC744 \uC790\uB3D9\uC73C\uB85C \uBAA8\uC558\uC2B5\uB2C8\uB2E4. \uBE60\uC9C4 \uC77C\uC774 \uBCF4\uC774\uBA74 \uC81C\uBAA9\uC744 \uB20C\uB7EC \uB0B4\uC6A9\uC744 \uD655\uC778\uD558\uAC70\uB098 \uACE0\uCE58\uC138\uC694."), renderWorkOverview({ doc: current3(), el, button: button2, onSelect: (id) => {
     if (state.overviewFrom === "author") {
       state.overviewReturn = { taskId: id, scrollY: window.scrollY || 0 };
       state.authorSection = "tasks";
@@ -66104,7 +66424,7 @@ function updateItem(item, key, value) {
   saved();
 }
 function authorView() {
-  const doc = current2();
+  const doc = current3();
   const authorTab = (v, t) => button2(t, () => {
     state.authorSection = v;
     state.selected = null;
@@ -66179,7 +66499,7 @@ function firstTaskEditor(doc) {
 }
 function newTask(groupId = "") {
   const task = createTask({ groupId });
-  current2().tasks.push(task);
+  current3().tasks.push(task);
   state.authorQuery = "";
   state.selected = task.id;
   saved();
@@ -66187,7 +66507,7 @@ function newTask(groupId = "") {
   focusEditor();
 }
 function mapWorkspace(editable) {
-  const base = current2();
+  const base = current3();
   const doc = editable || !state.roleQuery ? base : { ...base, tasks: base.tasks.filter((t) => t.ownerRole === state.roleQuery) };
   const groups = doc.groups || [];
   const section = el(
@@ -66275,7 +66595,7 @@ function focusEditor() {
   });
 }
 function selectTask(id, editable, date) {
-  const task = current2().tasks.find((t) => t.id === id);
+  const task = current3().tasks.find((t) => t.id === id);
   if (!task) return;
   if (editable) {
     state.selected = id;
@@ -66295,8 +66615,8 @@ function addGroup() {
       notice("\uD070 \uC5C5\uBB34 \uC774\uB984\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694.");
       return;
     }
-    current2().groups ??= [];
-    current2().groups.push({ id: makeId(), title });
+    current3().groups ??= [];
+    current3().groups.push({ id: makeId(), title });
     state.authorQuery = "";
     state.selected = null;
     saved();
@@ -66306,7 +66626,7 @@ function addGroup() {
 }
 function editGroup(group) {
   let title = group.title;
-  const groups = current2().groups;
+  const groups = current3().groups;
   const i2 = groups.findIndex((g) => g.id === group.id);
   modal("\uD070 \uC5C5\uBB34 \uC601\uC5ED \uC815\uB9AC", el("div", {}, field2("\uD070 \uC5C5\uBB34 \uC774\uB984", title, (v) => title = v, { maxLength: 300 }), el("div", { class: "actions" }, button2("\uC55E\uC73C\uB85C \uC774\uB3D9", () => {
     if (i2 < 1) return;
@@ -66323,7 +66643,7 @@ function editGroup(group) {
   }, "quiet", { disabled: i2 === groups.length - 1 }), button2("\uC601\uC5ED\uB9CC \uC0AD\uC81C", () => {
     modalRoot.querySelector("dialog")?.close();
     confirmAction("\uC774 \uC601\uC5ED\uB9CC \uC0AD\uC81C\uD560\uAE4C\uC694?", "\uC138\uBD80 \uC5C5\uBB34\uB294 \uC0AD\uC81C\uD558\uC9C0 \uC54A\uACE0 \uBBF8\uBD84\uB958\uB85C \uC62E\uAE41\uB2C8\uB2E4.", () => {
-      current2().tasks.filter((t) => t.groupId === group.id).forEach((t) => t.groupId = "");
+      current3().tasks.filter((t) => t.groupId === group.id).forEach((t) => t.groupId = "");
       groups.splice(i2, 1);
       saved();
       render();
@@ -66362,7 +66682,7 @@ function authorAI() {
       notice("AI \uB2F5\uAE00\uC744 \uBA3C\uC800 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.");
       return;
     }
-    const doc = current2(), candidate = structuredClone(doc), task = createTask({ title: raw.trim().split(/\r?\n/)[0].slice(0, 120), method: raw });
+    const doc = current3(), candidate = structuredClone(doc), task = createTask({ title: raw.trim().split(/\r?\n/)[0].slice(0, 120), method: raw });
     candidate.tasks.push(task);
     candidate.schemaVersion = CURRENT_SCHEMA_VERSION;
     const checked = validateDocument(candidate);
@@ -66382,7 +66702,7 @@ function authorAI() {
       return;
     }
     try {
-      const doc = applyAIDraft(current2(), draftGroups);
+      const doc = applyAIDraft(current3(), draftGroups);
       state.documents[state.documents.findIndex((d) => d.id === doc.id)] = doc;
       saved();
       close();
@@ -66395,14 +66715,14 @@ function authorAI() {
 }
 function addItem(cases) {
   const item = cases ? createCase() : createTask();
-  (cases ? current2().cases : current2().tasks).push(item);
+  (cases ? current3().cases : current3().tasks).push(item);
   state.selected = item.id;
   saved();
   render();
   document.querySelector(".editor input")?.focus();
 }
 function itemTools(item, cases) {
-  const list = cases ? current2().cases : current2().tasks;
+  const list = cases ? current3().cases : current3().tasks;
   const index = list.findIndex((x2) => x2.id === item.id);
   const move = (delta) => {
     [list[index], list[index + delta]] = [list[index + delta], list[index]];
@@ -66414,11 +66734,11 @@ function itemTools(item, cases) {
     copy.id = makeId();
     copy.title = (copy.title || "\uC5C5\uBB34") + " (\uC0AC\uBCF8)";
     if (copy.images) copy.images.forEach((image) => image.id = makeId());
-    const candidate = structuredClone(current2());
+    const candidate = structuredClone(current3());
     candidate[cases ? "cases" : "tasks"].splice(index + 1, 0, copy);
-    const check6 = validateDocument(candidate);
-    if (!check6.ok) {
-      notice("\uBCF5\uC81C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. " + check6.errors.join(" "));
+    const check7 = validateDocument(candidate);
+    if (!check7.ok) {
+      notice("\uBCF5\uC81C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. " + check7.errors.join(" "));
       return;
     }
     list.splice(index + 1, 0, copy);
@@ -66427,7 +66747,7 @@ function itemTools(item, cases) {
     render();
   }, "quiet"), button2("\uC704\uB85C", () => move(-1), "quiet", { disabled: index === 0, "aria-label": "\uC774 \uD56D\uBAA9\uC744 \uC704\uB85C \uC774\uB3D9" }), button2("\uC544\uB798\uB85C", () => move(1), "quiet", { disabled: index === list.length - 1, "aria-label": "\uC774 \uD56D\uBAA9\uC744 \uC544\uB798\uB85C \uC774\uB3D9" })), button2("\uC0AD\uC81C", () => confirmAction("\uC774 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?", item.title || "\uC774\uB984 \uC5C6\uB294 \uD56D\uBAA9", () => {
     list.splice(index, 1);
-    if (!cases) current2().cases.filter((c) => c.taskId === item.id).forEach((c) => c.taskId = "");
+    if (!cases) current3().cases.filter((c) => c.taskId === item.id).forEach((c) => c.taskId = "");
     state.selected = null;
     saved();
     render();
@@ -66439,10 +66759,10 @@ function taskEditor(task) {
     { class: "editor", "aria-label": "\uC5C5\uBB34 \uC791\uC131" },
     el("div", { class: "section-heading" }, el("h2", {}, "\uC5C5\uBB34\uBA85\uACFC \uD558\uB294 \uBC29\uBC95\uBD80\uD130"), tag2("\uB098\uBA38\uC9C0\uB294 \uC120\uD0DD", "green")),
     field2("\uC5C5\uBB34\uBA85", task.title, (v) => updateItem(task, "title", v), { placeholder: "\uC608: \uB9E4\uC6D4 \uC9C0\uCD9C \uC790\uB8CC \uC815\uB9AC", maxLength: 300 }),
-    photos.decorate(field2("\uD558\uB294 \uBC29\uBC95", task.method, (v) => updateItem(task, "method", v), { type: "textarea", rows: 8, placeholder: "\uBB34\uC5C7\uC744 \uD558\uB294\uC9C0, \uC5B4\uB5BB\uAC8C \uD558\uB294\uC9C0 \uC544\uB294 \uB9CC\uD07C \uC801\uAC70\uB098 \uAE30\uC874 \uBA54\uBAA8\uB97C \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.", hint: "\uC785\uB825\uD55C \uB0B4\uC6A9\uC740 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB429\uB2C8\uB2E4. \uD45C\uB294 \uAE00\uC790\uB85C \uB0A8\uC73C\uB2C8 \uC5F4 \uBC30\uCE58\uB294 \uC6D0\uBB38\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694." }), { doc: current2(), task, section: "method" }),
+    photos.decorate(field2("\uD558\uB294 \uBC29\uBC95", task.method, (v) => updateItem(task, "method", v), { type: "textarea", rows: 8, placeholder: "\uBB34\uC5C7\uC744 \uD558\uB294\uC9C0, \uC5B4\uB5BB\uAC8C \uD558\uB294\uC9C0 \uC544\uB294 \uB9CC\uD07C \uC801\uAC70\uB098 \uAE30\uC874 \uBA54\uBAA8\uB97C \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.", hint: "\uC785\uB825\uD55C \uB0B4\uC6A9\uC740 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC784\uC2DC\uC800\uC7A5\uB429\uB2C8\uB2E4. \uD45C\uB294 \uAE00\uC790\uB85C \uB0A8\uC73C\uB2C8 \uC5F4 \uBC30\uCE58\uB294 \uC6D0\uBB38\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694." }), { doc: current3(), task, section: "method" }),
     disclosure(`action-${task.id}`, "\uCCAB \uD589\uB3D9\xB7\uADFC\uAC70 \uB367\uBD99\uC774\uAE30 (\uC120\uD0DD)", field2("\uCCAB \uD589\uB3D9 \uD55C \uC904", task.firstAction || "", (v) => updateItem(task, "firstAction", v), { type: "textarea", rows: 2, maxLength: 2e3, placeholder: "\uC9C1\uC811 \uD655\uC778\uD55C \uC2DC\uC791 \uD589\uB3D9\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694. \uBE44\uC6CC \uB450\uC5B4\uB3C4 \uC800\uC7A5\uB429\uB2C8\uB2E4." }), button2("\uC774 \uC5C5\uBB34\uC5D0 PDF \uADFC\uAC70 \uC5F0\uACB0", () => attachPdfToTask(task), "secondary"), sourceInfo(task)),
     disclosure(`timing-${task.id}`, "\uC5B8\uC81C \uD558\uB294 \uC5C5\uBB34\uC778\uAC00\uC694? (\uC120\uD0DD)", timingEditor(task)),
-    disclosure(`group-${task.id}`, "\uD070 \uC5C5\uBB34\uBCC4\uB85C \uBB36\uAE30 (\uC120\uD0DD)", select("\uD070 \uC5C5\uBB34 \uC601\uC5ED", task.groupId || "", [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...(current2().groups || []).map((g) => [g.id, g.title])], (v) => {
+    disclosure(`group-${task.id}`, "\uD070 \uC5C5\uBB34\uBCC4\uB85C \uBB36\uAE30 (\uC120\uD0DD)", select("\uD070 \uC5C5\uBB34 \uC601\uC5ED", task.groupId || "", [["", "\uC544\uC9C1 \uBD84\uB958\uD558\uC9C0 \uC54A\uC74C"], ...(current3().groups || []).map((g) => [g.id, g.title])], (v) => {
       task.groupId = v;
       saved();
       render();
@@ -66451,7 +66771,7 @@ function taskEditor(task) {
       task.accessStatus = v;
       task.accessChecked = v === "confirmed";
       saved();
-    }), note("\uC790\uB8CC \uC811\uADFC \uD655\uC778\uC740 \uC5C5\uBB34 \uB2F4\uB2F9\uC774\uB098 \uC2E4\uC81C \uAD8C\uD55C \uC774\uAD00\uC758 \uC644\uB8CC\uB97C \uB73B\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), photos.decorate(field2("\uC9C4\uD589 \uB2E8\uACC4", task.steps, (v) => updateItem(task, "steps", v), { type: "textarea", placeholder: "1. \uC790\uB8CC \uD655\uC778\n2. \uB0B4\uC6A9 \uC815\uB9AC\n3. \uD655\uC778 \uC694\uCCAD" }), { doc: current2(), task, section: "steps" }), field2("\uC8FC\uB2F4\uB2F9 \uC5ED\uD560", task.ownerRole || "", (v) => updateItem(task, "ownerRole", v), { placeholder: "\uC608: \uC6B4\uC601 \uB2F4\uB2F9", maxLength: 1e3 }), field2("\uC9C0\uC6D0 \uC5ED\uD560", task.supportRole || "", (v) => updateItem(task, "supportRole", v), { placeholder: "\uC608: \uD589\uC815 \uC9C0\uC6D0", maxLength: 1e3 }), field2("\uBB38\uC758\uD560 \uC5ED\uD560", task.contacts, (v) => updateItem(task, "contacts", v), { type: "textarea", rows: 2, placeholder: "\uAC00\uB2A5\uD558\uBA74 \uAC1C\uC778 \uC815\uBCF4 \uB300\uC2E0 \uC5ED\uD560\xB7\uACF5\uC6A9 \uC5F0\uB77D \uCC3D\uAD6C" }), field2("\uACB0\uC7AC \uB610\uB294 \uD655\uC778", task.approval, (v) => updateItem(task, "approval", v), { type: "textarea", rows: 2 }), field2("\uC608\uC678 \uC0C1\uD669\uACFC \uB300\uC751", task.exceptions, (v) => updateItem(task, "exceptions", v), { type: "textarea", rows: 3 }), field2("\uC644\uB8CC \uC870\uAC74", task.doneWhen, (v) => updateItem(task, "doneWhen", v), { type: "textarea", rows: 2 }), field2("\uADFC\uAC70 \uB610\uB294 \uCC38\uACE0", task.evidence, (v) => updateItem(task, "evidence", v), { type: "textarea", rows: 2 }), field2("\uCD5C\uC885 \uD655\uC778\uC77C", task.verifiedAt, (v) => updateItem(task, "verifiedAt", v), { type: "date" }), el("div", { class: "check-row" }, check5("\uCCAB\uB0A0\uC5D0 \uC18C\uAC1C\uD560 \uC5C5\uBB34", task.firstDay, (v) => updateItem(task, "firstDay", v)), check5("\uCCAB \uC8FC\uC5D0 \uD574\uBCFC \uC5C5\uBB34", task.firstWeek, (v) => updateItem(task, "firstWeek", v))))),
+    }), note("\uC790\uB8CC \uC811\uADFC \uD655\uC778\uC740 \uC5C5\uBB34 \uB2F4\uB2F9\uC774\uB098 \uC2E4\uC81C \uAD8C\uD55C \uC774\uAD00\uC758 \uC644\uB8CC\uB97C \uB73B\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), photos.decorate(field2("\uC9C4\uD589 \uB2E8\uACC4", task.steps, (v) => updateItem(task, "steps", v), { type: "textarea", placeholder: "1. \uC790\uB8CC \uD655\uC778\n2. \uB0B4\uC6A9 \uC815\uB9AC\n3. \uD655\uC778 \uC694\uCCAD" }), { doc: current3(), task, section: "steps" }), field2("\uC8FC\uB2F4\uB2F9 \uC5ED\uD560", task.ownerRole || "", (v) => updateItem(task, "ownerRole", v), { placeholder: "\uC608: \uC6B4\uC601 \uB2F4\uB2F9", maxLength: 1e3 }), field2("\uC9C0\uC6D0 \uC5ED\uD560", task.supportRole || "", (v) => updateItem(task, "supportRole", v), { placeholder: "\uC608: \uD589\uC815 \uC9C0\uC6D0", maxLength: 1e3 }), field2("\uBB38\uC758\uD560 \uC5ED\uD560", task.contacts, (v) => updateItem(task, "contacts", v), { type: "textarea", rows: 2, placeholder: "\uAC00\uB2A5\uD558\uBA74 \uAC1C\uC778 \uC815\uBCF4 \uB300\uC2E0 \uC5ED\uD560\xB7\uACF5\uC6A9 \uC5F0\uB77D \uCC3D\uAD6C" }), field2("\uACB0\uC7AC \uB610\uB294 \uD655\uC778", task.approval, (v) => updateItem(task, "approval", v), { type: "textarea", rows: 2 }), field2("\uC608\uC678 \uC0C1\uD669\uACFC \uB300\uC751", task.exceptions, (v) => updateItem(task, "exceptions", v), { type: "textarea", rows: 3 }), field2("\uC644\uB8CC \uC870\uAC74", task.doneWhen, (v) => updateItem(task, "doneWhen", v), { type: "textarea", rows: 2 }), field2("\uADFC\uAC70 \uB610\uB294 \uCC38\uACE0", task.evidence, (v) => updateItem(task, "evidence", v), { type: "textarea", rows: 2 }), field2("\uCD5C\uC885 \uD655\uC778\uC77C", task.verifiedAt, (v) => updateItem(task, "verifiedAt", v), { type: "date" }), el("div", { class: "check-row" }, check6("\uCCAB\uB0A0\uC5D0 \uC18C\uAC1C\uD560 \uC5C5\uBB34", task.firstDay, (v) => updateItem(task, "firstDay", v)), check6("\uCCAB \uC8FC\uC5D0 \uD574\uBCFC \uC5C5\uBB34", task.firstWeek, (v) => updateItem(task, "firstWeek", v))))),
     itemTools(task, false)
   );
 }
@@ -66521,21 +66841,21 @@ function caseEditor(item) {
   return el("section", { class: "editor", "aria-label": "\uC9C4\uD589 \uAC74 \uC791\uC131" }, el("h2", {}, "\uB2E4\uC74C \uC0AC\uB78C\uC774 \uBC14\uB85C \uC774\uC5B4\uAC08 \uC218 \uC788\uAC8C"), field2("\uC9C4\uD589 \uAC74 \uC774\uB984", item.title, (v) => updateItem(item, "title", v), { placeholder: "\uC608: \uD558\uBC18\uAE30 \uD589\uC0AC \uC7A5\uC18C \uC608\uC57D", maxLength: 300 }), el("div", { class: "field-grid" }, select("\uD604\uC7AC \uC0C1\uD0DC", caseState(item), [["unknown", "\uC544\uC9C1 \uBAA8\uB984"], ["todo", "\uC2DC\uC791 \uC804"], ["doing", "\uC9C4\uD589 \uC911"], ["waiting", "\uD68C\uC2E0 \uB300\uAE30"], ["done", "\uC644\uB8CC"]], (v) => {
     setCaseStatus(item, v);
     render();
-  }), field2("\uAE30\uD55C", item.dueDate, (v) => updateItem(item, "dueDate", v), { type: "date" })), legacyCaseNote(item), select("\uC5F0\uACB0\uD560 \uC5C5\uBB34 (\uC120\uD0DD)", item.taskId || "", [["", "\uC5F0\uACB0\uD558\uC9C0 \uC54A\uC74C"], ...current2().tasks.map((t) => [t.id, t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"])], (v) => updateItem(item, "taskId", v)), field2("\uB2E4\uC74C \uD589\uB3D9", item.nextAction, (v) => updateItem(item, "nextAction", v), { type: "textarea", rows: 3, placeholder: "\uB2E4\uC74C\uC5D0 \uB204\uAC00, \uBB34\uC5C7\uC744 \uD558\uBA74 \uB418\uB294\uC9C0" }), field2("\uB204\uAD6C\uC758 \uC5B4\uB5A4 \uD68C\uC2E0\uC744 \uAE30\uB2E4\uB9AC\uB098\uC694?", item.waitingFor, (v) => updateItem(item, "waitingFor", v), { type: "textarea", rows: 2 }), field2("\uC9C4\uD589 \uBA54\uBAA8", item.notes, (v) => updateItem(item, "notes", v), { type: "textarea", rows: 6 }), sourceInfo(item), itemTools(item, true));
+  }), field2("\uAE30\uD55C", item.dueDate, (v) => updateItem(item, "dueDate", v), { type: "date" })), legacyCaseNote(item), select("\uC5F0\uACB0\uD560 \uC5C5\uBB34 (\uC120\uD0DD)", item.taskId || "", [["", "\uC5F0\uACB0\uD558\uC9C0 \uC54A\uC74C"], ...current3().tasks.map((t) => [t.id, t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"])], (v) => updateItem(item, "taskId", v)), field2("\uB2E4\uC74C \uD589\uB3D9", item.nextAction, (v) => updateItem(item, "nextAction", v), { type: "textarea", rows: 3, placeholder: "\uB2E4\uC74C\uC5D0 \uB204\uAC00, \uBB34\uC5C7\uC744 \uD558\uBA74 \uB418\uB294\uC9C0" }), field2("\uB204\uAD6C\uC758 \uC5B4\uB5A4 \uD68C\uC2E0\uC744 \uAE30\uB2E4\uB9AC\uB098\uC694?", item.waitingFor, (v) => updateItem(item, "waitingFor", v), { type: "textarea", rows: 2 }), field2("\uC9C4\uD589 \uBA54\uBAA8", item.notes, (v) => updateItem(item, "notes", v), { type: "textarea", rows: 6 }), sourceInfo(item), itemTools(item, true));
 }
 function legacyCaseNote(item) {
   return caseState(item) === "unknown" && item.status !== "unknown" ? note(`\uC774\uC804 \uAE30\uB85D: ${caseRecordedLabel(item)} \xB7 \uD604\uC7AC \uC0C1\uD0DC\uB97C \uD655\uC778\uD55C \uAE30\uB85D\uC774 \uC5C6\uC5B4 \uBBF8\uD655\uC778\uC73C\uB85C \uD45C\uC2DC\uD569\uB2C8\uB2E4.`) : null;
 }
 function sourceInfo(item) {
   if (!item.sourceRefs?.length) return null;
-  const sources = current2().sourceFiles.filter((s) => item.sourceRefs.includes(s.id));
+  const sources = current3().sourceFiles.filter((s) => item.sourceRefs.includes(s.id));
   return el("section", { class: "source-detail evidence-panel" }, el("h4", {}, "\uADFC\uAC70 \uD655\uC778"), sources.map((s) => el("div", { class: "source-item" }, el("strong", {}, s.name), s.pdf ? button2(`PDF \uC6D0\uBB38 \uBCF4\uAE30 \xB7 ${s.pdf.pageCount}\uCABD`, () => openPdfSource(s), "secondary") : note("\uC6D0\uB798 \uD30C\uC77C \uBAA8\uC591\uC740 \uC774 \uC804\uB2EC\uBCF8\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uCD94\uCD9C\uBB38\uACFC \uBCC4\uB3C4 \uC6D0\uBB38\uC744 \uB300\uC870\uD574 \uC8FC\uC138\uC694."), el("details", {}, el("summary", {}, "\uCD94\uCD9C\uBB38\xB7\uD655\uC778\uD560 \uACF3"), s.warnings?.map((w) => note(w, "warning-text")), s.excerpt ? el("pre", {}, s.excerpt) : note("\uCD94\uCD9C\uBB38 \uC5C6\uC74C \xB7 PDF \uCABD\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694.")))));
 }
-function openPdfSource(source) {
+function openPdfSource(source, returnLabel = "\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30") {
   const viewer = el("div", { class: "pdf-evidence-host" });
   let dispose = () => {
   };
-  const handle = modal(source.name, el("div", {}, note("JSON \uC548\uC758 PDF\uB97C \uAE30\uAE30\uC5D0\uC11C \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uC18D \uB9C1\uD06C\xB7\uC591\uC2DD\xB7\uC2A4\uD06C\uB9BD\uD2B8\uB294 \uC2E4\uD589\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), viewer), [(close) => button2("\uC5C5\uBB34\uB85C \uB3CC\uC544\uAC00\uAE30", close, "primary")], { stack: true, navigation: true, onClose: () => dispose() });
+  const handle = modal(source.name, el("div", {}, note("JSON \uC548\uC758 PDF\uB97C \uAE30\uAE30\uC5D0\uC11C \uD45C\uC2DC\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uC18D \uB9C1\uD06C\xB7\uC591\uC2DD\xB7\uC2A4\uD06C\uB9BD\uD2B8\uB294 \uC2E4\uD589\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), viewer), [(close) => button2(returnLabel, close, "primary")], { stack: true, navigation: true, onClose: () => dispose() });
   handle.dialog.classList.add("pdf-dialog");
   Promise.resolve(createPdfEvidenceViewer(source.pdf, viewer, { isCurrent: () => handle.dialog.isConnected })).then((cleanup) => {
     if (cleanup) {
@@ -66547,7 +66867,7 @@ function openPdfSource(source) {
   });
 }
 function attachPdfToTask(task) {
-  const doc = current2();
+  const doc = current3();
   let file = null, reviewed = false, busy = false;
   const result = el("p", { role: "status", class: "helper" });
   const body = el("div", {}, note("\uC804\uB2EC\uD560 \uC218 \uC788\uB3C4\uB85D \uAC80\uD1A0\uD55C PDF\uB9CC \uC5F0\uACB0\uD558\uC138\uC694. \uC6D0\uBCF8\uC744 \uBC14\uAFB8\uAC70\uB098 \uC11C\uBC84\uB85C \uBCF4\uB0B4\uC9C0 \uC54A\uACE0 JSON \uD55C \uD30C\uC77C\uC5D0 \uD568\uAED8 \uB2F4\uC2B5\uB2C8\uB2E4. PDF 10 MiB\xB7200\uCABD, \uC804\uCCB4 JSON 24 MiB\uAE4C\uC9C0\uC785\uB2C8\uB2E4."), field2("\uADFC\uAC70 PDF \uC120\uD0DD", "", () => {
@@ -66556,7 +66876,7 @@ function attachPdfToTask(task) {
     reviewed = false;
     body.querySelector("input[type=checkbox]").checked = false;
     result.textContent = file ? file.name : "";
-  } }), check5("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), result);
+  } }), check6("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), result);
   const handle = modal("PDF \uADFC\uAC70 \uC5F0\uACB0", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uAC80\uD1A0\uD55C PDF \uC5F0\uACB0", async (e) => {
     if (busy) return;
     if (!file || !reviewed) {
@@ -66567,7 +66887,7 @@ function attachPdfToTask(task) {
     e.currentTarget.disabled = true;
     result.textContent = "PDF\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4\u2026";
     try {
-      await attachPdfEvidence(doc, task, file, { isCurrent: () => handle.dialog.isConnected && current2() === doc && doc.tasks.includes(task) });
+      await attachPdfEvidence(doc, task, file, { isCurrent: () => handle.dialog.isConnected && current3() === doc && doc.tasks.includes(task) });
       saved();
       close();
       render();
@@ -66616,24 +66936,15 @@ function matches(item, query) {
   return query.normalize("NFKC").toLocaleLowerCase("ko-KR").trim().split(/\s+/).filter(Boolean).every((term) => searchable(item).includes(term));
 }
 function readerView() {
-  const doc = current2(), unknown = doc.cases.filter((c) => caseState(c) === "unknown").length, active = doc.cases.filter((c) => !["unknown", "done"].includes(caseState(c))).length;
-  const shell = el("section", {}, el("div", { class: "reader-intro" }, el("div", {}, el("h2", {}, "\uD544\uC694\uD55C \uC5C5\uBB34\uBD80\uD130 \uC0B4\uD3B4\uBCF4\uC138\uC694"), el("p", { class: "helper reader-count", role: "status" }, `\uC5C5\uBB34 ${doc.tasks.length}\uAC1C \xB7 \uC774\uC5B4\uBC1B\uC744 \uAC74 ${active}\uAC1C \xB7 \uC0C1\uD0DC \uD655\uC778\uD560 \uAE30\uB85D ${unknown}\uAC1C`)), button2("\uCCAB\uB0A0 \uC548\uB0B4 \uBCF4\uAE30", () => {
-    state.readerTab = "start";
-    state.query = "";
-    render();
-  }, "quiet")));
+  const doc = current3(), unknown = doc.cases.filter((c) => caseState(c) === "unknown").length, active = doc.cases.filter((c) => !["unknown", "done"].includes(caseState(c))).length;
+  const shell = el("section", {}, el("div", { class: "reader-intro" }, el("div", {}, el("h2", {}, "\uD544\uC694\uD55C \uC5C5\uBB34\uBD80\uD130 \uC0B4\uD3B4\uBCF4\uC138\uC694"), el("p", { class: "helper reader-count", role: "status" }, `\uC5C5\uBB34 ${doc.tasks.length}\uAC1C \xB7 \uC774\uC5B4\uBC1B\uC744 \uAC74 ${active}\uAC1C \xB7 \uC0C1\uD0DC \uD655\uC778\uD560 \uAE30\uB85D ${unknown}\uAC1C`)), button2("\uCCAB\uB0A0 \uC548\uB0B4 \uBCF4\uAE30", () => changeReaderTab("start"), "quiet")));
   if (doc.tasks.some((t) => !t.verifiedAt)) shell.append(note("\uD604\uD589\uC131 \uD655\uC778\uC77C\uC774 \uC5C6\uB294 \uC5C5\uBB34\uAC00 \uC788\uC2B5\uB2C8\uB2E4. \uC2E4\uC81C \uC2DC\uC791 \uC804 \uC911\uC694\uD55C \uC870\uAC74\xB7\uAD8C\uD55C\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.", "review-status"));
   shell.append(el("div", { class: "search-box" }, field2("\uC5C5\uBB34\uB098 \uC0C1\uD669 \uCC3E\uAE30", state.query, (v) => {
     state.query = v;
     state.limit = 12;
     renderReaderResults();
   }, { type: "search", placeholder: "\uC608: \uC790\uB8CC\uAC00 \uB204\uB77D\uB410\uC744 \uB54C, \uD589\uC0AC, \uC6D4\uB9D0\u2026", maxLength: 300 }), note("\uC5C5\uBB34 \uBC29\uBC95, \uC608\uC678 \uC0C1\uD669, \uC9C4\uD589 \uBA54\uBAA8\uB97C \uCC3E\uC2B5\uB2C8\uB2E4. PDF\xB7\uC0AC\uC9C4 \uC18D \uAE00\uC740 \uAC80\uC0C9\uB418\uC9C0 \uC54A\uC73C\uB2C8 \uC5F0\uACB0\uB41C \uC6D0\uBB38\uC744 \uC5F4\uC5B4 \uD655\uC778\uD558\uC138\uC694.")));
-  const tab = (v, t) => button2(t, () => {
-    state.readerTab = v;
-    state.query = "";
-    state.limit = 12;
-    render();
-  }, state.readerTab === v ? "pill selected" : "pill", { "aria-pressed": state.readerTab === v });
+  const tab = (v, t) => button2(t, () => changeReaderTab(v), state.readerTab === v ? "pill selected" : "pill", { "aria-pressed": state.readerTab === v });
   const more = disclosure("reader-options", "\uB2E4\uB978 \uAE30\uC900\uC73C\uB85C \uBCF4\uAE30", el("div", { class: "actions" }, ...[["week", "\uC774\uBC88 \uC8FC"], ["month", "\uC774\uBC88 \uB2EC"], ["situations", "\uC0C1\uD669\uBCC4"], ["start", "\uCCAB\uB0A0 \xB7 \uCCAB \uC8FC"], ["check", "\uD655\uC778 \uD544\uC694"]].map(([v, t]) => tab(v, t))));
   const roleOptions = [...new Set(doc.tasks.map((t) => t.ownerRole).filter(Boolean))];
   if (state.roleQuery && !roleOptions.includes(state.roleQuery)) state.roleQuery = "";
@@ -66654,13 +66965,24 @@ function renderReaderResults() {
   if (!root) return;
   const count = document.querySelector(".reader-count");
   if (count) {
-    const doc2 = current2();
+    const doc2 = current3();
     count.textContent = `\uC5C5\uBB34 ${doc2.tasks.length}\uAC1C \xB7 \uC774\uC5B4\uBC1B\uC744 \uAC74 ${doc2.cases.filter((c) => !["unknown", "done"].includes(caseState(c))).length}\uAC1C \xB7 \uC0C1\uD0DC \uD655\uC778\uD560 \uAE30\uB85D ${doc2.cases.filter((c) => caseState(c) === "unknown").length}\uAC1C`;
   }
-  const source = current2();
-  const doc = state.roleQuery ? { ...source, tasks: source.tasks.filter((t) => t.ownerRole === state.roleQuery) } : source;
+  const source = current3();
+  let doc = state.roleQuery ? { ...source, tasks: source.tasks.filter((t) => t.ownerRole === state.roleQuery) } : source;
   root.replaceChildren();
-  if (state.query.trim()) {
+  if (state.query.trim() && ["calendar", "cases"].includes(state.readerTab)) {
+    const tasks = doc.tasks.filter((t) => matches(t, state.query));
+    const ids = new Set(tasks.map((t) => t.id));
+    doc = { ...doc, tasks, cases: doc.cases.filter((c) => matches(c, state.query) || ids.has(c.taskId)) };
+    root.append(el("div", { class: "callout search-context" }, el("p", { role: "status" }, `\u2018${state.query}\u2019 \uAC80\uC0C9 \uC720\uC9C0 \xB7 ${state.readerTab === "calendar" ? "\uC77C\uC815" : "\uC9C4\uD589 \uAC74"} \uBCF4\uAE30`), button2("\uC5C5\uBB34 \uC804\uCCB4 \uAC80\uC0C9\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30", () => changeReaderTab("map"), "quiet"), button2("\uAC80\uC0C9 \uC9C0\uC6B0\uAE30", () => {
+      state.query = "";
+      state.limit = 12;
+      render();
+    }, "quiet")));
+    if (!(state.readerTab === "calendar" ? doc.tasks.length : doc.cases.length)) root.append(note(`\u2018${state.query}\u2019\uC5D0 \uB9DE\uB294 ${state.readerTab === "calendar" ? "\uC5C5\uBB34 \uC77C\uC815" : "\uC9C4\uD589 \uAC74"}\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC704\uC5D0\uC11C \uC5C5\uBB34 \uC804\uCCB4 \uAC80\uC0C9\uC73C\uB85C \uB3CC\uC544\uAC08 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`));
+  }
+  if (state.query.trim() && !["calendar", "cases"].includes(state.readerTab)) {
     const tasks = doc.tasks.filter((t) => matches(t, state.query));
     const cases = doc.cases.filter((t) => matches(t, state.query));
     const combined = [...tasks.map((t) => ({ task: t })), ...cases.map((c) => ({ case: c }))];
@@ -66705,7 +67027,7 @@ function renderReaderResults() {
     const unknown = doc.cases.filter((c) => caseState(c) === "unknown");
     if (unknown.length) root.append(el("h2", {}, `\uC0C1\uD0DC\uB97C \uD655\uC778\uD560 \uAE30\uB85D ${unknown.length}\uAC1C`), note("\uBBF8\uCC29\uC218\uB098 \uC9C4\uD589 \uC911\uC73C\uB85C \uD655\uC815\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uC774\uC804 \uAE30\uB85D\uC744 \uBCF4\uC874\uD55C \uCC44 \uD604\uC7AC \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."), el("div", { class: "read-list" }, unknown.map((c) => caseCard(c))));
     const active = doc.cases.filter((c) => !["unknown", "done"].includes(caseState(c))).sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"));
-    root.append(el("div", { class: "section-heading" }, el("h2", {}, `\uC9C4\uD589 \uC911\uC778 \uAC74 ${active.length}\uAC1C`), note("\uB2E4\uC74C \uD589\uB3D9\uACFC \uAE30\uD55C\uBD80\uD130 \uD655\uC778\uD574 \uC8FC\uC138\uC694.")), active.length ? el("div", { class: "read-list" }, active.slice(0, state.limit).map((c) => caseCard(c))) : empty("\uC9C4\uD589 \uC911\uC778 \uAC74\uC774 \uC5C6\uC5B4\uC694", "\uD604\uC7AC \uC774\uC5B4\uBC1B\uC744 \uAC74\uC774 \uC5C6\uB294 \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uC77C\uBC18 \uC5C5\uBB34\uB294 \uC774\uBC88 \uC8FC\xB7\uC774\uBC88 \uB2EC\uC5D0\uC11C \uD655\uC778\uD574 \uC8FC\uC138\uC694."));
+    root.append(el("div", { class: "section-heading" }, el("h2", {}, `\uC9C4\uD589 \uC911\uC778 \uAC74 ${active.length}\uAC1C`), note("\uB2E4\uC74C \uD589\uB3D9\uACFC \uAE30\uD55C\uBD80\uD130 \uD655\uC778\uD574 \uC8FC\uC138\uC694.")), active.length ? el("div", { class: "read-list" }, active.slice(0, state.limit).map((c) => caseCard(c))) : empty(state.query.trim() ? "\uAC80\uC0C9\uC5D0 \uB9DE\uB294 \uC9C4\uD589 \uC911\uC778 \uAC74\uC774 \uC5C6\uC5B4\uC694" : "\uC9C4\uD589 \uC911\uC778 \uAC74\uC774 \uC5C6\uC5B4\uC694", state.query.trim() ? "\uAC80\uC0C9\uC5B4\uB97C \uC720\uC9C0\uD55C \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uC5C5\uBB34 \uC804\uCCB4 \uAC80\uC0C9\uC73C\uB85C \uB3CC\uC544\uAC00\uAC70\uB098 \uAC80\uC0C9\uC744 \uC9C0\uC6CC \uB2E4\uB978 \uC9C4\uD589 \uAC74\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4." : "\uD604\uC7AC \uC774\uC5B4\uBC1B\uC744 \uAC74\uC774 \uC5C6\uB294 \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uC77C\uBC18 \uC5C5\uBB34\uB294 \uC774\uBC88 \uC8FC\xB7\uC774\uBC88 \uB2EC\uC5D0\uC11C \uD655\uC778\uD574 \uC8FC\uC138\uC694."));
     if (active.length > state.limit) root.append(button2("\uC9C4\uD589 \uAC74 \uB354 \uBCF4\uAE30", () => {
       state.limit += 12;
       renderReaderResults();
@@ -66751,7 +67073,7 @@ function caseProgress(item) {
   return body;
 }
 function taskContent(task, date) {
-  const content = el("section", { class: "read-content task-detail" }, el("div", { class: "action-start" }, el("p", { class: "eyebrow" }, date || timingLabel(task.timing)), el("h3", {}, "\uCCAB \uD589\uB3D9"), firstActionText(task) ? el("p", { class: "first-action" }, firstActionText(task)) : el("p", {}, "\uCCAB \uD589\uB3D9\uC774 \uBCC4\uB3C4\uB85C \uD655\uC778\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uBCF8\uBB38\uACFC \uADFC\uAC70\uC5D0\uC11C \uC2DC\uC791\uD560 \uACF3\uC744 \uD655\uC778\uD558\uC138\uC694.")), task.timing.startRule ? readBlock("\uC2DC\uC791\xB7\uC900\uBE44 \uAE30\uC900", task.timing.startRule) : null);
+  const content = el("section", { class: "read-content task-detail" }, el("div", { class: "action-start" }, el("p", { class: "eyebrow" }, date || timingLabel(task.timing)), firstActionText(task) ? [el("h3", {}, "\uCCAB \uD589\uB3D9"), el("p", { class: "first-action" }, firstActionText(task))] : null), task.timing.startRule ? readBlock("\uC2DC\uC791\xB7\uC900\uBE44 \uAE30\uC900", task.timing.startRule) : null);
   if (task.exceptions) content.append(readBlock("\uB9C9\uD614\uC744 \uB54C \xB7 \uBA3C\uC800 \uD655\uC778", task.exceptions));
   if (task.approval) content.append(readBlock("\uD544\uC694\uD55C \uC2B9\uC778\xB7\uD655\uC778", task.approval));
   const instructions = distinctInstructions(task);
@@ -66779,7 +67101,7 @@ function caseCard(item) {
   return el("details", { class: "read-card case-card" }, el("summary", {}, el("div", { class: "read-summary" }, el("div", { class: "read-title" }, el("div", { class: "tags" }, tag2(caseStateLabel(item), status === "unknown" || status === "waiting" ? "amber" : status === "done" ? "green" : ""), item.dueDate ? tag2("\uAE30\uD55C " + item.dueDate, item.dueDate < today() && status !== "done" ? "amber" : "") : tag2("\uAE30\uD55C \uBBF8\uD655\uC815")), el("h3", {}, item.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74"), el("p", {}, item.nextAction ? "\uB2E4\uC74C: " + short(item.nextAction) : "\uB2E4\uC74C \uD589\uB3D9 \uD655\uC778\uC774 \uD544\uC694\uD574\uC694")), el("span", { class: "expand-hint" }, "\uC9C4\uD589 \uB0B4\uC6A9 \uD3BC\uCE58\uAE30"))), el("div", { class: "read-content" }, legacyCaseNote(item), readBlock("\uB2E4\uC74C \uD589\uB3D9", item.nextAction || "\uC544\uC9C1 \uC815\uD574\uC9C0\uC9C0 \uC54A\uC558\uC5B4\uC694."), item.waitingFor ? readBlock("\uD68C\uC2E0 \uB300\uAE30", item.waitingFor) : null, item.notes ? readBlock("\uC9C4\uD589 \uBA54\uBAA8", item.notes) : null, item.taskId ? button2("\uC5F0\uACB0\uB41C \uC5C5\uBB34 \uC124\uBA85 \uC5F4\uAE30", () => selectTask(item.taskId, false), "secondary") : null, sourceInfo(item), caseProgress(item)));
 }
 function issuesPanel() {
-  const doc = current2(), issues = issuesFor(doc);
+  const doc = current3(), issues = issuesFor(doc);
   const section = el("section", { class: "issues-panel" }, el("h2", {}, "\uD55C \uBC88 \uB354 \uD655\uC778\uD558\uBA74 \uC88B\uC740 \uB0B4\uC6A9"), note("\uC785\uB825\uD55C \uB0B4\uC6A9 \uC911 \uD655\uC778\uD560 \uBD80\uBD84\uC744 \uBAA8\uC558\uC2B5\uB2C8\uB2E4. \uBB38\uC11C\uC758 \uC644\uC804\uC131\uC774\uB098 \uC5C5\uBB34 \uC219\uB828\uB3C4\uB97C \uD3C9\uAC00\uD558\uC9C0 \uC54A\uC544\uC694."));
   if (!issues.length) section.append(empty("\uD604\uC7AC \uADDC\uCE59\uC5D0\uC11C \uCC3E\uC740 \uD655\uC778 \uC0AC\uD56D\uC774 \uC5C6\uC5B4\uC694", "\uC2E4\uC81C \uC790\uB8CC \uC811\uADFC, \uD604\uC7A5 \uC608\uC678, \uCD5C\uC2E0 \uC808\uCC28\uB294 \uC778\uACC4\uC790\uC640 \uD568\uAED8 \uD655\uC778\uD574 \uC8FC\uC138\uC694."));
   else section.append(el("ul", { class: "issues-list" }, issues.map((issue) => {
@@ -66897,7 +67219,7 @@ function startWithPdf(file, targetId) {
   const target = targetId ? state.documents.find((d) => d.id === targetId) : null;
   let title = file.name.replace(/\.pdf$/i, ""), method = "", reviewed = false, busy = false;
   const result = el("p", { class: "helper", role: "status" });
-  const body = el("div", {}, note("PDF \uC804\uCCB4\uB97C \uC5C5\uBB34 \uC5EC\uB7EC \uAC1C\uB85C \uC790\uB3D9 \uD655\uC815\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uC5C5\uBB34 \uD558\uB098\uC758 \uADFC\uAC70\uB85C \uC5F0\uACB0\uD558\uACE0 \uC6D0\uB798 \uD398\uC774\uC9C0\uB97C \uBCF4\uBA70 \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uB367\uBD99\uC774\uC138\uC694."), field2("\uC5C5\uBB34\uBA85", title, (v) => title = v, { maxLength: 300 }), field2("\uC544\uB294 \uB0B4\uC6A9 (\uC120\uD0DD)", method, (v) => method = v, { type: "textarea", rows: 4 }), check5("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), note("PDF 10 MiB\xB7200\uCABD, \uC804\uCCB4 JSON 24 MiB\uAE4C\uC9C0. \uC6D0\uBCF8 \uD30C\uC77C\uC740 \uBC14\uAFB8\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC758 \uCD5C\uC2E0\uC131\uC774\uB098 \uACF5\uC720 \uAD8C\uD55C\uC744 \uC790\uB3D9\uC73C\uB85C \uD310\uB2E8\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), result);
+  const body = el("div", {}, note("PDF \uC804\uCCB4\uB97C \uC5C5\uBB34 \uC5EC\uB7EC \uAC1C\uB85C \uC790\uB3D9 \uD655\uC815\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uC5C5\uBB34 \uD558\uB098\uC758 \uADFC\uAC70\uB85C \uC5F0\uACB0\uD558\uACE0 \uC6D0\uB798 \uD398\uC774\uC9C0\uB97C \uBCF4\uBA70 \uD544\uC694\uD55C \uC548\uB0B4\uB9CC \uB367\uBD99\uC774\uC138\uC694."), field2("\uC5C5\uBB34\uBA85", title, (v) => title = v, { maxLength: 300 }), field2("\uC544\uB294 \uB0B4\uC6A9 (\uC120\uD0DD)", method, (v) => method = v, { type: "textarea", rows: 4 }), check6("\uC774 PDF\uC758 \uC804\uCCB4 \uB0B4\uC6A9\uC774 \uC804\uB2EC \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4", false, (v) => reviewed = v), note("PDF 10 MiB\xB7200\uCABD, \uC804\uCCB4 JSON 24 MiB\uAE4C\uC9C0. \uC6D0\uBCF8 \uD30C\uC77C\uC740 \uBC14\uAFB8\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC758 \uCD5C\uC2E0\uC131\uC774\uB098 \uACF5\uC720 \uAD8C\uD55C\uC744 \uC790\uB3D9\uC73C\uB85C \uD310\uB2E8\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), result);
   const handle = modal("PDF \uADFC\uAC70\uB85C \uC2DC\uC791", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2("\uC5C5\uBB34 \uD558\uB098\uB85C \uC5F0\uACB0", async (e) => {
     if (busy) return;
     if (!reviewed) {
@@ -67051,7 +67373,7 @@ ${b.text}`).join("\n\n");
           else expanded.delete(draft.id);
         }
       });
-      const box = el("article", { class: "draft-block" }, el("div", { class: "section-heading" }, check5(`\uCD08\uC548 ${index + 1} \uC120\uD0DD`, draft.selected, (v) => {
+      const box = el("article", { class: "draft-block" }, el("div", { class: "section-heading" }, check6(`\uCD08\uC548 ${index + 1} \uC120\uD0DD`, draft.selected, (v) => {
         draft.selected = v;
         updateCount();
       }), tag2(draft.source)), details);
@@ -67102,8 +67424,66 @@ function exportSelection(doc) {
   selection.caseIds = selection.caseIds.filter((id) => doc.cases.some((c) => c.id === id));
   return selection;
 }
+async function requestOutput(doc, selection, deliver, review = false) {
+  const generation = editGeneration, snapshot = structuredClone(doc), options = structuredClone(selection), sources = linkedPdfSources(snapshot, options);
+  const items = [...snapshot.tasks.filter((t) => !options.taskIds || options.taskIds.includes(t.id)), ...snapshot.cases.filter((c) => !options.caseIds || options.caseIds.includes(c.id))];
+  const records = items.flatMap((item) => sources.filter((source) => item.sourceRefs.includes(source.id) && source.pdf.pageCount > 1).map((source) => ({ item, source, value: (item.sourcePages?.find((link) => link.sourceId === source.id)?.pages || []).join(", ") })));
+  const pending = records.filter((record) => review || !record.value);
+  if (!pending.length) {
+    if (review) {
+      notice("\uC5F0\uACB0\uB41C PDF\uB294 \uD55C \uCABD\uC774\uAC70\uB098 \uC5C6\uC2B5\uB2C8\uB2E4. \uBCC4\uB3C4 \uCABD \uC120\uD0DD \uC5C6\uC774 \uD568\uAED8 \uCD9C\uB825\uB429\uB2C8\uB2E4.");
+      return;
+    }
+    const evidencePages = await prepareOutputEvidence(snapshot, options, storedOutputPages(snapshot, options), { dom: document, isCurrent: () => editGeneration === generation && current3()?.id === doc.id && current3()?.updatedAt === snapshot.updatedAt });
+    await deliver(snapshot, { ...options, evidencePages });
+    return;
+  }
+  const status = el("p", { role: "status", class: "helper" });
+  const body = el("div", {}, note("\uBCF8\uBB38\uC758 \uD45C\xB7\uC0AC\uC9C4\uC744 \uB2E4\uC2DC \uC785\uB825\uD560 \uD544\uC694 \uC5C6\uC774 \uC6D0\uBB38 \uCABD\uC744 \uD568\uAED8 \uB123\uC2B5\uB2C8\uB2E4. \uC5C5\uBB34\uB9C8\uB2E4 \uD544\uC694\uD55C \uCABD\uC744 \uD55C \uBC88 \uD655\uC778\uD558\uBA74 \uBB38\uC11C\uC640 \uC804\uB2EC JSON\uC5D0 \uAE30\uC5B5\uD569\uB2C8\uB2E4."), note("\uD55C \uCABD\uC9DC\uB9AC PDF\uC640 \uC774\uBBF8 \uD655\uC778\uD55C \uC5F0\uACB0\uC740 \uB2E4\uC2DC \uBB3B\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC608: 1 \uB610\uB294 1, 3-4. \uD55C \uBC88\uC5D0 \uD569\uACC4 20\uCABD\uAE4C\uC9C0 \uCD9C\uB825\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), sources.filter((source) => pending.some((record) => record.source.id === source.id)).map((source) => el("section", { class: "output-source" }, el("h3", {}, source.name), button2(`\uC6D0\uBB38 \uD655\uC778 \xB7 \uCD1D ${source.pdf.pageCount}\uCABD`, () => openPdfSource(source, "\uADFC\uAC70 \uCABD \uC5F0\uACB0\uB85C \uB3CC\uC544\uAC00\uAE30"), "secondary"), pending.filter((record) => record.source.id === source.id).map((record) => field2(`${record.item.title || "\uC774\uB984 \uC5C6\uB294 \uD56D\uBAA9"} \xB7 \uADFC\uAC70 \uCABD`, record.value, (value) => {
+    record.value = value;
+  }, { placeholder: "\uC608: 1 \uB610\uB294 1, 3-4", maxLength: 300 })))), note("\uC6D0\uBCF8 PDF\uB294 \uADF8\uB300\uB85C \uBCF4\uC874\uD569\uB2C8\uB2E4. \uCD9C\uB825\uC5D0\uB294 \uD655\uC778\uD55C \uCABD\uC758 \uC774\uBBF8\uC9C0\uB9CC \uB123\uC73C\uBA70, \uC774\uBBF8\uC9C0 \uC18D \uAE00\uC740 DOCX \uAC80\uC0C9 \uB300\uC0C1\uC774 \uC544\uB2D9\uB2C8\uB2E4."), status);
+  let busy = false;
+  const handle = modal("\uD568\uAED8 \uC804\uB2EC\uD560 \uADFC\uAC70 \uCABD", body, [(close) => button2("\uCDE8\uC18C", close), (close) => button2(review ? "\uD655\uC778\uD55C \uC5F0\uACB0 \uC800\uC7A5" : "\uC5F0\uACB0\uC744 \uAE30\uC5B5\uD558\uACE0 \uD568\uAED8 \uB9CC\uB4E4\uAE30", async (e) => {
+    if (busy) return;
+    busy = true;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    status.textContent = "\uD655\uC778\uD55C \uADFC\uAC70 \uCABD\uC744 \uC900\uBE44\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4\u2026";
+    try {
+      const isCurrent = () => handle.dialog.isConnected && editGeneration === generation && current3()?.id === doc.id && current3()?.updatedAt === snapshot.updatedAt;
+      const candidate = structuredClone(snapshot);
+      candidate.schemaVersion = CURRENT_SCHEMA_VERSION;
+      for (const record of pending) {
+        const pages = parseEvidencePages(record.value, record.source.pdf.pageCount);
+        const item = [...candidate.tasks, ...candidate.cases].find((item2) => item2.id === record.item.id);
+        item.sourcePages = [...(item.sourcePages || []).filter((link) => link.sourceId !== record.source.id), { sourceId: record.source.id, pages }];
+      }
+      const checked = validateDocument(candidate);
+      if (!checked.ok) throw new Error(checked.errors.join(" / "));
+      const evidencePages = await prepareOutputEvidence(candidate, options, storedOutputPages(candidate, options), { dom: document, isCurrent });
+      if (!isCurrent()) throw new Error("\uBB38\uC11C\uAC00 \uBC14\uB00C\uC5B4 \uCD9C\uB825\uC744 \uBA48\uCDC4\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB0B4\uC6A9\uC73C\uB85C \uB2E4\uC2DC \uC2DC\uC791\uD574 \uC8FC\uC138\uC694.");
+      for (const record of pending) {
+        const target = [...doc.tasks, ...doc.cases].find((item) => item.id === record.item.id);
+        target.sourcePages = structuredClone([...candidate.tasks, ...candidate.cases].find((item) => item.id === record.item.id).sourcePages);
+      }
+      saved();
+      candidate.updatedAt = doc.updatedAt;
+      if (!review) await deliver(candidate, { ...options, evidencePages });
+      close();
+      if (review) notice("\uD655\uC778\uD55C \uADFC\uAC70 \uCABD \uC5F0\uACB0\uC744 \uBC18\uC601\uD588\uC2B5\uB2C8\uB2E4. \uC784\uC2DC\uC800\uC7A5 \uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uACE0 JSON\uC73C\uB85C \uBC31\uC5C5\uD574 \uC8FC\uC138\uC694.");
+    } catch (error) {
+      if (handle.dialog.isConnected) {
+        status.setAttribute("role", "alert");
+        status.textContent = "\uCD9C\uB825\uC744 \uC644\uB8CC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. " + error.message;
+      }
+    } finally {
+      busy = false;
+      btn.disabled = false;
+    }
+  }, "primary")]);
+}
 function exportView() {
-  const doc = current2();
+  const doc = current3();
   const selection = exportSelection(doc);
   let includeContacts = false, includeMaterials = false, includeEvidence = false;
   const body = el("section", { class: "export-layout" });
@@ -67112,9 +67492,9 @@ function exportView() {
     "div",
     { class: "delivery-actions" },
     el("div", { class: "callout" }, el("h3", {}, "\uB2E4\uC74C \uB2F4\uB2F9\uC790\uC5D0\uAC8C \uC804\uB2EC\uD558\uAE30"), el("p", {}, "\uC774 \uC571\uC5D0\uC11C \uB2E4\uC2DC \uC5F4\uACE0 \uACE0\uCE60 \uC218 \uC788\uB294 \uD30C\uC77C\uC785\uB2C8\uB2E4. \uBC31\uC5C5\uD560 \uB54C\uB3C4 \uC0AC\uC6A9\uD558\uC138\uC694."), button2("\uC804\uB2EC\xB7\uBC31\uC5C5 \uD30C\uC77C \uBC1B\uAE30 (.json)", backup, "primary"), note("\uBAA8\uB4E0 \uC5C5\uBB34\xB7\uC0AC\uC9C4\xB7\uC9C4\uD589 \uAC74\uACFC \uD604\uC7AC \uB2F4\uAE34 \uCD9C\uCC98 \uC6D0\uBB38\xB7PDF \uADFC\uAC70\uAC00 \uB2E8\uC77C JSON\uC5D0 \uD3EC\uD568\uB429\uB2C8\uB2E4. \uD3EC\uD568\uD558\uC9C0 \uC54A\uC740 \uC6D0\uBCF8 \uC804\uCCB4\uAE4C\uC9C0 \uBCF4\uC874\uD55C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4. \uC774\uC804 \uAC1C\uC778 \uC218\uD589 \uCCB4\uD06C\uB294 \uBCC4\uB3C4\uC785\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC554\uD638\uD654\uB418\uC9C0 \uC54A\uC73C\uBBC0\uB85C \uBBFC\uAC10\uD55C \uB0B4\uC6A9\uC774 \uC5C6\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694.", "warning-text")),
-    el("div", { class: "callout" }, el("h3", {}, "\uC81C\uCD9C\uD558\uAC70\uB098 \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uAE30"), el("p", {}, "\uC5C5\uBB34\uC9C0\uB3C4\uC640 \uC0AC\uB78C\uC774 \uC77D\uB294 \uC548\uB0B4\uB97C \uBC1B\uC2B5\uB2C8\uB2E4. PDF \uADFC\uAC70 \uC790\uCCB4\xB7\uC804\uCCB4 \uC6D0\uBB38 \uBC1C\uCDCC\xB7\uB0B4\uBD80 \uC774\uB825\uC740 JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4."), button2("\uC5C5\uBB34 \uC548\uB0B4 \uC804\uCCB4 \uBC1B\uAE30 (.docx)", async () => {
+    el("div", { class: "callout" }, el("h3", {}, "\uC81C\uCD9C\uD558\uAC70\uB098 \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uAE30"), el("p", {}, "\uC5C5\uBB34\uC9C0\uB3C4\xB7\uC2E4\uD589 \uC548\uB0B4\xB7\uC0AC\uC9C4\uC744 \uBC1B\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0\uB41C PDF\uC758 \uD655\uC778\uD55C \uADFC\uAC70 \uCABD\uC744 \uD568\uAED8 \uB123\uC2B5\uB2C8\uB2E4."), button2("\uC5C5\uBB34 \uC548\uB0B4 \uC804\uCCB4 \uBC1B\uAE30 (.docx)", async () => {
       try {
-        download(await exportDocx(doc), `${safeName(doc.title)}-\uC804\uCCB4.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        await requestOutput(doc, {}, async (snapshot, options) => download(await exportDocx(snapshot, options), `${safeName(snapshot.title)}-\uC804\uCCB4.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
       } catch (error) {
         notice(error.message);
       }
@@ -67142,7 +67522,7 @@ function exportView() {
   }, "quiet")));
   const selectList = el("div", { class: "export-selection" });
   const redraw = () => {
-    selectList.replaceChildren(el("h4", {}, `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}\uAC1C`), ...doc.tasks.map((t) => check5(t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34", selection.taskIds.includes(t.id), (v) => toggle(selection.taskIds, t.id, v))), el("h4", {}, `\uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C`), ...doc.cases.map((c) => check5(c.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74", selection.caseIds.includes(c.id), (v) => toggle(selection.caseIds, c.id, v))));
+    selectList.replaceChildren(el("h4", {}, `\uC5C5\uBB34 \uB9E4\uB274\uC5BC ${doc.tasks.length}\uAC1C`), ...doc.tasks.map((t) => check6(t.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34", selection.taskIds.includes(t.id), (v) => toggle(selection.taskIds, t.id, v))), el("h4", {}, `\uC9C4\uD589 \uAC74 ${doc.cases.length}\uAC1C`), ...doc.cases.map((c) => check6(c.title || "\uC774\uB984 \uC5C6\uB294 \uC9C4\uD589 \uAC74", selection.caseIds.includes(c.id), (v) => toggle(selection.caseIds, c.id, v))));
     updateCount();
   };
   redraw();
@@ -67156,25 +67536,42 @@ function exportView() {
     btn.disabled = true;
     btn.textContent = "\uBB38\uC11C \uB9CC\uB4DC\uB294 \uC911\u2026";
     try {
-      const bytes = await exportDocx(doc, selection);
-      download(bytes, `${safeName(doc.title)}-${today()}.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-      notice("\uBB38\uC11C \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC5C8\uC2B5\uB2C8\uB2E4. \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uC5B4 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      await requestOutput(doc, selection, async (snapshot, options) => {
+        const bytes = await exportDocx(snapshot, options);
+        download(bytes, `${safeName(snapshot.title)}-${today()}.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        notice("\uBB38\uC11C \uD30C\uC77C\uC744 \uB9CC\uB4E4\uC5C8\uC2B5\uB2C8\uB2E4. \uBB38\uC11C \uD504\uB85C\uADF8\uB7A8\uC5D0\uC11C \uC5F4\uC5B4 \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+      });
     } catch (error) {
       notice("\uBB38\uC11C \uC0DD\uC131 \uC2E4\uD328: " + error.message);
     } finally {
       btn.disabled = false;
       btn.textContent = "\uC120\uD0DD\uD55C \uC5C5\uBB34\uB9CC \uBB38\uC11C\uB85C \uBC1B\uAE30";
     }
-  }, "primary"), button2("\uC778\uC1C4 \uBCF4\uAE30", () => {
-    state.printSelection = structuredClone(selection);
-    switchView("print");
+  }, "primary"), button2("\uC778\uC1C4 \uBCF4\uAE30", async () => {
+    try {
+      await requestOutput(doc, selection, async (snapshot, options) => {
+        state.printDocument = snapshot;
+        state.printSelection = options;
+        switchView("print");
+      });
+    } catch (error) {
+      notice(error.message);
+    }
   })));
+  scope.append(button2("\uADFC\uAC70 \uCABD \uC5F0\uACB0 \uD655\uC778\xB7\uBC14\uAFB8\uAE30", async () => {
+    try {
+      await requestOutput(doc, selection, async () => {
+      }, true);
+    } catch (error) {
+      notice(error.message);
+    }
+  }, "quiet"));
   panel.append(scope);
   const extras = disclosure("export-extras", "\uCD94\uAC00 \uAE30\uB2A5 \xB7 AI \uB3C4\uC6C0 \xB7 \uC218\uD589 \uAE30\uB85D");
   extras.append(el(
     "div",
     { class: "export-aside" },
-    el("div", { class: "panel" }, el("h3", {}, "\uB0B4 AI\uC5D0\uAC8C \uB3C4\uC6C0 \uC694\uCCAD\uD558\uAE30"), el("p", {}, "\uC704\uC5D0\uC11C \uC120\uD0DD\uD55C \uC5C5\uBB34\uC640 \uD504\uB86C\uD504\uD2B8\uB97C \uC9C1\uC811 \uD655\uC778\uD55C \uB4A4, \uC0AC\uC6A9\uD558\uB294 AI\uC5D0 \uBD99\uC5EC\uB123\uC73C\uC138\uC694. \uC774 \uC571\uC740 AI\uC5D0 \uC811\uC18D\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), check5("\uC5F0\uB77D\uD560 \uC5ED\uD560\xB7\uD68C\uC2E0 \uB300\uAE30 \uD3EC\uD568", false, (v) => includeContacts = v), check5("\uC900\uBE44\uC790\uB8CC \uD3EC\uD568", false, (v) => includeMaterials = v), check5("\uADFC\uAC70 \uD3EC\uD568", false, (v) => includeEvidence = v), note("\uBBFC\uAC10 \uD56D\uBAA9\uC740 \uAE30\uBCF8 \uC81C\uC678\uD569\uB2C8\uB2E4. \uBC29\uBC95\xB7\uBA54\uBAA8 \uC548\uC5D0 \uC11E\uC778 \uC815\uBCF4\uB294 \uC790\uB3D9\uC73C\uB85C \uCC3E\uC544\uB0B4\uC9C0 \uBABB\uD558\uBBC0\uB85C \uC9C1\uC811 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), button2("AI\uC6A9 \uB0B4\uC6A9 \uBBF8\uB9AC\uBCF4\uAE30", () => aiPreview(selection, { includeContacts, includeMaterials, includeEvidence }), "secondary full")),
+    el("div", { class: "panel" }, el("h3", {}, "\uB0B4 AI\uC5D0\uAC8C \uB3C4\uC6C0 \uC694\uCCAD\uD558\uAE30"), el("p", {}, "\uC704\uC5D0\uC11C \uC120\uD0DD\uD55C \uC5C5\uBB34\uC640 \uD504\uB86C\uD504\uD2B8\uB97C \uC9C1\uC811 \uD655\uC778\uD55C \uB4A4, \uC0AC\uC6A9\uD558\uB294 AI\uC5D0 \uBD99\uC5EC\uB123\uC73C\uC138\uC694. \uC774 \uC571\uC740 AI\uC5D0 \uC811\uC18D\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), check6("\uC5F0\uB77D\uD560 \uC5ED\uD560\xB7\uD68C\uC2E0 \uB300\uAE30 \uD3EC\uD568", false, (v) => includeContacts = v), check6("\uC900\uBE44\uC790\uB8CC \uD3EC\uD568", false, (v) => includeMaterials = v), check6("\uADFC\uAC70 \uD3EC\uD568", false, (v) => includeEvidence = v), note("\uBBFC\uAC10 \uD56D\uBAA9\uC740 \uAE30\uBCF8 \uC81C\uC678\uD569\uB2C8\uB2E4. \uBC29\uBC95\xB7\uBA54\uBAA8 \uC548\uC5D0 \uC11E\uC778 \uC815\uBCF4\uB294 \uC790\uB3D9\uC73C\uB85C \uCC3E\uC544\uB0B4\uC9C0 \uBABB\uD558\uBBC0\uB85C \uC9C1\uC811 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), button2("AI\uC6A9 \uB0B4\uC6A9 \uBBF8\uB9AC\uBCF4\uAE30", () => aiPreview(selection, { includeContacts, includeMaterials, includeEvidence }), "secondary full")),
     el("div", { class: "panel" }, el("h3", {}, "\uC774\uC804 \uAC1C\uC778 \uAE30\uB85D \uBCF4\uAD00"), el("p", {}, "\uC774\uC804 \uBC84\uC804\uC758 \uAC1C\uC778 \uC218\uD589 \uAE30\uB85D\uC744 \uC0AD\uC81C\uD558\uC9C0 \uC54A\uACE0 \uB0A8\uACA8 \uB450\uC5C8\uC2B5\uB2C8\uB2E4. \uC774 \uC571\uC5D0\uC11C\uB294 \uC0C8 \uAC1C\uC778 \uCCB4\uD06C\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC804\uB2EC JSON\uC5D0\uB294 \uD604\uC7AC \uC9C4\uD589\uAC74\uC758 \uC0C1\uD0DC\uAC00 \uB4E4\uC5B4\uAC11\uB2C8\uB2E4."), button2("\uC218\uD589 \uAE30\uB85D \uB0B4\uB824\uBC1B\uAE30", () => download(JSON.stringify({ schemaVersion: 1, kind: "handover-progress", documentId: doc.id, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), records: state.progress[doc.id] || {} }, null, 2), `${safeName(doc.title)}-\uC218\uD589\uAE30\uB85D.json`)), note("\uC218\uD589 \uAE30\uB85D\uC740 \uB2E4\uC2DC \uAC00\uC838\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."))
   ));
   panel.append(extras);
@@ -67193,54 +67590,67 @@ function aiPreview(selection, options, initialPurpose = "write") {
   const preview = el("textarea", { class: "ai-preview", rows: 14, "aria-label": "AI\uC5D0 \uBD99\uC5EC\uB123\uC744 \uD14D\uC2A4\uD2B8" });
   const refresh = () => {
     const selectedIds = /* @__PURE__ */ new Set([...selection.taskIds, ...selection.caseIds]);
-    const issues = issuesFor(current2()).filter((i2) => selectedIds.has(i2.itemId)).map((i2) => {
-      const item = [...current2().tasks, ...current2().cases].find((x2) => x2.id === i2.itemId);
+    const issues = issuesFor(current3()).filter((i2) => selectedIds.has(i2.itemId)).map((i2) => {
+      const item = [...current3().tasks, ...current3().cases].find((x2) => x2.id === i2.itemId);
       return `${item?.title || "\uC5C5\uBB34"}: ${i2.message}`;
     }).join("\n");
-    preview.value = (purpose === "ask" ? ask : write) + "\n\n" + exportAIText(current2(), { ...selection, ...config }) + "\n\n[\uADDC\uCE59\uC73C\uB85C \uCC3E\uC740 \uD655\uC778 \uD544\uC694 \uC0AC\uD56D]\n" + (issues || "\uD604\uC7AC \uC810\uAC80 \uADDC\uCE59\uC5D0\uC11C \uCC3E\uC740 \uD56D\uBAA9 \uC5C6\uC74C. \uC644\uC804\uC131 \uBCF4\uC99D\uC740 \uC544\uB2D9\uB2C8\uB2E4.");
+    preview.value = (purpose === "ask" ? ask : write) + "\n\n" + exportAIText(current3(), { ...selection, ...config }) + "\n\n[\uADDC\uCE59\uC73C\uB85C \uCC3E\uC740 \uD655\uC778 \uD544\uC694 \uC0AC\uD56D]\n" + (issues || "\uD604\uC7AC \uC810\uAC80 \uADDC\uCE59\uC5D0\uC11C \uCC3E\uC740 \uD56D\uBAA9 \uC5C6\uC74C. \uC644\uC804\uC131 \uBCF4\uC99D\uC740 \uC544\uB2D9\uB2C8\uB2E4.");
   };
   refresh();
   modal("AI\uC5D0 \uACF5\uC720\uD558\uAE30 \uC804 \uC9C1\uC811 \uD655\uC778\uD558\uC138\uC694", el("div", {}, note("\uC678\uBD80 AI\uC5D0 \uBD99\uC5EC\uB123\uC73C\uBA74 \uD574\uB2F9 \uC11C\uBE44\uC2A4\uB85C \uC815\uBCF4\uAC00 \uC804\uB2EC\uB429\uB2C8\uB2E4. \uC870\uC9C1\uC758 \uACF5\uC720 \uAE30\uC900\uC744 \uD655\uC778\uD558\uACE0, \uC544\uB798 \uD3C9\uBB38\uC5D0\uC11C \uBBFC\uAC10\uD55C \uBD80\uBD84\uC744 \uC9C1\uC811 \uC9C0\uC6B0\uC138\uC694.", "warning-text"), select("\uB3C4\uC6C0\uBC1B\uC744 \uBAA9\uC801", purpose, [["write", "\uC791\uC131 \uB0B4\uC6A9\uC744 \uB2E4\uB4EC\uAE30"], ["ask", "\uC778\uC218\uC790 \uC9C8\uBB38 \uB9CC\uB4E4\uAE30"]], (v) => {
     purpose = v;
     refresh();
-  }), check5("\uC5F0\uB77D\uD560 \uC5ED\uD560\xB7\uD68C\uC2E0 \uB300\uAE30 \uD3EC\uD568", config.includeContacts, (v) => {
+  }), check6("\uC5F0\uB77D\uD560 \uC5ED\uD560\xB7\uD68C\uC2E0 \uB300\uAE30 \uD3EC\uD568", config.includeContacts, (v) => {
     config.includeContacts = v;
     refresh();
-  }), check5("\uC900\uBE44\uC790\uB8CC \uD3EC\uD568", config.includeMaterials, (v) => {
+  }), check6("\uC900\uBE44\uC790\uB8CC \uD3EC\uD568", config.includeMaterials, (v) => {
     config.includeMaterials = v;
     refresh();
-  }), check5("\uADFC\uAC70 \uD3EC\uD568", config.includeEvidence, (v) => {
+  }), check6("\uADFC\uAC70 \uD3EC\uD568", config.includeEvidence, (v) => {
     config.includeEvidence = v;
     refresh();
   }), note("\uD3EC\uD568 \uC124\uC815\uC744 \uBC14\uAFB8\uBA74 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uB9CC\uB4ED\uB2C8\uB2E4. \uC9C1\uC811 \uC9C0\uC6B4 \uB0B4\uC6A9\uC774 \uC788\uB2E4\uBA74 \uB9C8\uC9C0\uB9C9\uC5D0 \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694."), preview), [(close) => button2("\uB2EB\uAE30", close), () => button2("\uD14D\uC2A4\uD2B8 \uD30C\uC77C \uB0B4\uB824\uBC1B\uAE30", () => download(preview.value, "\uC778\uC218\uC778\uACC4-AI-\uACF5\uC720\uC804\uD655\uC778.txt", "text/plain"), "primary")]);
 }
 function printView() {
-  const doc = current2(), selection = state.printSelection || { taskIds: doc.tasks.map((t) => t.id), caseIds: doc.cases.map((c) => c.id) };
+  const doc = state.printDocument || current3(), selection = state.printSelection || { taskIds: doc.tasks.map((t) => t.id), caseIds: doc.cases.map((c) => c.id) };
   const tasks = doc.tasks.filter((t) => selection.taskIds.includes(t.id)), cases = doc.cases.filter((c) => selection.caseIds.includes(c.id));
-  const sheet = el("section", { class: "print-sheet" }, el("div", { class: "actions no-print" }, button2("\uB0B4\uBCF4\uB0B4\uAE30\uB85C \uB3CC\uC544\uAC00\uAE30", () => switchView("export")), button2("\uC778\uC1C4 / PDF \uC800\uC7A5", () => window.print(), "primary")), el("header", { class: "print-heading" }, el("p", { class: "eyebrow" }, "\uC778\uC218\uC778\uACC4 A to Z"), el("h2", {}, doc.title || "\uC778\uC218\uC778\uACC4"), note(`\uCD9C\uB825\uC77C ${today()} \xB7 \uC120\uD0DD \uC5C5\uBB34 ${tasks.length}/${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589\xB7\uD655\uC778 \uAE30\uB85D ${cases.length}/${doc.cases.length}\uAC1C`), note("\uC5C5\uBB34 \uC548\uB0B4\uC640 \uC0AC\uC9C4\uC744 \uCD9C\uB825\uD569\uB2C8\uB2E4. PDF \uC6D0\uBB38 \uC790\uCCB4\xB7\uC804\uCCB4 \uCD94\uCD9C\uBB38\xB7\uB0B4\uBD80 \uC774\uB825\uC740 \uC804\uB2EC JSON\uC5D0 \uB0A8\uC2B5\uB2C8\uB2E4.")), renderWorkOverview({ doc, taskIds: selection.taskIds, el, button: button2 }), doc.onboarding.dayOne ? readBlock("\uCCAB\uB0A0 \uC548\uB0B4", doc.onboarding.dayOne) : null, doc.onboarding.firstWeek ? readBlock("\uCCAB \uC8FC \uC548\uB0B4", doc.onboarding.firstWeek) : null, el("h2", {}, "\uC5C5\uBB34 \uC548\uB0B4"));
+  const sheet = el("section", { class: "print-sheet" }, el("div", { class: "actions no-print" }, button2("\uB0B4\uBCF4\uB0B4\uAE30\uB85C \uB3CC\uC544\uAC00\uAE30", () => switchView("export")), button2("\uC778\uC1C4 / PDF \uC800\uC7A5", () => window.print(), "primary")), el("header", { class: "print-heading" }, el("p", { class: "eyebrow" }, "\uC778\uC218\uC778\uACC4 A to Z"), el("h2", {}, doc.title || "\uC778\uC218\uC778\uACC4"), note(`\uCD9C\uB825\uC77C ${today()} \xB7 \uC120\uD0DD \uC5C5\uBB34 ${tasks.length}/${doc.tasks.length}\uAC1C \xB7 \uC9C4\uD589\xB7\uD655\uC778 \uAE30\uB85D ${cases.length}/${doc.cases.length}\uAC1C`), note("\uC5C5\uBB34 \uC548\uB0B4\xB7\uC0AC\uC9C4\uACFC \uD655\uC778\uD55C PDF \uADFC\uAC70 \uCABD\uC744 \uCD9C\uB825\uD569\uB2C8\uB2E4. \uC6D0\uBB38 \uD30C\uC77C\uACFC \uC804\uCCB4 \uC790\uB8CC\uB294 \uC804\uB2EC JSON\uC5D0 \uBCF4\uC874\uB429\uB2C8\uB2E4.")), renderWorkOverview({ doc, taskIds: selection.taskIds, el, button: button2 }), el("h2", {}, "\uC5C5\uBB34 \uC548\uB0B4"));
   tasks.forEach((task, i2) => {
-    const item = el("article", { class: "print-item" }, el("h3", {}, `${i2 + 1}. ${task.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"}`), note(timingLabel(task.timing)), readBlock("\uCCAB \uD589\uB3D9", firstActionText(task) || "\uBCC4\uB3C4 \uD655\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4. \uC544\uB798 \uBCF8\uBB38\xB7\uADFC\uAC70\uC5D0\uC11C \uC2DC\uC791\uD560 \uACF3\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694."), task.timing.startRule ? readBlock("\uC2DC\uC791\xB7\uC900\uBE44 \uAE30\uC900", task.timing.startRule) : null, task.exceptions ? readBlock("\uB9C9\uD614\uC744 \uB54C \xB7 \uBA3C\uC800 \uD655\uC778", task.exceptions) : null, task.approval ? readBlock("\uC2B9\uC778\xB7\uD655\uC778", task.approval) : null);
+    const item = el("article", { class: "print-item" }, el("h3", {}, `${i2 + 1}. ${task.title || "\uC774\uB984 \uC5C6\uB294 \uC5C5\uBB34"}`), note(timingLabel(task.timing)), firstActionText(task) ? readBlock("\uCCAB \uD589\uB3D9", firstActionText(task)) : null, task.timing.startRule ? readBlock("\uC2DC\uC791\xB7\uC900\uBE44 \uAE30\uC900", task.timing.startRule) : null, task.exceptions ? readBlock("\uB9C9\uD614\uC744 \uB54C \xB7 \uBA3C\uC800 \uD655\uC778", task.exceptions) : null, task.approval ? readBlock("\uC2B9\uC778\xB7\uD655\uC778", task.approval) : null);
     const instructions = distinctInstructions(task);
     for (const part of instructions) item.append(...[readBlock(part.label, part.text), photos.gallery(task, part.key, { print: true })].filter(Boolean));
     for (const key of ["method", "steps"]) if (!instructions.some((p) => p.key === key)) item.append(...[photos.gallery(task, key, { print: true })].filter(Boolean));
     item.append(...[["\uC5EC\uAE30\uAE4C\uC9C0 \uD558\uBA74 \uB05D", "doneWhen"], ["\uC8FC\uB2F4\uB2F9 \uC5ED\uD560", "ownerRole"], ["\uC9C0\uC6D0 \uC5ED\uD560", "supportRole"], ["\uBAA9\uC801", "purpose"], ["\uC900\uBE44\uC790\uB8CC", "materials"], ["\uBB38\uC758\uD560 \uC5ED\uD560", "contacts"], ["\uADFC\uAC70 \uBA54\uBAA8", "evidence"]].map(([label, key]) => task[key] ? readBlock(label, task[key]) : null).filter(Boolean));
-    for (const source of doc.sourceFiles.filter((s) => task.sourceRefs.includes(s.id))) item.append(note(`\uADFC\uAC70: ${source.name}${source.pdf ? ` \xB7 PDF ${source.pdf.pageCount}\uCABD\uC740 JSON\uC5D0\uC11C \uC5F4\uB78C` : " \xB7 \uC6D0\uBCF8 \uBAA8\uC591 \uBBF8\uD3EC\uD568, \uCD94\uCD9C\uBB38\uC740 JSON\uC5D0\uC11C \uD655\uC778"}`));
+    for (const source of doc.sourceFiles.filter((s) => task.sourceRefs.includes(s.id))) {
+      if (source.pdf) {
+        const wanted = task.sourcePages?.find((link) => link.sourceId === source.id)?.pages;
+        for (const [index, page] of (selection.evidencePages || []).entries()) if (page.sourceId === source.id && (!wanted || wanted.includes(page.pageNumber))) item.append(el("p", {}, el("a", { href: `#print-evidence-${index}` }, `\uADFC\uAC70 \uCABD: ${source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`)));
+      } else item.append(note(`\uADFC\uAC70: ${source.name} \xB7 \uC6D0\uBCF8 \uBAA8\uC591 \uBBF8\uD3EC\uD568, \uCD94\uCD9C\uBB38\uC740 JSON\uC5D0\uC11C \uD655\uC778`));
+    }
     if (task.verifiedAt) item.append(note("\uCD5C\uC885 \uD655\uC778\uC77C " + task.verifiedAt));
     sheet.append(item);
   });
-  sheet.append(el("h2", {}, "\uC9C0\uAE08 \uC774\uC5B4\uBC1B\uC744 \uAC74 \xB7 \uD655\uC778 \uAE30\uB85D"));
+  if (cases.length) sheet.append(el("h2", {}, "\uC9C0\uAE08 \uC774\uC5B4\uBC1B\uC744 \uAC74 \xB7 \uD655\uC778 \uAE30\uB85D"));
   cases.forEach((item) => sheet.append(el("article", { class: "print-item" }, el("h3", {}, item.title || "\uC774\uB984 \uC5C6\uB294 \uAE30\uB85D"), note(caseStateLabel(item) + " \xB7 \uAE30\uD55C " + (item.dueDate || "\uBBF8\uD655\uC815")), legacyCaseNote(item), readBlock("\uB2E4\uC74C \uD589\uB3D9", item.nextAction || "\uD655\uC778 \uD544\uC694"), item.waitingFor ? readBlock("\uD68C\uC2E0 \uB300\uAE30", item.waitingFor) : null, item.notes ? readBlock("\uC9C4\uD589 \uBA54\uBAA8", item.notes) : null)));
+  if (tasks.length === doc.tasks.length && cases.length === doc.cases.length) {
+    if (doc.onboarding.dayOne) sheet.append(readBlock("\uCCAB\uB0A0 \uC548\uB0B4", doc.onboarding.dayOne));
+    if (doc.onboarding.firstWeek) sheet.append(readBlock("\uCCAB \uC8FC \uC548\uB0B4", doc.onboarding.firstWeek));
+  }
+  (selection.evidencePages || []).forEach((page, index) => {
+    const source = doc.sourceFiles.find((s) => s.id === page.sourceId);
+    sheet.append(el("figure", { class: "print-evidence", id: `print-evidence-${index}` }, el("figcaption", {}, `\uADFC\uAC70 \uCABD: ${source.name} \xB7 \uC6D0\uBB38 ${page.pageNumber}\uCABD`, el("p", {}, "\uC5F0\uACB0\uB41C \uC548\uB0B4: " + [...tasks, ...cases].filter((item) => item.sourceRefs.includes(source.id) && (!item.sourcePages?.find((link) => link.sourceId === source.id) || item.sourcePages.find((link) => link.sourceId === source.id).pages.includes(page.pageNumber))).map((item) => item.title).join(" \xB7 "))), el("img", { src: `data:image/png;base64,${page.data}`, width: page.width, height: page.height, alt: `${source.name} \uC6D0\uBB38 ${page.pageNumber}\uCABD \u2014 \uD45C\uC640 \uC0AC\uC9C4\uC744 \uD3EC\uD568\uD55C \uC6D0\uBB38 \uC774\uBBF8\uC9C0` })));
+  });
   sheet.append(note("\uC124\uBA85 \uC77D\uC74C\uACFC \uC2E4\uC81C \uC9C4\uD589\uAC74 \uC644\uB8CC\uB294 \uB2E4\uB985\uB2C8\uB2E4. \uCD9C\uB825\uBCF8\uC744 \uACE0\uCCD0\uB3C4 \uC804\uB2EC JSON\uC5D0 \uC790\uB3D9 \uBC18\uC601\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."));
   return sheet;
 }
 window.addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && current2()) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && current3()) {
     e.preventDefault();
     backup();
   }
 });
 window.addEventListener("beforeunload", (e) => {
-  if ((state.storageError || savePending || saveRunning) && current2()) {
+  if ((state.storageError || savePending || saveRunning) && current3()) {
     e.preventDefault();
     e.returnValue = "";
   }
