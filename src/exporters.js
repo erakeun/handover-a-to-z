@@ -1,11 +1,11 @@
 import {
-  AlignmentType, BorderStyle, Document, Footer, HeadingLevel, ImageRun, LineRuleType, PageNumber,
+  AlignmentType, Bookmark, BorderStyle, Document, Footer, HeadingLevel, ImageRun, InternalHyperlink, LineRuleType, PageNumber,
   Packer, Paragraph, ShadingType, Tab, Table, TableCell, TableLayoutType,
   TableRow, TextRun, WidthType,
 } from 'docx';
 import { validateDocument } from './model.js';
 import { decodeBase64 } from './image-data.js';
-import { buildWorkOverview } from './work-overview.js';
+import { caseState, caseStateLabel, caseRecordedLabel } from './handover-flow.js';
 
 const FONT = '맑은 고딕';
 const WIDTH = 9600;
@@ -19,9 +19,9 @@ const CADENCES = {
   halfyear: '반기마다', yearly: '매년', semester: '매 학기',
 };
 const WEEKDAYS = ['', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-const STATUSES = { todo: '시작 전', doing: '진행 중', waiting: '대기 중', done: '완료' };
 const DAY_RULES = {
   dayOfMonth: '매월 지정일', monthEnd: '매월 말일',
+  monthEndUnconfirmed: '매월 말(정확한 날짜 확인 필요)',
   monthStartUnconfirmed: '매월 초(정확한 날짜 확인 필요)',
   firstBusinessDay: '매월 첫 영업일(휴일·근무일 확인 필요)',
 };
@@ -83,16 +83,32 @@ function heading(text, level = HeadingLevel.HEADING_1) {
   return paragraph(text, { heading: level, keepNext: true });
 }
 
-function field(children, label, value) {
+function linkedParagraph(text, anchor, options = {}) {
+  return new Paragraph({
+    spacing: { after: 120, line: 300 }, widowControl: true, ...options,
+    children: [new InternalHyperlink({ anchor, children: textRuns(text, {
+      color: '1E3A5F', underline: {},
+    }) })],
+  });
+}
+
+function bookmarkedHeading(text, anchor, level = HeadingLevel.HEADING_1) {
+  return new Paragraph({
+    heading: level, keepNext: true,
+    children: [new Bookmark({ id: anchor, children: textRuns(text) })],
+  });
+}
+
+function field(children, label, value, keepWithNext = false) {
   children.push(paragraph(label, {
     keepNext: true, spacing: { before: 160, after: 50 },
   }, { bold: true, color: '334155' }));
-  children.push(paragraph(value === '' || value === undefined ? '미입력' : value));
+  children.push(paragraph(value === '' || value === undefined ? '미입력' : value, { keepNext: keepWithNext }));
 }
 
 const filled = value => value !== '' && value !== null && value !== undefined;
 
-function timingText(timing, includeStartRule = true) {
+function timingText(timing, includeStartRule = true, compact = false) {
   const lines = [];
   const used = new Set(['kind', 'startRule']);
   if (timing.dayRule === 'dayOfMonth') used.add('dayRule');
@@ -131,7 +147,8 @@ function timingText(timing, includeStartRule = true) {
     lines.push(`지정일 업무: ${timing.date || '날짜 미정'}`);
   } else if (timing.kind === 'event') {
     used.add('trigger');
-    lines.push('행사·상황 발생 시 수행', `발생 조건: ${timing.trigger || '미입력'}`);
+    lines.push('행사·상황 발생 시 수행');
+    if (!compact) lines.push(`발생 조건: ${timing.trigger || '미입력'}`);
   } else if (timing.kind === 'relative') {
     used.add('anchorDate');
     used.add('offsetDays');
@@ -157,7 +174,7 @@ function timingText(timing, includeStartRule = true) {
     ['offsetDays', '기준일과의 간격', offsetText],
   ].filter(([key]) => !used.has(key) && filled(timing[key]))
     .map(([key, label, format]) => `${label}: ${format(timing[key])}`);
-  if (saved.length) {
+  if (saved.length && !compact) {
     lines.push('저장된 보조 설정(현재 시점 유형의 일정 계산에는 사용하지 않음):', ...saved);
   }
   return lines.join('\n');
@@ -172,12 +189,12 @@ function sourceText(refs, document) {
   const sources = new Map(document.sourceFiles.map(source => [source.id, source]));
   return refs.map(id => {
     const source = sources.get(id);
-    return source ? `${source.name} (출처 ID: ${id})` : `출처 ID: ${id} (원본 출처 정보 없음)`;
+    return source ? source.name : '연결된 원본 출처 정보를 확인해야 합니다.';
   }).join('\n');
 }
 
 function summaryTable(tasks, numbers) {
-  const widths = [550, 3950, 5100];
+  const widths = [4900, 2000, 2700];
   const row = (values, isHeader = false) => new TableRow({
     ...(isHeader ? { tableHeader: true } : {}),
     // No fixed heights or cantSplit: long cells must be able to span pages.
@@ -185,7 +202,9 @@ function summaryTable(tasks, numbers) {
       width: { size: widths[i], type: WidthType.DXA },
       margins: { top: 100, bottom: 100, left: 120, right: 120 },
       ...(isHeader ? { shading: { type: ShadingType.CLEAR, fill: 'E8EFF6' } } : {}),
-      children: [paragraph(value, {
+      children: [typeof value === 'object' ? linkedParagraph(value.text, value.anchor, {
+        spacing: { after: 40, line: 300 }, keepNext: false,
+      }) : paragraph(value, {
         spacing: { after: 40, line: 300 }, keepNext: false,
       }, { bold: isHeader, size: 20 })],
     })),
@@ -200,8 +219,14 @@ function summaryTable(tasks, numbers) {
       insideHorizontal: border, insideVertical: border,
     },
     rows: [
-      row(['번호', '업무명', '언제 하나요'], true),
-      ...tasks.map((task, index) => row([String(numbers?.get(task.id) ?? index + 1), task.title, timingText(task.timing, false)])),
+      row(['세부 업무명 · 제목을 눌러 이동', '담당 역할', '언제 하나요'], true),
+      ...tasks.map((task, index) => {
+        const number = numbers?.get(task.id) ?? index + 1;
+        return row([
+          { text: `${number}. ${task.title}`, anchor: `handover_task_${number}` },
+          task.ownerRole || '담당 미입력', timingText(task.timing, false, true),
+        ]);
+      }),
     ],
   });
 }
@@ -221,7 +246,7 @@ function addImages(children, task, section) {
         data: decodeBase64(image.data),
         transformation: { width: image.width * ratio, height: image.height * ratio },
         altText: {
-          name: image.id,
+          name: `${section === 'steps' ? 'step' : 'method'}_photo_${index + 1}`,
           title: `${task.title || '이름 없는 업무'} · ${label}`,
           description: image.caption || `${task.title || '이름 없는 업무'}의 ${label}`,
         },
@@ -237,53 +262,81 @@ function addImages(children, task, section) {
 }
 
 function addTask(children, task, index, document, level = HeadingLevel.HEADING_2) {
-  children.push(heading(`${index + 1}. ${task.title}`, level));
-  field(children, '업무 ID', task.id);
-  field(children, '언제 하나요', timingText(task.timing));
-  if (task.method || !task.images?.some(image => image.section === 'method')) {
-    field(children, '어떤 방식으로 하나요', task.method);
-  } else {
-    children.push(paragraph('어떤 방식으로 하나요', { keepNext: true }, { bold: true, color: '334155' }));
+  const start = timingText(task.timing);
+  const firstAction = filled(task.firstAction) ? task.firstAction : '확인 필요: 먼저 할 일이 아직 적혀 있지 않습니다.';
+  const exceptions = filled(task.exceptions) ? task.exceptions : '확인 필요: 예외 대응이 아직 적혀 있지 않습니다.';
+  const doneWhen = filled(task.doneWhen) ? task.doneWhen : '확인 필요: 완료 기준이 아직 적혀 있지 않습니다.';
+  const core = [start, firstAction, exceptions, doneWhen].join('\n');
+  // A bounded short opening stays together; arbitrary long input must still
+  // flow across pages instead of creating an unbreakable oversized block.
+  const shortOpening = core.length <= 600 && core.split(/\r\n|\r|\n/).length <= 12;
+  children.push(bookmarkedHeading(`${index + 1}. ${task.title}`, `handover_task_${index + 1}`, level));
+  field(children, '언제 시작하나요', start, shortOpening);
+  field(children, '먼저 할 일', firstAction, shortOpening);
+  // Keep decisions needed before acting ahead of long instructions and photos.
+  field(children, '막히거나 예외가 생기면', exceptions, shortOpening);
+  field(children, '어디까지 하면 완료인가요', doneWhen);
+  if (filled(task.materials)) field(children, '시작 전에 준비할 것 · 접근 경로', task.materials);
+
+  // Exact equality only: similar paragraphs may contain different conditions.
+  // All photos survive, even when the corresponding text is empty or shared.
+  const sameProcedure = filled(task.steps) && task.steps === task.method;
+  const hasStepsPhotos = task.images?.some(image => image.section === 'steps');
+  const hasMethodPhotos = task.images?.some(image => image.section === 'method');
+  if (filled(task.steps) || hasStepsPhotos) {
+    if (filled(task.steps)) field(children, '지금 할 일 · 수행 절차', task.steps);
+    else children.push(paragraph('수행 절차 · 사진 안내', { keepNext: true }, { bold: true }));
+    addImages(children, task, 'steps');
   }
-  addImages(children, task, 'method');
-  const missing = [];
+  if (!sameProcedure && (filled(task.method) || hasMethodPhotos)) {
+    const label = filled(task.steps) ? '참고 설명 · 어떤 방식으로 하나요' : '지금 할 일 · 어떤 방식으로 하나요';
+    if (filled(task.method)) field(children, label, task.method);
+    else children.push(paragraph(label, { keepNext: true }, { bold: true }));
+    addImages(children, task, 'method');
+  } else if (sameProcedure) {
+    addImages(children, task, 'method');
+  }
+  if (!filled(task.steps) && !filled(task.method) && !hasStepsPhotos && !hasMethodPhotos) {
+    field(children, '지금 할 일 · 수행 절차', '확인 필요: 실행 방법이 아직 적혀 있지 않습니다.');
+  }
+  if (/\t/.test(`${task.method}${task.steps}`)) {
+    children.push(paragraph('탭으로 구분한 본문은 원래 표의 열 배치와 다르게 보일 수 있습니다. 조건과 대응의 관계는 근거 원문을 함께 확인하세요.', {}, { size: 20, color: '475569' }));
+  }
   for (const [label, key] of [
-    ['업무 목적', 'purpose'],
-    ['준비 자료·접근 경로', 'materials'], ['수행 절차', 'steps'],
-    ['주담당 역할', 'ownerRole'], ['지원 역할', 'supportRole'],
-    ['문의 역할', 'contacts'], ['검토·승인', 'approval'],
-    ['예외 상황과 대응', 'exceptions'], ['완료 기준', 'doneWhen'],
-    ['증빙·결과물', 'evidence'], ['최종 확인일', 'verifiedAt'],
+    ['검토·승인', 'approval'], ['증빙·결과물', 'evidence'], ['문의 역할', 'contacts'],
+    ['주담당 역할', 'ownerRole'], ['지원 역할', 'supportRole'], ['업무 목적', 'purpose'],
   ]) {
-    // Preserve every entered value verbatim, including intentional whitespace.
-    // Empty optional fields remain explicit without consuming two paragraphs each.
+    // User-entered content is preserved verbatim, including intentional spaces.
     if (filled(task[key])) field(children, label, task[key]);
-    else if (key === 'steps' && task.images?.some(image => image.section === 'steps')) {
-      children.push(paragraph(label, { keepNext: true }, { bold: true, color: '334155' }));
-    }
-    else missing.push(label);
-    if (key === 'steps') addImages(children, task, 'steps');
   }
-  if (missing.length) children.push(paragraph(`미입력 항목: ${missing.join(', ')}`));
   field(children, '접근 권한 확인', task.accessStatus === 'notApplicable'
     ? '해당 없음'
     : task.accessStatus ? (task.accessStatus === 'confirmed' ? '확인함' : '미확인')
       : task.accessChecked ? '확인함' : '미확인');
-  field(children, '초기 확인 대상', [
-    `첫날: ${task.firstDay ? '해당' : '해당 없음'}`,
-    `첫 주: ${task.firstWeek ? '해당' : '해당 없음'}`,
-  ].join(' / '));
+  field(children, '최종 내용 확인', task.verifiedAt || '확인 필요: 최종 확인일이 없습니다.');
+  if (task.firstDay || task.firstWeek) {
+    field(children, '처음 확인할 때', [task.firstDay ? '첫날 확인' : '', task.firstWeek ? '첫 주 확인' : ''].filter(Boolean).join(' / '));
+  }
   field(children, '근거 출처', sourceText(task.sourceRefs, document));
+  children.push(linkedParagraph('업무 지도로 돌아가기', 'handover_map'));
 }
 
-function addCase(children, item, index, document) {
+function addCase(children, item, index, document, taskNumbers) {
   children.push(heading(`${index + 1}. ${item.title}`, HeadingLevel.HEADING_2));
-  field(children, '진행 건 ID', item.id);
-  field(children, '현재 상태', STATUSES[item.status] ?? item.status);
-  field(children, '다음 행동', item.nextAction);
-  field(children, '기한', item.dueDate);
-  field(children, '기다리는 대상·회신', item.waitingFor);
-  field(children, '전달 메모', item.notes);
+  if (item.taskId) {
+    const task = document.tasks.find(task => task.id === item.taskId);
+    const number = taskNumbers.get(item.taskId);
+    if (task && number) children.push(linkedParagraph(`연결된 업무: ${number}. ${task.title}`, `handover_task_${number}`));
+    else children.push(paragraph('연결된 업무는 이 출력 범위에 포함되지 않았습니다. 인수인계 JSON에서 확인하세요.'));
+  }
+  field(children, '현재 상태', caseStateLabel(item));
+  if (caseState(item) === 'unknown' && item.status !== 'unknown') {
+    field(children, '이전 기록 · 현재 상태는 다시 확인', caseRecordedLabel(item));
+  }
+  field(children, '다음 행동', item.nextAction || '확인 필요: 다음 행동이 아직 적혀 있지 않습니다.');
+  field(children, '기한', item.dueDate || '확인 필요: 기한이 아직 적혀 있지 않습니다.');
+  if (filled(item.waitingFor)) field(children, '기다리는 대상·회신', item.waitingFor);
+  if (filled(item.notes)) field(children, '전달 메모', item.notes);
   field(children, '근거 출처', sourceText(item.sourceRefs, document));
 }
 
@@ -298,35 +351,6 @@ function taskGroups(document, tasks, partial) {
   return groups;
 }
 
-function workOverviewTable(owners) {
-  const widths = [1800, 2600, 5200];
-  const row = (values, header = false) => new TableRow({
-    ...(header ? { tableHeader: true } : {}),
-    // Repeat labels instead of merging cells, so readers retain the context
-    // when a long overview spans pages. Long titles may wrap and split freely.
-    children: values.map((value, index) => new TableCell({
-      width: { size: widths[index], type: WidthType.DXA },
-      margins: { top: 100, bottom: 100, left: 120, right: 120 },
-      ...(header ? { shading: { type: ShadingType.CLEAR, fill: 'E8EFF6' } } : {}),
-      children: [paragraph(value, { spacing: { after: 40, line: 300 }, keepNext: false }, {
-        size: 21, bold: header,
-      })],
-    })),
-  });
-  const border = { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' };
-  return new Table({
-    width: { size: WIDTH, type: WidthType.DXA },
-    columnWidths: widths,
-    layout: TableLayoutType.FIXED,
-    borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
-    rows: [
-      row(['담당 역할', '큰 업무', '세부 업무명'], true),
-      ...owners.flatMap(owner => owner.groups.flatMap(group =>
-        group.tasks.map(task => row([owner.owner, group.title, task.title])))),
-    ],
-  });
-}
-
 /**
  * Produce a self-contained DOCX in browsers and Node. No remote services are used.
  * Undefined selection includes all items; [] deliberately includes no items.
@@ -335,28 +359,38 @@ export async function exportDocx(document, options = {}) {
   const { tasks, cases, partial } = checkedInput(document, options);
   const groups = taskGroups(document, tasks, partial);
   const numbers = new Map(groups.flatMap(group => group.tasks).map((task, index) => [task.id, index + 1]));
+  const usedSources = new Set([...tasks, ...cases].flatMap(item => item.sourceRefs));
+  const sources = partial ? document.sourceFiles.filter(source => usedSources.has(source.id)) : document.sourceFiles;
+  const hasPDF = sources.some(source => source.pdf);
   const generatedAt = new Date().toISOString();
   const children = [
-    paragraph('업무 인수인계서', { spacing: { after: 100 } }, {
-      size: 22, color: '475569', bold: true,
-    }),
+    paragraph('업무 인수인계서', { spacing: { after: 100 } }, { size: 22, color: '475569', bold: true }),
     heading(document.title, HeadingLevel.TITLE),
     paragraph(`문서 생성일: ${generatedAt} (UTC)`, {}, { size: 18, color: '475569' }),
-    paragraph(`내보내기 범위: ${partial ? '선택 항목' : '전체 문서'} · 업무 ${tasks.length}개 · 진행 건 ${cases.length}개`),
+    paragraph(`내보내기 범위: ${partial ? '선택 항목' : '전체 업무·진행 건'} · 업무 ${tasks.length}개 · 진행 건 ${cases.length}개`),
+    paragraph(`읽는 범위: 업무 안내와 사진, 진행 건, 출처 이름·확인 경고를 담았습니다. 전체 원문 발췌와 복사 이력은 이 DOCX에 넣지 않았습니다. 보존된 자료는 인수인계 JSON을 열어 확인하세요.${hasPDF ? ' 근거 PDF도 이 DOCX에 포함되지 않았습니다. 표·페이지 확인에는 JSON의 근거 PDF를 함께 여세요.' : ''}`, {}, { size: 20, color: '475569' }),
     paragraph(SECURITY_NOTICE, {}, { size: 20, color: '9A3412' }),
-    heading('처음 시작하는 사람을 위한 안내'),
+    bookmarkedHeading('업무 지도 · 내 업무 한눈에 보기', 'handover_map'),
+    paragraph(`${partial ? '선택한 업무만 표시' : '전체 업무 표시'} · ${tasks.length}개. 큰 업무 아래에서 제목을 누르면 실행 안내로 이동합니다. 인쇄본에서는 같은 번호와 제목을 찾으세요.`),
   ];
-  field(children, '첫날 확인할 일', document.onboarding.dayOne);
-  field(children, '첫 주 확인할 일', document.onboarding.firstWeek);
-
-  children.push(heading('업무 한눈에 보기'));
   for (const group of groups) {
     if (group.title) children.push(heading(`큰 업무: ${group.title}`, HeadingLevel.HEADING_2));
     if (group.tasks.length) children.push(summaryTable(group.tasks, numbers));
     else if (group.title) children.push(paragraph('등록된 세부 업무가 없습니다.'));
   }
-  if (!tasks.length) children.push(paragraph('내보내기에 포함된 업무가 없습니다.'));
-  children.push(heading('업무 상세'));
+  if (!tasks.length) children.push(paragraph('표시할 업무가 없습니다.'));
+
+  children.push(heading('처음 시작하는 사람을 위한 안내'));
+  if (partial) children.push(paragraph('아래 첫날·첫 주 안내는 문서 전체에 공통으로 작성된 내용입니다. 선택한 업무에 맞는지 확인하세요.'));
+  field(children, '첫날 확인할 일', document.onboarding.dayOne);
+  field(children, '첫 주 확인할 일', document.onboarding.firstWeek);
+
+  children.push(heading('현재 진행 건 · 다음 행동'));
+  children.push(paragraph('반복 업무의 실행 방법과 별도로, 지금 넘겨받을 건을 확인하세요. 상태 미확인은 아직 현재 상황을 확인하지 못했다는 뜻입니다.'));
+  cases.forEach((item, index) => addCase(children, item, index, document, numbers));
+  if (!cases.length) children.push(paragraph('내보내기에 포함된 진행 건이 없습니다.'));
+
+  children.push(heading('업무 상세 · 실행 안내'));
   for (const group of groups) {
     if (group.title) children.push(heading(`큰 업무: ${group.title}`, HeadingLevel.HEADING_2));
     group.tasks.forEach(task => addTask(children, task, numbers.get(task.id) - 1, document,
@@ -365,43 +399,18 @@ export async function exportDocx(document, options = {}) {
   }
   if (!tasks.length) children.push(paragraph('내보내기에 포함된 업무가 없습니다.'));
 
-  children.push(heading('별도 인계할 진행 건'));
-  cases.forEach((item, index) => addCase(children, item, index, document));
-  if (!cases.length) children.push(paragraph('내보내기에 포함된 진행 건이 없습니다.'));
-
   children.push(heading('출처와 확인 사항'));
-  children.push(paragraph('원문에서 가져온 내용과 실제 업무 절차가 일치하는지 인계 담당자가 확인하세요. 원문 추출 경고가 있으면 원본 파일과 대조하세요.'));
-  const usedSources = new Set([...tasks, ...cases].flatMap(item => item.sourceRefs));
-  const sources = partial
-    ? document.sourceFiles.filter(source => usedSources.has(source.id))
-    : document.sourceFiles;
-  if (partial) {
-    children.push(paragraph('선택 내보내기에는 연결된 출처의 이름·정보·경고만 포함합니다. 원문 발췌에는 선택하지 않은 내용이 섞일 수 있어 생략했습니다.'));
-  }
+  children.push(paragraph('원문에서 가져온 내용과 실제 업무 절차가 일치하는지 인계 담당자가 확인하세요. 원문 추출 경고가 있으면 원본 파일과 대조하세요. 문서의 표·사진 배치가 실행 안내와 다를 수 있습니다.'));
+  if (partial) children.push(paragraph('선택한 업무·진행 건에 연결된 출처만 표시합니다. 원문 발췌에는 선택하지 않은 내용이 섞일 수 있어 생략했습니다.'));
   if (!sources.length) children.push(paragraph('포함된 출처 정보가 없습니다.'));
   sources.forEach((source, index) => {
     children.push(heading(`${index + 1}. ${source.name}`, HeadingLevel.HEADING_2));
-    field(children, '출처 ID', source.id);
-    field(children, '파일 형식', source.format);
-    field(children, '가져온 시각', source.importedAt);
-    field(children, '추출·확인 경고', source.warnings.length ? source.warnings.join('\n') : '기록된 경고 없음');
-    if (!partial) field(children, '원문 발췌', source.excerpt);
+    const linked = usedSources.has(source.id);
+    field(children, '읽는 범위', source.pdf
+      ? `근거 PDF ${source.pdf.pageCount}쪽은 이 DOCX에 포함되지 않았습니다. 근거 PDF는 인수인계 JSON에서 열람하세요.${linked ? '' : ' 선택된 업무·진행 건과 연결되지 않은 보관 자료입니다.'}`
+      : `출처 이름과 확인 경고만 표시합니다. 보존된 원문 발췌는 인수인계 JSON에서 확인하세요.${linked ? '' : ' 업무·진행 건과 연결되지 않은 보관 자료입니다.'}`);
+    field(children, '추출·확인 경고', source.warnings.length ? source.warnings.join('\n') : '기록된 경고 없음 · 원본과의 일치가 보증된 것은 아닙니다.');
   });
-
-  children.push(heading('문서 기록'));
-  field(children, '문서 ID', document.id);
-  field(children, '최초 작성 시각', document.createdAt);
-  field(children, '최종 수정 시각', document.updatedAt);
-  if (document.provenance !== undefined) {
-    field(children, '이전 문서·가져오기 기록', partial
-      ? '선택하지 않은 내용이 포함될 수 있어 선택 내보내기에서는 이전 기록 원문을 생략했습니다.'
-      : JSON.stringify(document.provenance, null, 2));
-  }
-  children.push(heading('내 업무 한눈에 보기'));
-  children.push(paragraph(`${partial ? '선택한 업무만 표시' : '전체 업무 표시'} · ${tasks.length}개`));
-  const overview = buildWorkOverview(document, { taskIds: tasks.map(task => task.id) });
-  if (overview.length) children.push(workOverviewTable(overview));
-  else children.push(paragraph('표시할 업무가 없습니다.'));
 
   const file = new Document({
     title: document.title,
@@ -485,6 +494,7 @@ export function exportAIText(document, options = {}) {
       '큰 업무:', groupNames.get(task.groupId) || '미분류 업무',
       '시점:', timingText(task.timing), '방식:', task.method,
       '수행 절차:', task.steps);
+    if (filled(task.firstAction)) lines.push('먼저 할 일:', task.firstAction);
     if (materials) lines.push('준비 자료·접근 경로:', task.materials);
     if (contacts) lines.push(
       '주담당 역할:', task.ownerRole || '미입력',
@@ -497,8 +507,9 @@ export function exportAIText(document, options = {}) {
   if (!cases.length) lines.push('포함된 진행 건 없음');
   cases.forEach((item, index) => {
     lines.push('', `[진행 건 ${index + 1}]`, '제목:', item.title,
-      '상태:', STATUSES[item.status] ?? item.status,
+      '상태:', caseStateLabel(item),
       '다음 행동:', item.nextAction, '기한:', item.dueDate || '미입력');
+    if (caseState(item) === 'unknown' && item.status !== 'unknown') lines.push('이전 기록 · 현재 상태는 다시 확인:', caseRecordedLabel(item));
     if (contacts) lines.push('기다리는 대상·회신:', item.waitingFor);
   });
   lines.push('', '=== 참고 자료 끝 ===');

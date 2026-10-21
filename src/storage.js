@@ -1,7 +1,10 @@
 import {validateDocument, stringifyDocument} from './model.js';
-export const DATA_KEY='handover.az.documents.v1';
+export const DATA_KEY='handover.az.documents.v3';
+export const LEGACY_DATA_KEY='handover.az.documents.v1';
+export const MIGRATION_KEY='handover.az.migration.v3';
 export const PROGRESS_KEY='handover.az.progress.v1';
-export const CURRENT_KEY='handover.az.current.v1';
+export const CURRENT_KEY='handover.az.current.v3';
+export const LEGACY_CURRENT_KEY='handover.az.current.v1';
 export function loadDocuments(storage) {
   const raw=storage.getItem(DATA_KEY);
   if (!raw) return [];

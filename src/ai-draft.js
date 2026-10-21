@@ -1,4 +1,4 @@
-import { createTask, makeId, stringifyDocument, validateDocument } from './model.js';
+import { CURRENT_SCHEMA_VERSION, createTask, makeId, stringifyDocument, validateDocument } from './model.js';
 
 export const AUTHOR_PROMPT = `내가 제공하는 인수인계 메모를 큰 업무 영역과 세부 업무로 정리해 주세요.
 내 메모의 사실만 사용하고, 담당자·절차·날짜·주기·승인 조건·시스템 주소·계정·인증정보를 추측하거나 만들어 내지 마세요.
@@ -195,6 +195,7 @@ export function applyAIDraft(document, groups) {
       }));
     }
   }
+  result.schemaVersion = CURRENT_SCHEMA_VERSION;
   result.updatedAt = now;
   const validation = validateDocument(result);
   check(validation.ok, `AI 초안을 추가할 수 없습니다.\n${validation.errors.join('\n')}`);

@@ -2,7 +2,8 @@ import { IMAGE_LIMITS, validateImage } from "./image-data.js";
 import { EXAMPLE_IMAGES } from "./example-images.js";
 
 /**
- * Portable v1/v2 data model. All dates are Gregorian civil dates, not UTC instants.
+ * Portable v1/v2/v3 data model. Legacy documents are never changed by reading.
+ * All dates are Gregorian civil dates, not UTC instants.
  * Limits apply to editable drafts as well as imported and exported documents.
  */
 export const LIMITS = Object.freeze({
@@ -23,19 +24,27 @@ export const LIMITS = Object.freeze({
   offsetDays: 36_600,
 });
 
+export const CURRENT_SCHEMA_VERSION = 3;
+
+/** PDF bytes stay inside the portable file; no URL or executable viewer is stored. */
+export const PDF_LIMITS = Object.freeze({ bytes: 10 * 1024 * 1024, pages: 200 });
+
 const BAD_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 // Tabs and CR/LF are deliberate exceptions: handover tables and paragraphs need them.
 const BAD_CONTROLS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/u;
 const CADENCES = new Set(["daily", "weekly", "monthly", "quarterly", "halfyear", "yearly", "semester"]);
-const DAY_RULES = new Set(["dayOfMonth", "monthEnd", "monthStartUnconfirmed", "firstBusinessDay"]);
+const DAY_RULES = new Set(["dayOfMonth", "monthEnd", "monthStartUnconfirmed", "monthEndUnconfirmed", "firstBusinessDay"]);
 const KINDS = new Set(["regular", "date", "event", "relative"]);
-const STATUSES = new Set(["todo", "doing", "waiting", "done"]);
+const STATUSES = new Set(["unknown", "todo", "doing", "waiting", "done"]);
 const ACCESS_STATUSES = new Set(["unconfirmed", "confirmed", "notApplicable"]);
 const TASK_TEXT = ["method", "purpose", "materials", "steps", "contacts", "approval", "exceptions", "doneWhen", "evidence"];
-const OPTIONAL_TASK_KEYS = ["groupId", "ownerRole", "supportRole", "accessStatus"];
-const TASK_KEYS = ["id", "title", "groupId", "ownerRole", "supportRole", "timing", ...TASK_TEXT, "verifiedAt", "accessChecked", "accessStatus", "sourceRefs", "firstDay", "firstWeek"];
+const OPTIONAL_TASK_KEYS = ["groupId", "ownerRole", "supportRole", "accessStatus", "firstAction"];
+const TASK_KEYS = ["id", "title", "groupId", "ownerRole", "supportRole", "timing", ...TASK_TEXT, "firstAction", "verifiedAt", "accessChecked", "accessStatus", "sourceRefs", "firstDay", "firstWeek"];
+const LEGACY_TASK_KEYS = TASK_KEYS.filter((key) => key !== "firstAction");
 const IMAGE_KEYS = ["id", "section", "caption", "mime", "width", "height", "data"];
-const CASE_KEYS = ["id", "title", "status", "nextAction", "dueDate", "waitingFor", "notes", "sourceRefs"];
+const OPTIONAL_CASE_KEYS = ["statusConfirmed", "taskId"];
+const CASE_KEYS = ["id", "title", "status", "statusConfirmed", "taskId", "nextAction", "dueDate", "waitingFor", "notes", "sourceRefs"];
+const LEGACY_CASE_KEYS = CASE_KEYS.filter((key) => !OPTIONAL_CASE_KEYS.includes(key));
 const SOURCE_KEYS = ["id", "name", "format", "importedAt", "excerpt", "warnings"];
 const TIMING_KEYS = ["kind", "cadence", "dayRule", "weekday", "day", "month", "date", "trigger", "anchorDate", "offsetDays", "startRule"];
 const DOCUMENT_KEYS = ["schemaVersion", "id", "title", "createdAt", "updatedAt", "groups", "tasks", "cases", "onboarding", "sourceFiles", "provenance"];
@@ -130,7 +139,7 @@ export function dateISO(date = new Date()) {
 export function createTask(overrides = {}) {
   const defaults = Object.fromEntries(TASK_TEXT.map((key) => [key, ""]));
   return {
-    id: makeId(), title: "", groupId: "", ownerRole: "", supportRole: "", ...defaults, verifiedAt: "",
+    id: makeId(), title: "", groupId: "", ownerRole: "", supportRole: "", ...defaults, firstAction: "", verifiedAt: "",
     accessChecked: overrides.accessStatus === "confirmed",
     accessStatus: overrides.accessChecked === true ? "confirmed" : "unconfirmed",
     sourceRefs: [], firstDay: false, firstWeek: false, ...overrides,
@@ -140,7 +149,7 @@ export function createTask(overrides = {}) {
 
 export function createCase(overrides = {}) {
   return {
-    id: makeId(), title: "", status: "todo", nextAction: "", dueDate: "",
+    id: makeId(), title: "", status: "unknown", statusConfirmed: false, taskId: "", nextAction: "", dueDate: "",
     waitingFor: "", notes: "", sourceRefs: [], ...overrides,
   };
 }
@@ -148,10 +157,36 @@ export function createCase(overrides = {}) {
 export function createDocument(overrides = {}) {
   const now = new Date().toISOString();
   return {
-    schemaVersion: 1, id: makeId(), title: "새 인수인계 문서", createdAt: now, updatedAt: now,
+    schemaVersion: CURRENT_SCHEMA_VERSION, id: makeId(), title: "새 인수인계 문서", createdAt: now, updatedAt: now,
     groups: [], tasks: [], cases: [], sourceFiles: [], ...overrides,
     onboarding: { dayOne: "", firstWeek: "", ...overrides.onboarding },
   };
+}
+
+/**
+ * Synchronous envelope validation, before allocating decoded PDF bytes.
+ * The PDF parser separately verifies structure, encryption and actual pages.
+ * Keeping this distinction avoids treating a valid base64 header as a readable PDF.
+ */
+export function inspectPdfEvidence(pdf) {
+  const check = (condition, message) => { if (!condition) throw new Error(message); };
+  check(isRecord(pdf) && [Object.prototype, null].includes(Object.getPrototypeOf(pdf)), "PDF 근거 객체가 필요합니다.");
+  const descriptors = Object.getOwnPropertyDescriptors(pdf);
+  check(Reflect.ownKeys(descriptors).length === 2 && ["data", "pageCount"].every((key) =>
+    descriptors[key]?.enumerable && owns(descriptors[key], "value")), "PDF 근거에는 data와 pageCount만 저장할 수 있습니다.");
+  const { data, pageCount } = pdf;
+  check(Number.isInteger(pageCount) && pageCount >= 1 && pageCount <= PDF_LIMITS.pages, "PDF는 1~200쪽까지 지원합니다.");
+  check(typeof data === "string" && data.length >= 12 && data.length % 4 === 0
+    && data.length <= 4 * Math.ceil(PDF_LIMITS.bytes / 3), "PDF base64는 비어 있지 않은 10 MiB 이내 데이터여야 합니다.");
+  const bytes = data.length / 4 * 3 - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
+  check(bytes <= PDF_LIMITS.bytes, "PDF 한 파일은 10 MiB 이하여야 합니다.");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  check(/^[A-Za-z0-9+/]*={0,2}$/u.test(data)
+    && (!data.endsWith("==") || (alphabet.indexOf(data.at(-3)) & 15) === 0)
+    && (!data.endsWith("=") || data.endsWith("==") || (alphabet.indexOf(data.at(-2)) & 3) === 0),
+  "PDF는 data URL·공백이 없는 정규 base64 문자열이어야 합니다.");
+  check(atob(data.slice(0, 12)).startsWith("%PDF-"), "정상적인 PDF 헤더가 아닙니다.");
+  return { bytes, pageCount };
 }
 
 /**
@@ -164,14 +199,16 @@ function inspectJSON(value, addError) {
   let count = 0;
   let stopped = false;
   let maximumString = LIMITS.excerpt;
+  let pdfStringAllowed = false;
   let graphCharacters = 0;
   let graphBudget = LIMITS.jsonBytes;
+  let graphVersion = 1;
   const charge = (length) => {
     graphCharacters += length;
     // Every code unit needs at least one UTF-8 JSON byte. This cheap lower bound
     // prevents huge repeated values from reaching JSON.stringify at all.
     if (graphCharacters > graphBudget) {
-      addError(`v${graphBudget === LIMITS.imageJsonBytes ? 2 : 1} JSON 문서는 UTF-8 기준 ${graphBudget === LIMITS.imageJsonBytes ? 24 : 5} MiB 이하여야 합니다.`);
+      addError(`v${graphVersion} JSON 문서는 UTF-8 기준 ${graphBudget === LIMITS.imageJsonBytes ? 24 : 5} MiB 이하여야 합니다.`);
       stopped = true;
     }
   };
@@ -190,7 +227,9 @@ function inspectJSON(value, addError) {
     if (typeof node === "string") {
       charge(node.length);
       if (stopped) return;
-      if (node.length > maximumString) { addError(`${path}: 문자열 길이 제한을 초과했습니다.`); return; }
+      const stringLimit = pdfStringAllowed && /^\$\.sourceFiles\[\d+\]\.pdf\.data$/u.test(path)
+        ? 4 * Math.ceil(PDF_LIMITS.bytes / 3) : maximumString;
+      if (node.length > stringLimit) { addError(`${path}: 문자열 길이 제한을 초과했습니다.`); return; }
       if (BAD_CONTROLS.test(node)) addError(`${path}: 허용하지 않는 제어문자가 있습니다.`);
       if (invalidUnicode(node)) addError(`${path}: 짝이 맞지 않는 유니코드 서로게이트가 있습니다.`);
       return;
@@ -219,9 +258,14 @@ function inspectJSON(value, addError) {
     }
     // Read the root version through a descriptor so accessors are never invoked.
     // v1 retains its original graph-wide string cap, including provenance.
-    if (depth === 0 && !array && Object.getOwnPropertyDescriptor(node, "schemaVersion")?.value === 2) {
-      maximumString = 4 * Math.ceil(IMAGE_LIMITS.imageBytes / 3);
-      graphBudget = LIMITS.imageJsonBytes;
+    if (depth === 0 && !array) {
+      const version = Object.getOwnPropertyDescriptor(node, "schemaVersion")?.value;
+      if (version === 2 || version === 3) {
+        maximumString = 4 * Math.ceil(IMAGE_LIMITS.imageBytes / 3);
+        pdfStringAllowed = version === 3;
+        graphBudget = LIMITS.imageJsonBytes;
+        graphVersion = version;
+      }
     }
     const keys = Reflect.ownKeys(node);
     if (keys.length > LIMITS.nodes) {
@@ -274,16 +318,19 @@ export function validateDocument(value) {
   const warning = (message) => { if (warnings.length < 100) warnings.push(message); };
   inspectJSON(value, error);
   if (errors.length) return { ok: false, errors, warnings };
+  const version = value?.schemaVersion;
+  const hasImages = version === 2 || version === 3;
+  const hasReviewFields = version === 3;
   // This is exactly the format stringifyDocument writes, so valid documents can
   // always be exported and imported again under the same byte budget.
-  const jsonBudget = value?.schemaVersion === 2 ? LIMITS.imageJsonBytes : LIMITS.jsonBytes;
+  const jsonBudget = hasImages ? LIMITS.imageJsonBytes : LIMITS.jsonBytes;
   if (encoder.encode(JSON.stringify(value, null, 2)).byteLength > jsonBudget) {
-    error(`v${value?.schemaVersion === 2 ? 2 : 1} JSON 문서는 UTF-8 기준 ${value?.schemaVersion === 2 ? 24 : 5} MiB 이하여야 합니다.`);
+    error(`v${hasImages ? version : 1} JSON 문서는 UTF-8 기준 ${hasImages ? 24 : 5} MiB 이하여야 합니다.`);
     return { ok: false, errors, warnings };
   }
   const object = (node, path, allowed, required = allowed) => {
     if (!isRecord(node)) { error(`${path}: 객체가 필요합니다.`); return false; }
-    for (const key of Object.keys(node)) if (!allowed.includes(key)) error(`${path}.${key}: v${value?.schemaVersion === 2 ? 2 : 1}에서 알 수 없는 속성입니다.`);
+    for (const key of Object.keys(node)) if (!allowed.includes(key)) error(`${path}.${key}: v${version}에서 알 수 없는 속성입니다.`);
     for (const key of required) if (!owns(node, key)) error(`${path}.${key}: 필수 속성이 없습니다.`);
     return true;
   };
@@ -330,7 +377,7 @@ export function validateDocument(value) {
     if (!object(node, path, TIMING_KEYS, ["kind"])) return;
     if (!KINDS.has(node.kind)) error(`${path}.kind: 지원하지 않는 일정 종류입니다.`);
     if (owns(node, "cadence") && node.cadence !== "" && !CADENCES.has(node.cadence)) error(`${path}.cadence: 지원하지 않는 반복 주기입니다.`);
-    if (owns(node, "dayRule") && !DAY_RULES.has(node.dayRule)) error(`${path}.dayRule: 지원하지 않는 월간 날짜 규칙입니다.`);
+    if (owns(node, "dayRule") && (!DAY_RULES.has(node.dayRule) || (!hasReviewFields && node.dayRule === "monthEndUnconfirmed"))) error(`${path}.dayRule: v${version}에서 지원하지 않는 월간 날짜 규칙입니다.`);
     for (const [key, min, max] of [["weekday", 1, 7], ["day", 1, 31], ["month", 1, 12], ["offsetDays", -LIMITS.offsetDays, LIMITS.offsetDays]]) {
       if (owns(node, key) && node[key] !== "" && (!Number.isInteger(node[key]) || node[key] < min || node[key] > max)) {
         error(`${path}.${key}: ${min}부터 ${max}까지의 정수 또는 빈 값이 필요합니다.`);
@@ -341,10 +388,13 @@ export function validateDocument(value) {
   };
 
   if (!object(value, "$", DOCUMENT_KEYS, DOCUMENT_KEYS.filter((key) => !["provenance", "groups"].includes(key)))) return { ok: false, errors, warnings };
-  if (value.schemaVersion !== 1 && value.schemaVersion !== 2) error("$.schemaVersion: 지원하는 스키마 버전은 숫자 1 또는 2입니다.");
+  if (![1, 2, 3].includes(version)) {
+    error("$.schemaVersion: 지원하는 스키마 버전은 숫자 1, 2, 3입니다. 이 파일은 최신 인수인계 A to Z에서 열어 주세요.");
+    return { ok: false, errors, warnings };
+  }
   // Reject count/size excess before base64 allocation, CRC, or decompression.
   let imageCount = 0, imageBytes = 0, imageBudgetExceeded = false;
-  if (value.schemaVersion === 2 && Array.isArray(value.tasks)) value.tasks.forEach((task, index) => {
+  if (hasImages && Array.isArray(value.tasks)) value.tasks.forEach((task, index) => {
     if (!Array.isArray(task?.images)) return;
     imageCount += task.images.length;
     if (task.images.length > IMAGE_LIMITS.perTask) {
@@ -356,7 +406,7 @@ export function validateDocument(value) {
       const size = image.data.length / 4 * 3 - (image.data.endsWith("==") ? 2 : image.data.endsWith("=") ? 1 : 0);
       imageBytes += Math.max(0, size);
       if (size > IMAGE_LIMITS.imageBytes) {
-        error(`$.tasks[${index}].images: v2 문서 이미지 한 장은 2 MiB 이하여야 합니다.`);
+        error(`$.tasks[${index}].images: v${version} 문서 이미지 한 장은 2 MiB 이하여야 합니다.`);
         imageBudgetExceeded = true;
       }
     }
@@ -366,7 +416,7 @@ export function validateDocument(value) {
     imageBudgetExceeded = true;
   }
   if (imageBytes > IMAGE_LIMITS.totalBytes) {
-    error("v2 문서 전체 이미지 용량은 16 MiB 이하여야 합니다.");
+    error(`v${version} 문서 전체 이미지 용량은 16 MiB 이하여야 합니다.`);
     imageBudgetExceeded = true;
   }
   if (imageBudgetExceeded) return { ok: false, errors, warnings };
@@ -389,7 +439,8 @@ export function validateDocument(value) {
   });
   if (list(value.tasks, "$.tasks", LIMITS.tasks)) value.tasks.forEach((task, index) => {
     const path = `$.tasks[${index}]`;
-    if (!object(task, path, value.schemaVersion === 2 ? [...TASK_KEYS, "images"] : TASK_KEYS, TASK_KEYS.filter((key) => !OPTIONAL_TASK_KEYS.includes(key)))) return;
+    const taskKeys = hasReviewFields ? TASK_KEYS : LEGACY_TASK_KEYS;
+    if (!object(task, path, hasImages ? [...taskKeys, "images"] : taskKeys, LEGACY_TASK_KEYS.filter((key) => !OPTIONAL_TASK_KEYS.includes(key)))) return;
     id(task.id, `${path}.id`);
     title(task.title, `${path}.title`);
     if (owns(task, "groupId") && string(task.groupId, `${path}.groupId`, LIMITS.id) && task.groupId !== "" && !groupIds.has(task.groupId)) {
@@ -399,12 +450,13 @@ export function validateDocument(value) {
     if (owns(task, "accessStatus") && !ACCESS_STATUSES.has(task.accessStatus)) error(`${path}.accessStatus: 지원하지 않는 자료 접근 확인 상태입니다.`);
     timing(task.timing, `${path}.timing`);
     TASK_TEXT.forEach((key) => string(task[key], `${path}.${key}`));
+    if (owns(task, "firstAction")) string(task.firstAction, `${path}.firstAction`, 2_000);
     if (string(task.verifiedAt, `${path}.verifiedAt`, 40) && task.verifiedAt !== "" && !parseCivil(task.verifiedAt) && !validTimestamp(task.verifiedAt)) {
       error(`${path}.verifiedAt: 빈 값, YYYY-MM-DD 날짜 또는 ISO 시각이 필요합니다.`);
     }
     ["accessChecked", "firstDay", "firstWeek"].forEach((key) => boolean(task[key], `${path}.${key}`));
     sourceRefs(task.sourceRefs, `${path}.sourceRefs`);
-    if (value.schemaVersion === 2 && owns(task, "images") && list(task.images, `${path}.images`, IMAGE_LIMITS.perTask)) {
+    if (hasImages && owns(task, "images") && list(task.images, `${path}.images`, IMAGE_LIMITS.perTask)) {
       task.images.forEach((image, imageIndex) => {
         const imagePath = `${path}.images[${imageIndex}]`;
         if (!object(image, imagePath, IMAGE_KEYS)) return;
@@ -416,10 +468,15 @@ export function validateDocument(value) {
   });
   if (list(value.cases, "$.cases", LIMITS.cases)) value.cases.forEach((item, index) => {
     const path = `$.cases[${index}]`;
-    if (!object(item, path, CASE_KEYS)) return;
+    if (!object(item, path, hasReviewFields ? CASE_KEYS : LEGACY_CASE_KEYS, LEGACY_CASE_KEYS)) return;
     id(item.id, `${path}.id`);
     title(item.title, `${path}.title`);
-    if (!STATUSES.has(item.status)) error(`${path}.status: 지원하지 않는 진행 상태입니다.`);
+    if (!STATUSES.has(item.status) || (!hasReviewFields && item.status === "unknown")) error(`${path}.status: v${version}에서 지원하지 않는 진행 상태입니다.`);
+    if (owns(item, "statusConfirmed")) boolean(item.statusConfirmed, `${path}.statusConfirmed`);
+    if (owns(item, "taskId") && string(item.taskId, `${path}.taskId`, LIMITS.id)
+      && item.taskId !== "" && (!Array.isArray(value.tasks) || !value.tasks.some((task) => task?.id === item.taskId))) {
+      error(`${path}.taskId: 존재하지 않는 업무 ID입니다.`);
+    }
     ["nextAction", "waitingFor", "notes"].forEach((key) => string(item[key], `${path}.${key}`));
     civil(item.dueDate, `${path}.dueDate`);
     sourceRefs(item.sourceRefs, `${path}.sourceRefs`);
@@ -427,7 +484,7 @@ export function validateDocument(value) {
   const sourceIds = new Set();
   if (list(value.sourceFiles, "$.sourceFiles", LIMITS.sources)) value.sourceFiles.forEach((source, index) => {
     const path = `$.sourceFiles[${index}]`;
-    if (!object(source, path, SOURCE_KEYS)) return;
+    if (!object(source, path, hasReviewFields ? [...SOURCE_KEYS, "pdf"] : SOURCE_KEYS, SOURCE_KEYS)) return;
     id(source.id, `${path}.id`);
     sourceIds.add(source.id);
     string(source.name, `${path}.name`, LIMITS.title, true);
@@ -435,6 +492,10 @@ export function validateDocument(value) {
     timestamp(source.importedAt, `${path}.importedAt`);
     string(source.excerpt, `${path}.excerpt`, LIMITS.excerpt);
     if (list(source.warnings, `${path}.warnings`, 200)) source.warnings.forEach((item, itemIndex) => string(item, `${path}.warnings[${itemIndex}]`, 2_000));
+    if (owns(source, "pdf")) {
+      if (source.format !== "pdf") error(`${path}.format: PDF 근거의 형식은 pdf여야 합니다.`);
+      try { inspectPdfEvidence(source.pdf); } catch (failure) { error(`${path}.pdf: ${failure.message}`); }
+    }
   });
   refs.forEach(({ reference, path }) => { if (!sourceIds.has(reference)) error(`${path}: 존재하지 않는 출처 ID "${reference}"입니다.`); });
   return { ok: errors.length === 0, errors, warnings };
@@ -483,9 +544,9 @@ function rejectDuplicateJSONKeys(text) {
 
 export function parseImport(text) {
   if (typeof text !== "string") throw new TypeError("JSON 텍스트를 전달해 주세요.");
-  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2 24 MiB 이하여야 합니다.");
+  if (text.length > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2/v3 24 MiB 이하여야 합니다.");
   const rawBytes = encoder.encode(text).byteLength;
-  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2 24 MiB 이하여야 합니다.");
+  if (rawBytes > LIMITS.imageJsonBytes) throw new Error("JSON 파일은 UTF-8 기준 v1 5 MiB, v2/v3 24 MiB 이하여야 합니다.");
   let document;
   try {
     // Scan nesting/count limits before JSON.parse can allocate an abusive graph.
@@ -495,7 +556,10 @@ export function parseImport(text) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new Error("올바른 JSON 문서가 아닙니다. 파일의 문법을 확인해 주세요.");
   }
-  if (document?.schemaVersion !== 2 && rawBytes > LIMITS.jsonBytes) throw new Error("v1 JSON 파일은 UTF-8 기준 5 MiB 이하여야 합니다.");
+  if (isRecord(document) && owns(document, "schemaVersion") && ![1, 2, 3].includes(document.schemaVersion)) {
+    throw new Error("이 파일은 최신 인수인계 A to Z에서 열어 주세요. 현재 내용은 바뀌지 않았습니다.");
+  }
+  if (document?.schemaVersion === 1 && rawBytes > LIMITS.jsonBytes) throw new Error("v1 JSON 파일은 UTF-8 기준 5 MiB 이하여야 합니다.");
   const result = validateDocument(document);
   if (!result.ok) throw new Error(`가져올 수 없는 인수인계 문서입니다.\n${result.errors.join("\n")}`);
   return { document, warnings: result.warnings };
@@ -526,6 +590,7 @@ export function importAsCopy(document) {
   const remap = (item) => ({
     ...item, id: fresh(item.id), sourceRefs: item.sourceRefs.map((reference) => map.get(reference)),
     ...(owns(item, "groupId") ? { groupId: item.groupId === "" ? "" : map.get(item.groupId) } : {}),
+    ...(owns(item, "taskId") ? { taskId: item.taskId === "" ? "" : map.get(item.taskId) } : {}),
     ...(owns(item, "images") ? { images: item.images.map((image) => ({ ...image, id: fresh(image.id) })) } : {}),
   });
   const tasks = source.tasks.map(remap);
@@ -590,6 +655,7 @@ export function dueInRange(task, startISO, endISO) {
   if (timing.cadence === "monthly") {
     if (!DAY_RULES.has(dayRule)) return unresolved("지원하지 않는 월간 날짜 규칙입니다.");
     if (dayRule === "monthStartUnconfirmed") return unresolved("월초의 정확한 날짜가 아직 확정되지 않았습니다. 달력 1일인지 다른 기준인지 확인해 주세요.");
+    if (dayRule === "monthEndUnconfirmed") return unresolved("월말에 하는 업무입니다. 정확한 날짜는 미확인이므로 달력의 말일로 확정하지 않습니다.");
     if (dayRule === "firstBusinessDay") return unresolved("첫 영업일은 기관 휴무일·공휴일 확인이 필요합니다. 확정 날짜를 입력해 주세요.");
   }
   if (timing.cadence === "weekly" && (!Number.isInteger(timing.weekday) || timing.weekday < 1 || timing.weekday > 7)) return unresolved("요일을 선택해 주세요(월요일 1~일요일 7).");
@@ -638,7 +704,7 @@ export function issuesFor(document, todayISO = dateISO()) {
     else if (ordinal(verified) > ordinal(today)) add(task, "verification-future", "마지막 확인일이 미래입니다. 날짜를 확인해 주세요.");
   }
   for (const item of document.cases ?? []) {
-    if (item.status !== "done" && !nonblank(item.nextAction)) add(item, "missing-next-action", "이 건을 이어받은 사람이 다음에 할 행동을 한 가지 적어 주세요.");
+    if (!(item.status === "done" && item.statusConfirmed === true) && !nonblank(item.nextAction)) add(item, "missing-next-action", "이 건을 이어받은 사람이 다음에 할 행동을 한 가지 적어 주세요.");
   }
   return issues;
 }
@@ -652,7 +718,7 @@ export function exampleDocument(todayISO = dateISO()) {
     return value ? civilString(value) : todayISO;
   };
   const document = createDocument({
-    schemaVersion: 2,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     title: "[가상 예시] 해솔 학습지원팀 업무 인수인계",
     onboarding: {
       dayOne: "이 문서는 기능 체험용 가상 예시입니다. 실제 기관의 규정·연락처·계정이 아닙니다.\n1. 전임자와 진행 중인 3건의 다음 행동을 함께 읽습니다.\n2. 본인 계정으로 예시 자료실의 열람 권한을 확인합니다. 비밀번호를 전달받지 않습니다.\n3. 오늘 일정과 긴급 문의 전달 경로를 확인하고 체크합니다.",
@@ -748,15 +814,15 @@ export function exampleDocument(todayISO = dateISO()) {
   });
   document.cases = [
     createCase({
-      title: "[가상] 다음 주 교육실 배정 확인", status: "doing", nextAction: "시설 담당 역할에게 가상 배정안의 검토 결과를 확인한다.",
+      title: "[가상] 다음 주 교육실 배정 확인", status: "doing", statusConfirmed: true, nextAction: "시설 담당 역할에게 가상 배정안의 검토 결과를 확인한다.",
       dueDate: atOffset(3), waitingFor: "", notes: "현재 상태: 배정안 작성 완료.\n주의: 이 예시의 공간과 담당자는 실제로 존재하지 않습니다.", sourceRefs: [source.id],
     }),
     createCase({
-      title: "[가상] 안내문 검토 회신 대기", status: "waiting", nextAction: "기한까지 회신이 없으면 검토 담당 역할에게 진행 상황을 확인한다.",
+      title: "[가상] 안내문 검토 회신 대기", status: "waiting", statusConfirmed: true, nextAction: "기한까지 회신이 없으면 검토 담당 역할에게 진행 상황을 확인한다.",
       dueDate: atOffset(5), waitingFor: "가상 검토 담당 역할의 문구 확인", notes: "전달 완료: 안내문 초안 v1.\n미확정: 최종 일정 문구.", sourceRefs: [source.id],
     }),
     createCase({
-      title: "[가상] 자료실 권한 신청 준비", status: "todo", nextAction: "", dueDate: "",
+      title: "[가상] 자료실 권한 신청 준비", status: "todo", statusConfirmed: true, nextAction: "", dueDate: "",
       waitingFor: "", notes: "누락 점검 기능을 체험하기 위해 다음 행동을 비워 둔 가상 사례입니다. 실제 인수 시 신청 담당 역할과 다음 행동을 적으세요.", sourceRefs: [source.id],
     }),
   ];

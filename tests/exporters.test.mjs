@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { unzipSync, strFromU8 } from 'fflate';
 import { DOMParser } from '@xmldom/xmldom';
 import { exportDocx, exportAIText } from '../src/exporters.js';
@@ -103,22 +104,22 @@ test('DOCX reopens as OOXML with Korean headings, onboarding, summary, details a
   const output = await reopen(document);
   for (const text of [
     document.title, '문서 생성일:', '처음 시작하는 사람을 위한 안내', '업무 한눈에 보기',
-    '업무 상세', '별도 인계할 진행 건', '출처와 확인 사항',
+    '업무 상세', '현재 진행 건 · 다음 행동', '출처와 확인 사항',
     document.onboarding.dayOne, document.onboarding.firstWeek,
     document.tasks[0].purpose, document.tasks[0].materials, document.tasks[0].contacts,
     document.tasks[0].ownerRole, document.tasks[0].supportRole,
     document.tasks[0].approval, document.tasks[0].exceptions, document.tasks[0].doneWhen,
     document.tasks[0].evidence, document.tasks[0].verifiedAt,
     document.cases[0].nextAction, document.cases[0].waitingFor, document.cases[0].notes,
-    document.sourceFiles[0].excerpt, ...document.sourceFiles[0].warnings,
-    document.sourceFiles[1].excerpt, '가상-이전-문서',
+    ...document.sourceFiles[0].warnings, ...document.sourceFiles[1].warnings,
   ]) assert.ok(output.text.includes(text), `preserved: ${text}`);
-  assert.ok(output.text.indexOf('업무 한눈에 보기') < output.text.indexOf('업무 상세'));
-  assert.ok(output.text.indexOf('업무 상세') < output.text.indexOf('별도 인계할 진행 건'));
+  assert.ok(output.text.indexOf('업무 지도') < output.text.indexOf('업무 상세'));
+  assert.ok(output.text.indexOf('현재 진행 건 · 다음 행동') < output.text.indexOf('업무 상세'));
+  for (const value of [document.id, document.sourceFiles[0].excerpt, document.sourceFiles[1].excerpt, '가상-이전-문서', 'PROVENANCE_PRIVATE_NOTE']) assert.ok(!output.text.includes(value), value);
   assert.ok(output.text.includes('암호화되지 않은 평문'));
   assert.ok(output.text.includes('직접 확인'));
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 2, 'summary plus final work overview');
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tblHeader').length, 2);
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 1, 'one front work map without a duplicate appendix');
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tblHeader').length, 1);
   assert.equal(output.dom.getElementsByTagNameNS(NS, 'trHeight').length, 0);
   assert.equal(output.dom.getElementsByTagNameNS(NS, 'cantSplit').length, 0);
   const styles = strFromU8(output.zip['word/styles.xml']);
@@ -143,7 +144,7 @@ test('DOCX preserves complete long Korean text, empty lines, spaces, CRLF and ta
   assert.ok(output.dom.getElementsByTagNameNS(NS, 'tab').length > 0);
 });
 
-test('35-task DOCX consolidates 245 missing fields without changing entered content or JSON', async () => {
+test('35-task reader DOCX preserves entered work and explicit unknowns without a missing-field wall', async () => {
   const document = fixture();
   const missingFields = [
     ['materials', '준비 자료·접근 경로'], ['steps', '수행 절차'],
@@ -164,11 +165,8 @@ test('35-task DOCX consolidates 245 missing fields without changing entered cont
   const originalJSON = JSON.stringify(document);
   const output = await reopen(document);
   assert.equal(JSON.stringify(document), originalJSON, 'DOCX export must not mutate the input document');
-  const missingParagraphs = output.paragraphs.filter(text => text.startsWith('미입력 항목: '));
-  assert.equal(missingParagraphs.length, 35);
-  for (const text of missingParagraphs) {
-    assert.equal(text, `미입력 항목: ${missingFields.map(([, label]) => label).join(', ')}`);
-  }
+  assert.equal(output.paragraphs.filter(text => text.startsWith('미입력 항목: ')).length, 0);
+  assert.equal(output.paragraphs.filter(text => text === '확인 필요: 완료 기준이 아직 적혀 있지 않습니다.').length, 35);
   for (const item of document.tasks) {
     for (const key of ['method', 'purpose', 'ownerRole', 'exceptions', 'evidence']) {
       assert.ok(output.paragraphs.includes(item[key]), `entered ${key} remains a complete literal paragraph`);
@@ -176,7 +174,7 @@ test('35-task DOCX consolidates 245 missing fields without changing entered cont
     assert.ok(output.paragraphs.some(text => text.includes(item.timing.startRule)));
   }
   for (const source of document.sourceFiles) {
-    assert.ok(output.paragraphs.includes(source.excerpt));
+    assert.ok(!output.paragraphs.includes(source.excerpt));
     for (const warning of source.warnings) assert.ok(output.text.includes(warning));
   }
   const populated = structuredClone(document);
@@ -184,8 +182,8 @@ test('35-task DOCX consolidates 245 missing fields without changing entered cont
     for (const [key] of missingFields) item[key] = key === 'verifiedAt' ? '2026-10-20' : `가상 입력 ${key}`;
   }
   const populatedOutput = await reopen(populated);
-  assert.equal(populatedOutput.paragraphs.length - output.paragraphs.length, 245 * 2 - 35);
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 9, 'eight group summaries plus final work overview');
+  for (const item of populated.tasks) for (const [key] of missingFields) assert.ok(populatedOutput.paragraphs.includes(item[key]), key);
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tbl').length, 8, 'eight group maps, no repeated appendix');
 });
 
 test('summary omits start rules while detailed DOCX and AI exports preserve them', async () => {
@@ -214,7 +212,7 @@ test('DOCX selection applies to summary/detail and excludes source excerpts in p
   ]) assert.ok(!output.text.includes(excluded), `excluded: ${excluded}`);
   assert.ok(output.text.includes('검증용 원문.docx'));
   assert.ok(output.text.includes('선택하지 않은 내용이 섞일 수 있어 생략'));
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tr').length, 4, 'selected task appears in summary and final overview');
+  assert.equal(output.dom.getElementsByTagNameNS(NS, 'tr').length, 2, 'selected task appears once in the map');
 
   const empty = await reopen(document, { taskIds: [], caseIds: [] });
   assert.equal(empty.dom.getElementsByTagNameNS(NS, 'tbl').length, 0);
@@ -239,7 +237,10 @@ test('malicious-looking markup is literal text, never XML or external relationsh
   document.tasks[0].title = '<img src=x onerror=alert(1)> 가상 업무';
   const output = await reopen(document);
   assert.ok(output.paragraphs.includes(literal));
-  assert.equal(output.dom.getElementsByTagNameNS(NS, 'hyperlink').length, 0);
+  for (const link of Array.from(output.dom.getElementsByTagNameNS(NS, 'hyperlink'))) {
+    assert.match(link.getAttribute('w:anchor'), /^handover_(map|task_\d+)$/);
+    assert.ok(!link.hasAttribute('r:id'), 'only generated internal links are allowed');
+  }
   assert.equal(output.dom.getElementsByTagName('script').length, 0);
   assert.ok(!strFromU8(output.zip['word/_rels/document.xml.rels']).includes('TargetMode="External"'));
   const ai = exportAIText(document);
@@ -310,7 +311,7 @@ test('DOCX and AI exports retain big-work groups while selection omits other gro
   document.tasks[1].groupId = 'group-2';
   const full = await reopen(document);
   for (const group of document.groups) assert.ok(full.text.includes(`큰 업무: ${group.title}`));
-  assert.equal(full.dom.getElementsByTagNameNS(NS, 'tbl').length, 3, 'two nonempty group summaries plus final work overview');
+  assert.equal(full.dom.getElementsByTagNameNS(NS, 'tbl').length, 2, 'two nonempty group maps');
   assert.ok(full.text.indexOf('학생 지원 큰 업무') < full.text.indexOf(document.tasks[0].title));
   assert.ok(full.text.includes('등록된 세부 업무가 없습니다.'));
   const selected = await reopen(document, { taskIds: ['task-1'], caseIds: [] });
@@ -403,4 +404,111 @@ test('invalid control characters, prototype keys and malformed export options ar
   assert.throws(() => exportAIText(valid, { caseIds: [3] }), /문자열 ID 배열/);
   assert.throws(() => exportAIText(valid, { includeContacts: 'false' }), /참 또는 거짓/);
   await assert.rejects(exportDocx(valid, null), /옵션은 객체/);
+});
+
+test('reader DOCX omits archive metadata in full and selected exports without deleting input', async () => {
+  const document = fixture();
+  document.provenance = { copyHistory: Array.from({ length: 25 }, (_, i) => ({
+    idMap: { [`INTERNAL_SOURCE_${i}`]: `INTERNAL_TARGET_${i}` }, sha256: `INTERNAL_HASH_${i}`,
+  })), original: { note: 'ARCHIVE_ONLY_NOTE' } };
+  document.tasks[0].method = '업무 접수번호 USER_REFERENCE_9281은 다음 담당자에게 그대로 전달합니다.';
+  const before = JSON.stringify(document);
+  for (const options of [{}, { taskIds: ['task-1'], caseIds: ['case-1'] }]) {
+    const result = await reopen(document, options);
+    for (const marker of ['INTERNAL_SOURCE_', 'INTERNAL_TARGET_', 'INTERNAL_HASH_', 'ARCHIVE_ONLY_NOTE', 'SOURCE_PRIVATE_EXCERPT', 'UNREFERENCED_SOURCE_SECRET', document.id]) {
+      assert.ok(!result.text.includes(marker), marker);
+    }
+    assert.ok(result.text.includes(document.tasks[0].method));
+    assert.ok(result.text.includes('보존된 자료는 인수인계 JSON을 열어 확인'));
+    assert.equal(JSON.stringify(document), before);
+  }
+});
+
+test('only exact method and steps repetitions are merged; similar text remains complete', async () => {
+  const document = fixture();
+  document.tasks = [document.tasks[0]];
+  document.tasks[0].method = '동일 절차 고유 문장\n1. 접수\n2. 확인\t완료';
+  document.tasks[0].steps = document.tasks[0].method;
+  const exact = await reopen(document);
+  assert.equal(exact.paragraphs.filter(text => text === document.tasks[0].method).length, 1);
+  for (const different of [document.tasks[0].method + ' ', document.tasks[0].method + '\n3. 반려 시 담당자 확인']) {
+    document.tasks[0].steps = different;
+    const result = await reopen(document);
+    assert.ok(result.paragraphs.includes(document.tasks[0].method));
+    assert.ok(result.paragraphs.includes(different));
+  }
+});
+
+test('first action is explicit and legacy case states remain unconfirmed until confirmed', async () => {
+  const document = fixture();
+  const legacy = await reopen(document);
+  assert.equal(document.schemaVersion, 1);
+  assert.equal(legacy.paragraphs.filter(text => text === '상태 미확인').length, 2);
+  document.schemaVersion = 3;
+  document.tasks[0].firstAction = '먼저 실제 접수 목록을 열고 미처리 건 수를 확인합니다.';
+  const original = JSON.stringify(document);
+  const output = await reopen(document);
+  assert.ok(output.paragraphs.includes(document.tasks[0].firstAction));
+  assert.ok(output.text.includes('확인 필요: 먼저 할 일이 아직 적혀 있지 않습니다.'));
+  assert.equal(output.paragraphs.filter(text => text === '상태 미확인').length, 2);
+  assert.ok(output.paragraphs.includes('회신 대기'));
+  assert.ok(output.paragraphs.includes('이전 기록 · 현재 상태는 다시 확인'));
+  assert.ok(exportAIText(document).includes('상태 미확인'));
+  assert.equal(JSON.stringify(document), original);
+  document.cases.forEach(item => { item.statusConfirmed = true; });
+  const confirmed = await reopen(document);
+  assert.equal(confirmed.paragraphs.filter(text => text === '상태 미확인').length, 0);
+  assert.ok(confirmed.paragraphs.includes('회신 대기'));
+});
+
+test('PDF evidence is named with page scope but is never attached or presented as rendered DOCX content', async () => {
+  const document = fixture();
+  document.schemaVersion = 3;
+  const data = Buffer.from(await readFile(new URL('../fixtures/import/synthetic-text-and-scan.pdf', import.meta.url))).toString('base64');
+  document.sourceFiles[0].format = 'pdf';
+  document.sourceFiles[0].name = '합성 근거 PDF.pdf';
+  document.sourceFiles[0].pdf = { data, pageCount: 2 };
+  const before = JSON.stringify(document);
+  const result = await reopen(document);
+  assert.ok(result.text.includes('합성 근거 PDF.pdf'));
+  assert.ok(result.text.includes('근거 PDF 2쪽은 이 DOCX에 포함되지 않았습니다.'));
+  assert.ok(result.text.includes('근거 PDF는 인수인계 JSON에서 열람'));
+  assert.ok(!result.text.includes(data));
+  assert.ok(!Object.keys(result.zip).some(name => /embeddings|\.pdf$/i.test(name)));
+  assert.equal(JSON.stringify(document), before);
+});
+
+test('all generated navigation links resolve to internal bookmarks and omit source identifiers', async () => {
+  const result = await reopen(fixture());
+  const bookmarks = Array.from(result.dom.getElementsByTagNameNS(NS, 'bookmarkStart')).map(node => node.getAttribute('w:name'));
+  assert.equal(new Set(bookmarks).size, 3);
+  assert.deepEqual([...bookmarks].sort(), ['handover_map', 'handover_task_1', 'handover_task_2']);
+  const links = Array.from(result.dom.getElementsByTagNameNS(NS, 'hyperlink'));
+  assert.equal(links.length, 4);
+  for (const link of links) assert.ok(bookmarks.includes(link.getAttribute('w:anchor')));
+});
+
+test('case-to-task links preserve the relation without revealing tasks outside the selected export', async () => {
+  const document = fixture();
+  document.schemaVersion = 3;
+  document.cases[0].taskId = document.tasks[1].id;
+  const full = await reopen(document);
+  assert.ok(full.text.includes(`연결된 업무: 2. ${document.tasks[1].title}`));
+  const selected = await reopen(document, { taskIds: ['task-1'], caseIds: ['case-1'] });
+  assert.ok(selected.text.includes('연결된 업무는 이 출력 범위에 포함되지 않았습니다.'));
+  assert.ok(!selected.text.includes(document.tasks[1].title));
+});
+
+test('month-end uncertainty and event detail stay explicit without overflowing the map with event prose', async () => {
+  const document = fixture();
+  document.schemaVersion = 3;
+  document.tasks[0].timing = { ...document.tasks[0].timing, dayRule: 'monthEndUnconfirmed' };
+  document.tasks[1].timing = { ...document.tasks[1].timing, kind: 'event', trigger: '발생 조건 고유 문장 '.repeat(200), startRule: '확정된 공지가 도착한 뒤 시작' };
+  const output = await reopen(document);
+  assert.ok(output.text.includes('매월 말(정확한 날짜 확인 필요)'));
+  assert.ok(output.text.includes(document.tasks[1].timing.trigger));
+  assert.ok(output.text.includes(document.tasks[1].timing.startRule));
+  const tables = Array.from(output.dom.getElementsByTagNameNS(NS, 'tbl')).map(visibleText).join('\n');
+  assert.ok(!tables.includes(document.tasks[1].timing.trigger));
+  assert.ok(tables.includes('행사·상황 발생 시 수행'));
 });

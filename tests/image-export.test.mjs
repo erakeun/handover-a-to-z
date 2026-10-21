@@ -13,6 +13,21 @@ const NS = {
   a: 'http://schemas.openxmlformats.org/drawingml/2006/main',
 };
 
+// These tests continue to exercise portable v2 photos. Do not smuggle v3
+// fields into an older-version fixture through the current draft constructors.
+function legacyTask(overrides) {
+  const task = createTask(overrides);
+  delete task.firstAction;
+  return task;
+}
+
+function legacyCase(overrides) {
+  const item = createCase({ status: 'todo', ...overrides });
+  delete item.statusConfirmed;
+  delete item.taskId;
+  return item;
+}
+
 async function attachment(filename, id, section, caption) {
   const bytes = new Uint8Array(await readFile(new URL(`../fixtures/images/${filename}`, import.meta.url)));
   const { mime, width, height } = inspectImageBytes(bytes);
@@ -23,7 +38,7 @@ async function fixture() {
   return createDocument({
     schemaVersion: 2, id: 'image-export-document', title: '합성 사진 포함 인수인계',
     tasks: [
-      createTask({
+      legacyTask({
         id: 'image-task-one', title: '화면을 보며 접수 확인',
         method: '방법 본문 고유 문장.\n원본 한글과 줄바꿈을 보존합니다.',
         steps: '단계 본문 고유 문장.\n1. 목록 확인\n2. 결과 저장',
@@ -32,12 +47,12 @@ async function fixture() {
           await attachment('large-portrait.jpg', 'image-step', 'steps', '세로 사진 설명 · 2단계 결과 확인'),
         ],
       }),
-      createTask({
+      legacyTask({
         id: 'image-task-two', title: '선택하지 않은 별도 업무', method: '',
         images: [await attachment('portrait.png', 'image-unselected', 'method', '선택하지 않은 사진 설명')],
       }),
     ],
-    cases: [createCase({ id: 'image-case', title: '사진 없는 진행 건', nextAction: '다음 회신 확인' })],
+    cases: [legacyCase({ id: 'image-case', title: '사진 없는 진행 건', nextAction: '다음 회신 확인' })],
   });
 }
 
@@ -72,6 +87,9 @@ async function reopen(document, options) {
 
 test('DOCX embeds exact PNG and JPEG bytes and keeps photos beside their method or steps', async () => {
   const document = await fixture();
+  assert.equal(document.schemaVersion, 2);
+  assert.ok(document.tasks.every(task => !Object.hasOwn(task, 'firstAction')));
+  assert.ok(document.cases.every(item => !Object.hasOwn(item, 'statusConfirmed') && !Object.hasOwn(item, 'taskId')));
   const original = stringifyDocument(document);
   // Test the actual JSON transport path before document export.
   const restored = parseImport(original).document;
@@ -93,7 +111,7 @@ test('DOCX embeds exact PNG and JPEG bytes and keeps photos beside their method 
     }
   }
   assert.ok(result.text.indexOf(document.tasks[0].method) < result.text.indexOf(document.tasks[0].images[0].caption));
-  assert.ok(result.text.indexOf(document.tasks[0].images[0].caption) < result.text.indexOf(document.tasks[0].steps));
+  assert.ok(result.text.indexOf(document.tasks[0].images[1].caption) < result.text.indexOf(document.tasks[0].method), 'execution steps precede background method text');
   assert.ok(result.text.indexOf(document.tasks[0].steps) < result.text.indexOf(document.tasks[0].images[1].caption));
   assert.equal(result.dom.getElementsByTagName('script').length, 0, 'caption markup remains literal text');
   assert.ok(!strFromU8(result.entries['word/_rels/document.xml.rels']).includes('TargetMode="External"'));
@@ -105,7 +123,7 @@ test('DOCX embeds exact PNG and JPEG bytes and keeps photos beside their method 
 test('large landscape and portrait photos fit A4, preserve proportions and stay with captions', async () => {
   const document = await fixture();
   const result = await reopen(document, { taskIds: ['image-task-one'], caseIds: [] });
-  const images = document.tasks[0].images;
+  const images = [...document.tasks[0].images].sort((a, b) => (a.section === 'steps' ? 0 : 1) - (b.section === 'steps' ? 0 : 1));
   const drawings = Array.from(result.dom.getElementsByTagNameNS(NS.wp, 'inline'));
   assert.equal(drawings.length, 2);
   drawings.forEach((drawing, index) => {
@@ -118,7 +136,8 @@ test('large landscape and portrait photos fit A4, preserve proportions and stay 
     // XML attribute whitespace is normalized; the visible caption paragraph
     // separately preserves its complete line breaks and literal markup.
     assert.equal(properties.getAttribute('descr'), images[index].caption.replace(/[\n\r\t]/g, ' '));
-    assert.equal(properties.getAttribute('name'), images[index].id);
+    assert.match(properties.getAttribute('name'), /^(step|method)_photo_\d+$/);
+    assert.notEqual(properties.getAttribute('name'), images[index].id);
     assert.ok(properties.getAttribute('title').includes(document.tasks[0].title));
   });
   result.paragraphs.forEach((paragraph, index) => {
@@ -172,4 +191,17 @@ test('AI export excludes photo binary and captions even with all sensitive-text 
   }
   assert.ok(result.includes(document.tasks[0].method));
   assert.ok(result.includes(document.tasks[0].steps));
+});
+
+test('merging identical instruction text keeps both sections’ exact photos and captions', async () => {
+  const document = await fixture();
+  document.tasks = [document.tasks[0]];
+  document.tasks[0].steps = document.tasks[0].method;
+  const result = await reopen(document);
+  assert.equal(result.paragraphs.filter(node => textOf(node) === document.tasks[0].method).length, 1);
+  assert.equal(result.media.length, 2);
+  for (const image of document.tasks[0].images) {
+    assert.ok(result.text.includes(image.caption));
+    assert.ok(result.media.some(([, bytes]) => Buffer.from(bytes).equals(Buffer.from(decodeBase64(image.data)))));
+  }
 });

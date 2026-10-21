@@ -17,15 +17,16 @@ async function overview(document, options) {
   assert.deepEqual(errors, []);
   const body = dom.getElementsByTagNameNS(NS, 'body')[0];
   const children = Array.from(body.childNodes).filter(node => node.nodeType === 1);
-  const titleIndex = children.findIndex(node => node.localName === 'p' && textOf(node) === '내 업무 한눈에 보기');
+  const titleIndex = children.findIndex(node => node.localName === 'p' && textOf(node) === '업무 지도 · 내 업무 한눈에 보기');
   assert.ok(titleIndex >= 0);
-  assert.ok(children.slice(0, titleIndex).some(node => textOf(node) === '문서 기록'), 'overview follows document records');
-  const appendix = children.slice(titleIndex).filter(node => node.localName !== 'sectPr');
-  const table = appendix.find(node => node.localName === 'tbl');
-  return { dom, body, appendix, text: appendix.map(textOf).join('\n'), table };
+  const endIndex = children.findIndex(node => textOf(node) === '처음 시작하는 사람을 위한 안내');
+  assert.ok(titleIndex < endIndex, 'map appears before onboarding and details');
+  const appendix = children.slice(titleIndex, endIndex);
+  const tables = appendix.filter(node => node.localName === 'tbl');
+  return { dom, body, appendix, text: appendix.map(textOf).join('\n'), tables, table: tables[0] };
 }
 
-test('DOCX ends with owner, large-work and complete small-task titles, including missing-owner labels', async () => {
+test('DOCX begins with owner, large-work and complete small-task titles, including missing-owner labels', async () => {
   const document = createDocument({
     groups: [{ id: 'g-one', title: '장학 업무' }, { id: 'g-two', title: '예산 업무' }],
     tasks: [
@@ -36,18 +37,18 @@ test('DOCX ends with owner, large-work and complete small-task titles, including
   });
   const original = JSON.stringify(document);
   const result = await overview(document);
-  assert.equal(result.appendix.at(-1).localName, 'tbl', 'overview table is the final document content');
+  assert.equal(result.tables.length, 2, 'one map table per large-work group');
   assert.ok(result.text.includes('전체 업무 표시 · 3개'));
   for (const label of ['담당 역할', '큰 업무', '세부 업무명', '김담당 / 이담당', '담당 미입력', '장학 업무', '예산 업무']) {
     assert.ok(result.text.includes(label), label);
   }
-  assert.equal(result.table.getElementsByTagNameNS(NS, 'tr').length, 4);
+  assert.equal(result.tables.reduce((sum, table) => sum + table.getElementsByTagNameNS(NS, 'tr').length - 1, 0), 3);
   assert.equal(result.table.getElementsByTagNameNS(NS, 'tblHeader').length, 1);
   for (const task of document.tasks) assert.ok(result.text.includes(task.title));
   assert.equal(JSON.stringify(document), original);
 });
 
-test('final overview respects selected tasks and does not include other owners or task titles', async () => {
+test('front map respects selected tasks and does not include other owners or task titles', async () => {
   const document = createDocument({ tasks: [
     createTask({ id: 'selected', title: '선택한 고유 업무', ownerRole: '선택 담당' }),
     createTask({ id: 'omitted', title: '제외한 고유 업무', ownerRole: '제외 담당' }),
@@ -75,9 +76,9 @@ test('many long Korean titles remain complete in an overview that may flow acros
     tasks,
   });
   const result = await overview(document);
-  const cells = Array.from(result.table.getElementsByTagNameNS(NS, 'tc')).map(textOf);
-  for (const task of tasks) assert.ok(cells.includes(task.title), `complete title: ${task.id}`);
-  assert.equal(result.table.getElementsByTagNameNS(NS, 'tr').length, 81);
+  const cells = result.tables.flatMap(table => Array.from(table.getElementsByTagNameNS(NS, 'tc')).map(textOf));
+  for (const task of tasks) assert.ok(cells.some(text => text.endsWith(task.title)), `complete title: ${task.id}`);
+  assert.equal(result.tables.reduce((sum, table) => sum + table.getElementsByTagNameNS(NS, 'tr').length - 1, 0), 80);
   assert.equal(result.table.getElementsByTagNameNS(NS, 'trHeight').length, 0);
   assert.equal(result.table.getElementsByTagNameNS(NS, 'cantSplit').length, 0);
   assert.equal(result.table.getElementsByTagNameNS(NS, 'vMerge').length, 0);

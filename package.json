@@ -1,6 +1,6 @@
 {
-  "name": "handover-a-to-z-review",
-  "version": "0.2.0",
+  "name": "handover-a-to-z",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {

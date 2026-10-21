@@ -165,6 +165,7 @@ export function renderCalendar({
   const summary = element('p', 'calendar-summary', `이 기간의 업무 ${scheduledTasks.size}개 · 일정 ${occurrences}회`);
   summary.setAttribute('role', 'status');
   root.append(summary);
+  if (!occurrences) root.append(element('p', 'helper', '확인된 날짜 일정 없음 · 월초·월말·상황별 업무는 아래에서 확인하세요.'));
 
   // Native table semantics keep ordinary Tab/Enter/Space behavior. A grid role
   // would promise arrow-key navigation and is intentionally not used.
@@ -257,6 +258,7 @@ export function renderCalendar({
 
   const pending = element('details', 'calendar-unresolved');
   pending.dataset.unresolvedCount = String(unresolved.length);
+  pending.open = unresolved.length > 0;
   pending.append(element('summary', 'calendar-unresolved-summary', `상황 발생·일정 미확정 업무 ${unresolved.length}개`));
   pending.append(element('p', 'calendar-unresolved-help', '상황이 생겨야 하거나 날짜 기준을 확인해야 하는 업무입니다. 날짜가 정해질 때까지 달력에 임의로 배치하지 않습니다.'));
   if (unresolved.length) {
