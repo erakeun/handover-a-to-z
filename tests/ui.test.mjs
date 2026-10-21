@@ -1055,7 +1055,7 @@ test('DOM PDF output asks for each selected item, and blank, invalid or cancelle
   await click('내보내기', ui.document.querySelector('.top-nav'));
   await selectOutputItems([task, item]);
   const before = snapshot();
-  await click('선택한 업무만 문서로 받기');
+  await click('선택한 업무만 문서로 받기');await click('필요한 쪽만 직접 연결',ui.document.querySelector('dialog'));
   const dialog = ui.document.querySelector('dialog');
   assert.match(dialog.querySelector('h2').textContent, /함께 전달할 근거 쪽/);
   assert.equal(dialog.querySelectorAll('.output-source').length, 1, 'one shared source is shown once');
@@ -1095,7 +1095,7 @@ test('DOM PDF preflight reuses one item’s confirmed pages without assigning th
   await click('내보내기', ui.document.querySelector('.top-nav'));
   await selectOutputItems([confirmed, pending]);
   const before = snapshot();
-  await click('인쇄 보기');
+  await click('인쇄 보기');await click('필요한 쪽만 직접 연결',ui.document.querySelector('dialog'));
   let dialog = ui.document.querySelector('dialog');
   assert.equal(dialog.querySelectorAll('.output-source input').length, 1);
   assert.equal(control(`${pending.title} · 근거 쪽`, dialog).value, '');
@@ -1149,7 +1149,7 @@ test('DOM newly confirmed page input is not persisted or upgraded when the page 
   await click('내보내기', ui.document.querySelector('.top-nav'));
   await selectOutputItems([task]);
   const before = snapshot();
-  await click('선택한 업무만 문서로 받기');
+  await click('선택한 업무만 문서로 받기');await click('필요한 쪽만 직접 연결',ui.document.querySelector('dialog'));
   const dialog = ui.document.querySelector('dialog');
   await fill(`${task.title} · 근거 쪽`, '1', dialog);
   const prototype = ui.HTMLCanvasElement.prototype;
@@ -1454,7 +1454,7 @@ test('completed case uses historical labels and reopening preserves the exact or
 test('batch PDF choices start unchecked, update only explicit items, and cancelling discards the pending batch', async () => {
  const doc=reviewExampleDocument(),selected=[doc.tasks[0],doc.tasks[1],doc.cases[0]];
  await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click('내보내기',ui.document.querySelector('.top-nav'));await selectOutputItems(selected);
- const before=snapshot();await click('선택한 업무만 문서로 받기');const dialog=ui.document.querySelector('dialog');
+ const before=snapshot();await click('선택한 업무만 문서로 받기');await click('필요한 쪽만 직접 연결',ui.document.querySelector('dialog'));const dialog=ui.document.querySelector('dialog');
  const boxes=[...dialog.querySelectorAll('.evidence-batch-items input')];assert.equal(boxes.length,3);assert.ok(boxes.every(box=>!box.checked));
  await fill('함께 연결할 근거 쪽','1',dialog);await click('선택한 항목에 같은 쪽 연결',dialog);assert.ok(selected.every(item=>control(item.title+' · 근거 쪽',dialog).value===''));
  for(const box of [boxes[0],boxes[2]]){box.checked=true;box.dispatchEvent(new ui.Event('change',{bubbles:true}));}
@@ -1463,4 +1463,54 @@ test('batch PDF choices start unchecked, update only explicit items, and cancell
  await fill(selected[0].title+' · 근거 쪽','2',dialog);assert.match(dialog.querySelector('.evidence-batch-items label').textContent,/2쪽 연결 예정/);
  await fill(selected[0].title+' · 근거 쪽','',dialog);assert.match(dialog.querySelector('.evidence-batch-items label').textContent,/미연결/);
  assert.deepEqual(snapshot(),before);await click('취소',dialog);assert.deepEqual(snapshot(),before);
+});
+
+
+test('one-note path preserves blank lines and literal text without splitting or asking for classification',async()=>{
+ await mount();await startNew();await click('메모 붙여넣기');
+ const text='첫 줄은 제목 후보\n\n1. 접수함을 확인합니다.\n2. 미확인 날짜는 그대로 둡니다.\n\n<표> 원문은 따로 확인';
+ await fill('붙여넣을 내용',text);await click('이대로 한 업무로 추가',ui.document.querySelector('dialog'));
+ const doc=savedDocument();assert.equal(doc.tasks.length,1);assert.equal(doc.tasks[0].title,'첫 줄은 제목 후보');assert.equal(doc.tasks[0].method,text);assert.equal(doc.tasks[0].groupId,'');assert.deepEqual(doc.tasks[0].sourceRefs,[]);assert.equal(doc.tasks[0].firstAction,'');
+ assert.equal(ui.document.querySelector('dialog'),null);assert.equal(ui.document.querySelector('.draft-list'),null);
+ const exported=JSON.parse(await backupText());assert.equal(exported.tasks[0].method,text);assert.equal(networkAttempts.length,0);
+});
+
+test('same PDF can gain a short guide from a case without file reselection or duplicating original bytes',async()=>{
+ const doc=reviewExampleDocument();await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click('진행·확인 기록 2');
+ await click('이 원문으로 다른 업무 안내');await fill('새 업무명','원문 조건을 보고 회신하기');await fill('덧붙일 안내 (선택)','원문 조건을 먼저 읽고 미확인 날짜를 물어봅니다.');
+ assert.equal(ui.document.querySelector('dialog input[type=file]'),null);await click('안내 추가',ui.document.querySelector('dialog'));
+ const after=savedDocument();assert.deepEqual(after.sourceFiles,doc.sourceFiles);assert.equal(after.tasks.length,doc.tasks.length+1);assert.deepEqual(after.tasks.slice(0,-1),doc.tasks);assert.deepEqual(after.cases,doc.cases);
+ const task=after.tasks.at(-1);assert.deepEqual(task.sourceRefs,[doc.sourceFiles[0].id]);assert.equal(task.sourcePages,undefined);assert.equal(control('업무명').value,task.title);assert.equal(control('하는 방법').value,task.method);
+});
+
+test('a stored PDF can be linked to an existing empty task without a new file or inferred pages',async()=>{
+ const doc=reviewExampleDocument();const task=createTask({title:'별도 가상 안내',method:'필요할 때 원문을 읽습니다.'});doc.tasks.push(task);
+ await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click([...ui.document.querySelectorAll('.map-task')].find(n=>n.textContent.includes(task.title)));
+ await click('이 업무에 PDF 근거 연결');await click(doc.sourceFiles[0].name,ui.document.querySelector('.stored-source-picker'));
+ const after=savedDocument();assert.deepEqual(after.sourceFiles,doc.sourceFiles);assert.deepEqual(after.tasks.at(-1).sourceRefs,[doc.sourceFiles[0].id]);assert.equal(after.tasks.at(-1).sourcePages,undefined);
+});
+
+test('whole-original decision replaces eight page judgments with no input and cancelling changes nothing',async()=>{
+ const doc=reviewExampleDocument();await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click('내보내기',ui.document.querySelector('.top-nav'));
+ const before=snapshot();await click('업무 안내 전체 받기 (.docx)');const dialog=ui.document.querySelector('dialog');
+ assert.match(dialog.textContent,/선택한 업무와 관계없는 쪽도/);assert.match(dialog.textContent,/원문 전체 2쪽/);assert.equal(dialog.querySelectorAll('input').length,0);assert.ok(button('원문 2쪽을 부록으로 함께',dialog));
+ assert.deepEqual(snapshot(),before);await click('취소',dialog);assert.deepEqual(snapshot(),before);assert.equal(downloads.length,0);
+});
+
+test('whole-original render failure never writes guessed page relations or produces partial output',async()=>{
+ const doc=reviewExampleDocument();await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click('내보내기',ui.document.querySelector('.top-nav'));const before=snapshot();
+ await click('업무 안내 전체 받기 (.docx)');const dialog=ui.document.querySelector('dialog'),prototype=ui.HTMLCanvasElement.prototype,previous=prototype.getContext;prototype.getContext=()=>{throw new Error('가상 렌더 실패');};
+ try{await click('원문 2쪽을 부록으로 함께',dialog);for(let attempt=0;attempt<100&&!dialog.querySelector('[role=alert]');attempt++)await new Promise(resolve=>originalSetTimeout(resolve,10));assert.match(dialog.querySelector('[role=alert]').textContent,/출력을 완료하지 못했습니다/);assert.deepEqual(snapshot(),before);assert.equal(downloads.length,0);}finally{prototype.getContext=previous;}
+});
+
+test('long original never offers automatic whole appendix and retains preview and page choice without mutation',async()=>{
+ const doc=reviewExampleDocument();doc.sourceFiles[0].pdf.pageCount=99;
+ await mount({[DATA_KEY]:JSON.stringify([doc]),[CURRENT_KEY]:doc.id});await click('이어서 작성');await click('내보내기',ui.document.querySelector('.top-nav'));const before=snapshot();
+ await click('업무 안내 전체 받기 (.docx)');const dialog=ui.document.querySelector('dialog');
+ assert.match(dialog.textContent,/원문 전체 99쪽/);assert.match(dialog.textContent,/20쪽/);assert.match(dialog.textContent,/JSON/);
+ assert.ok(button('원문 확인',dialog));assert.ok(button('필요한 쪽만 직접 연결',dialog));
+ assert.equal([...dialog.querySelectorAll('button')].filter(node=>node.textContent.includes('쪽을 부록으로 함께')).length,0);
+ assert.deepEqual(snapshot(),before);await click('필요한 쪽만 직접 연결',dialog);
+ assert.ok(control(doc.tasks[0].title+' · 근거 쪽',ui.document.querySelector('dialog')));assert.deepEqual(snapshot(),before);assert.equal(downloads.length,0);
+ await click('취소',ui.document.querySelector('dialog'));assert.deepEqual(snapshot(),before);
 });

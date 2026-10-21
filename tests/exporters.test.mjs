@@ -478,6 +478,8 @@ async function evidencePage(sourceId, pageNumber = 1) {
 
 test('selected reception keeps body before extra notes and includes chosen evidence without onboarding or empty cases', async () => {
   const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  document.tasks[0].sourcePages = [{ sourceId: document.sourceFiles[0].id, pages: [1] }];
   const task = document.tasks[0];
   const original = JSON.stringify(document);
   const page = await evidencePage(document.sourceFiles[0].id);
@@ -505,6 +507,8 @@ test('selected reception keeps body before extra notes and includes chosen evide
 
 test('linked PDF omissions and invalid evidence stop DOCX generation while original JSON stays intact', async () => {
   const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  document.tasks[0].sourcePages = [{ sourceId: document.sourceFiles[0].id, pages: [1] }];
   const original = JSON.stringify(document);
   const sourceId = document.sourceFiles[0].id;
   const page = await evidencePage(sourceId);
@@ -518,6 +522,65 @@ test('linked PDF omissions and invalid evidence stop DOCX generation while origi
   await assert.rejects(exportDocx(document, { taskIds: [], caseIds: [document.cases[0].id] }), /함께 전달할 근거 쪽을 선택/);
   const duplicate = await reopen(document, { ...selected, evidencePages: [page, { ...page }] });
   assert.equal(duplicate.paragraphs.filter(text => /원문 1쪽 \/ 총 2쪽/.test(text)).length, 1);
+  assert.equal(JSON.stringify(document), original);
+});
+
+test('explicit whole-original appendix includes every page once without claiming unconfirmed page links', async () => {
+  const document = reviewExampleDocument(), source = document.sourceFiles[0];
+  const original = JSON.stringify(document);
+  const pages = [await evidencePage(source.id, 1), await evidencePage(source.id, 2)];
+  const selected = { taskIds: [document.tasks[0].id], caseIds: [], evidencePages: [...pages].reverse(), wholeSourceIds: [source.id] };
+  const result = await reopen(document, selected);
+  assert.equal(result.paragraphs.filter(text => text === `참고 원문 부록: ${source.name} (업무별 쪽 미지정)`).length, 1);
+  assert.ok(!result.text.includes(`근거 쪽: ${source.name} · 원문`), 'unconfirmed task must not acquire a claimed page relation');
+  for (const page of pages) assert.equal(result.paragraphs.filter(text => text.endsWith(`원문 ${page.pageNumber}쪽 / 총 2쪽`)).length, 1);
+  assert.ok(result.text.indexOf('원문 1쪽 / 총 2쪽') < result.text.indexOf('원문 2쪽 / 총 2쪽'));
+  assert.ok(result.text.includes('원문 전체 2쪽을 참고 부록에 한 번씩 포함했습니다.'));
+  assert.ok(result.text.indexOf(document.tasks[0].method) < result.text.indexOf('근거 쪽 · 참고 원문 부록'));
+  const bookmarks = Array.from(result.dom.getElementsByTagNameNS(NS, 'bookmarkStart')).map(node => node.getAttribute('w:name'));
+  for (const link of Array.from(result.dom.getElementsByTagNameNS(NS, 'hyperlink'))) assert.ok(bookmarks.includes(link.getAttribute('w:anchor')));
+  const all = await reopen(document, { evidencePages: pages, wholeSourceIds: [source.id] });
+  assert.equal(all.paragraphs.filter(text => text === `참고 원문 부록: ${source.name} (업무별 쪽 미지정)`).length, 8);
+  for (const page of pages) assert.equal(all.paragraphs.filter(text => text.endsWith(`원문 ${page.pageNumber}쪽 / 총 2쪽`)).length, 1);
+  for (const task of document.tasks) for (const value of [task.method, task.steps, task.exceptions, task.doneWhen].filter(Boolean)) assert.ok(all.text.includes(value));
+  assert.equal(JSON.stringify(document), original);
+});
+
+test('whole appendix requires an explicit valid source choice and complete pages, never silently omitting a condition table', async () => {
+  const document = reviewExampleDocument(), sourceId = document.sourceFiles[0].id;
+  const original = JSON.stringify(document);
+  const pages = [await evidencePage(sourceId, 1), await evidencePage(sourceId, 2)];
+  const selected = { taskIds: [document.tasks[0].id], caseIds: [] };
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: pages }), /아직 지정되지 않았습니다/);
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: [pages[0]] }), /아직 지정되지 않았습니다/);
+  await assert.rejects(exportDocx(document, { ...selected, evidencePages: [pages[0]], wholeSourceIds: [sourceId] }), /원문 부록의 쪽이 빠져/);
+  for (const wholeSourceIds of [null, 'all', [sourceId, sourceId], ['missing'], [1]]) {
+    await assert.rejects(exportDocx(document, { ...selected, evidencePages: pages, wholeSourceIds }), /원문 부록/);
+  }
+  await assert.rejects(exportDocx(document, { taskIds: [], caseIds: [], evidencePages: [], wholeSourceIds: [sourceId] }), /원문 부록/);
+  assert.equal(JSON.stringify(document), original);
+});
+
+test('whole-original choice preserves known task-to-page links beside unconfirmed references', async () => {
+  const document = reviewExampleDocument(), source = document.sourceFiles[0];
+  document.schemaVersion = 4;
+  const known = document.tasks[0], unknown = document.tasks[1];
+  known.sourcePages = [{ sourceId: source.id, pages: [1] }];
+  const original = JSON.stringify(document);
+  const result = await reopen(document, {
+    taskIds: [known.id, unknown.id], caseIds: [], wholeSourceIds: [source.id],
+    evidencePages: [await evidencePage(source.id, 1), await evidencePage(source.id, 2)],
+  });
+  const knownStart = result.paragraphs.lastIndexOf(`1. ${known.title}`);
+  const unknownStart = result.paragraphs.lastIndexOf(`2. ${unknown.title}`);
+  const end = result.paragraphs.indexOf('출처와 확인 사항');
+  const knownText = result.paragraphs.slice(knownStart, unknownStart).join('\n');
+  const unknownText = result.paragraphs.slice(unknownStart, end).join('\n');
+  assert.ok(knownText.includes(`근거 쪽: ${source.name} · 원문 1쪽`));
+  assert.ok(!knownText.includes('업무별 쪽 미지정'));
+  assert.ok(!knownText.includes(`근거 쪽: ${source.name} · 원문 2쪽`));
+  assert.ok(unknownText.includes(`참고 원문 부록: ${source.name} (업무별 쪽 미지정)`));
+  assert.ok(!unknownText.includes(`근거 쪽: ${source.name}`));
   assert.equal(JSON.stringify(document), original);
 });
 
@@ -604,6 +667,8 @@ test('saved page relations require every needed page and link each task only to 
 
 test('single-task output keeps the full action guide before large evidence and has no policy-only tail', async () => {
   const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  document.tasks[0].sourcePages = [{ sourceId: document.sourceFiles[0].id, pages: [1] }];
   const task = document.tasks[0];
   const page = await evidencePage(document.sourceFiles[0].id);
   const before = JSON.stringify(document);
@@ -654,6 +719,8 @@ test('completed case output keeps the earlier action as history and reopening re
 
 test('PDF evidence links never hide an additional non-PDF source name', async () => {
   const document = reviewExampleDocument();
+  document.schemaVersion = 4;
+  document.tasks[0].sourcePages = [{ sourceId: document.sourceFiles[0].id, pages: [1] }];
   const task = document.tasks[0];
   const page = await evidencePage(document.sourceFiles[0].id);
   document.sourceFiles.push({ id: 'extra-source', name: '추가 참고자료.docx', format: 'docx', importedAt: now, excerpt: '', warnings: [] });

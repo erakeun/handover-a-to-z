@@ -24,5 +24,5 @@ export function distinctInstructions(task) {
 export function taskReadiness(task) {
   if (firstActionText(task)) return '첫 행동 안내 있음';
   if (distinctInstructions(task).length) return '본문 안내 있음';
-  return task?.sourceRefs?.length ? '원문으로 보기' : '읽기 확인 필요';
+  return task?.sourceRefs?.length ? '참고자료 있음' : '읽기 확인 필요';
 }

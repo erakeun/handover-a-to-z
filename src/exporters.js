@@ -61,10 +61,16 @@ function checkedInput(document, options) {
 // Evidence page images are a temporary export choice, never a document field.
 // Refuse missing/invalid pages instead of silently producing instructions whose
 // required source is available only in another file.
-function checkedEvidencePages(document, tasks, cases, value = []) {
+function checkedEvidencePages(document, tasks, cases, value = [], wholeSourceIds = []) {
   if (!Array.isArray(value) || value.length > 20) throw new Error('함께 전달할 근거 쪽은 20쪽 이내로 선택해 주세요.');
   const used = new Set([...tasks, ...cases].flatMap(item => item.sourceRefs));
   const sources = document.sourceFiles.filter(source => used.has(source.id) && source.pdf);
+  if (!Array.isArray(wholeSourceIds) || wholeSourceIds.some(id => typeof id !== 'string')
+    || new Set(wholeSourceIds).size !== wholeSourceIds.length
+    || wholeSourceIds.some(id => !sources.some(source => source.id === id))) {
+    throw new Error('원문 부록은 선택한 업무·진행 건에 연결된 PDF만 중복 없이 선택해 주세요.');
+  }
+  const wholeSources = new Set(wholeSourceIds);
   const pages = [];
   let totalBytes = 0;
   for (const page of value) {
@@ -86,39 +92,57 @@ function checkedEvidencePages(document, tasks, cases, value = []) {
     }
     totalBytes += bytes.length;
     if (totalBytes > 32 * 1024 * 1024) throw new Error('근거 쪽 이미지 합계가 32 MiB를 넘습니다. 필요한 쪽을 나누어 출력해 주세요.');
-    pages.push({ ...page, source, bytes, anchor: `handover_evidence_${pages.length + 1}` });
+    pages.push({ ...page, source, bytes, wholeSource: wholeSources.has(source.id), anchor: `handover_evidence_${pages.length + 1}` });
   }
   for (const source of sources) {
     const included = pages.filter(page => page.sourceId === source.id).map(page => page.pageNumber);
     if (!included.length) {
       throw new Error(`${source.name}: 함께 전달할 근거 쪽을 선택해 주세요. 필요한 표·사진이 빠진 문서는 만들지 않았습니다.`);
     }
+    if (wholeSources.has(source.id) && (included.length !== source.pdf.pageCount
+      || Array.from({ length: source.pdf.pageCount }, (_, index) => index + 1).some(number => !included.includes(number)))) {
+      throw new Error(`${source.name}: 원문 부록의 쪽이 빠져 문서를 만들지 않았습니다. 전체 ${source.pdf.pageCount}쪽을 함께 전달해 주세요.`);
+    }
     for (const item of [...tasks, ...cases].filter(item => item.sourceRefs.includes(source.id))) {
       const saved = item.sourcePages?.find(reference => reference.sourceId === source.id);
+      if (!saved && source.pdf.pageCount > 1 && !wholeSources.has(source.id)) {
+        throw new Error(`${item.title}: 필요한 근거 쪽이 아직 지정되지 않았습니다. 원문 전체를 부록으로 함께 전달하거나 필요한 쪽을 직접 연결해 주세요.`);
+      }
       const required = saved?.pages || (source.pdf.pageCount === 1 ? [1] : []);
       if (required.some(pageNumber => !included.includes(pageNumber))) {
         throw new Error(`${item.title}: 연결한 근거 쪽이 빠져 문서를 만들지 않았습니다. ${source.name}의 ${required.join(', ')}쪽을 함께 전달해 주세요.`);
       }
     }
   }
+  // Preserve the source document order even when a caller supplies rendered
+  // pages out of order. A whole-original link always starts at its first page.
+  pages.sort((a, b) => sources.indexOf(a.source) - sources.indexOf(b.source) || a.pageNumber - b.pageNumber);
+  pages.forEach((page, index) => { page.anchor = `handover_evidence_${index + 1}`; });
   return pages;
 }
 
 function refersToPage(item, page) {
   if (!item.sourceRefs.includes(page.sourceId)) return false;
   const saved = item.sourcePages?.find(reference => reference.sourceId === page.sourceId);
-  return saved ? saved.pages.includes(page.pageNumber) : page.source.pdf.pageCount === 1 ? page.pageNumber === 1 : true;
+  return saved ? saved.pages.includes(page.pageNumber) : page.source.pdf.pageCount === 1 && page.pageNumber === 1;
 }
 
 function evidenceLinks(children, item, pages) {
   for (const page of pages.filter(page => refersToPage(item, page))) {
     children.push(linkedParagraph(`근거 쪽: ${page.source.name} · 원문 ${page.pageNumber}쪽`, page.anchor));
   }
+  const linked = new Set();
+  for (const page of pages) {
+    if (!page.wholeSource || !item.sourceRefs.includes(page.sourceId)
+      || item.sourcePages?.some(reference => reference.sourceId === page.sourceId) || linked.has(page.sourceId)) continue;
+    linked.add(page.sourceId);
+    children.push(linkedParagraph(`참고 원문 부록: ${page.source.name} (업무별 쪽 미지정)`, page.anchor));
+  }
 }
 
 function addEvidencePages(children, pages, tasks, numbers) {
   if (!pages.length) return;
-  children.push(heading('함께 전달한 근거 쪽'));
+  children.push(heading(pages.some(page => page.wholeSource) ? '근거 쪽 · 참고 원문 부록' : '함께 전달한 근거 쪽'));
   pages.forEach((page, index) => {
     children.push(bookmarkedHeading(`${index + 1}. ${page.source.name} · 원문 ${page.pageNumber}쪽 / 총 ${page.source.pdf.pageCount}쪽`, page.anchor, HeadingLevel.HEADING_2));
     const ratio = Math.min(1, IMAGE_WIDTH / page.width, 760 / page.height);
@@ -135,10 +159,13 @@ function addEvidencePages(children, pages, tasks, numbers) {
         },
       })],
     }));
-    children.push(paragraph('선택한 원문 쪽을 그대로 담은 이미지입니다. 표·사진과 실행 안내를 함께 확인하세요.', {}, { size: 18, color: '475569' }));
+    children.push(paragraph(page.wholeSource
+      ? '원문 전체를 한 번씩 담은 참고 부록입니다. 업무별 쪽 관계가 미지정인 안내는 이 자료에서 직접 확인하세요.'
+      : '선택한 원문 쪽을 그대로 담은 이미지입니다. 표·사진과 실행 안내를 함께 확인하세요.', {}, { size: 18, color: '475569' }));
     for (const task of tasks.filter(task => refersToPage(task, page))) {
       children.push(linkedParagraph(`업무로 돌아가기: ${task.title}`, `handover_task_${numbers.get(task.id)}`));
     }
+    if (page.wholeSource) children.push(linkedParagraph('업무 지도로 돌아가기', 'handover_map'));
   });
 }
 
@@ -406,7 +433,7 @@ function addTask(children, task, index, document, level = HeadingLevel.HEADING_2
   if (task.firstDay || task.firstWeek) {
     field(children, '처음 확인할 때', [task.firstDay ? '첫날 확인' : '', task.firstWeek ? '첫 주 확인' : ''].filter(Boolean).join(' / '));
   }
-  const otherSources = task.sourceRefs.filter(sourceId => !evidencePages.some(page => page.sourceId === sourceId && refersToPage(task, page)));
+  const otherSources = task.sourceRefs.filter(sourceId => !evidencePages.some(page => page.sourceId === sourceId && (refersToPage(task, page) || page.wholeSource)));
   if (otherSources.length || !task.sourceRefs.length) field(children, '근거 출처', sourceText(otherSources, document));
   children.push(linkedParagraph('업무 지도로 돌아가기', 'handover_map'));
 }
@@ -450,7 +477,7 @@ function taskGroups(document, tasks, partial) {
  */
 export async function exportDocx(document, options = {}) {
   const { tasks, cases, partial } = checkedInput(document, options);
-  const evidencePages = checkedEvidencePages(document, tasks, cases, options.evidencePages);
+  const evidencePages = checkedEvidencePages(document, tasks, cases, options.evidencePages, options.wholeSourceIds);
   const groups = taskGroups(document, tasks, partial);
   const numbers = new Map(groups.flatMap(group => group.tasks).map((task, index) => [task.id, index + 1]));
   const usedSources = new Set([...tasks, ...cases].flatMap(item => item.sourceRefs));
@@ -502,16 +529,19 @@ export async function exportDocx(document, options = {}) {
   }
 
   children.push(heading('출처와 확인 사항'));
-  children.push(paragraph(`업무 안내·사진과 선택한 근거 쪽을 담았습니다. 전체 원문·복사 이력은 JSON에서 확인하세요.${partial ? ' 선택하지 않은 내용이 섞일 수 있어 생략한 원문 발췌도 JSON에 남습니다.' : ''}`, {}, { size: 20, color: '475569' }));
+  children.push(paragraph(`업무 안내·사진과 선택한 근거 쪽${evidencePages.some(page => page.wholeSource) ? '·참고 원문 부록' : ''}을 담았습니다. ${evidencePages.some(page => page.wholeSource) ? '원본 파일' : '전체 원문'}·복사 이력은 JSON에서 확인하세요.${partial ? ' 선택하지 않은 내용이 섞일 수 있어 생략한 원문 발췌도 JSON에 남습니다.' : ''}`, {}, { size: 20, color: '475569' }));
   children.push(paragraph('암호화되지 않은 평문입니다. 공유 전 개인정보·비밀번호·인증정보를 직접 확인하고 제거하세요. 아래 추출 경고와 실제 절차는 원본과 대조하세요.', {}, { size: 20, color: '9A3412' }));
   if (!sources.length) children.push(paragraph('포함된 출처 정보가 없습니다.'));
   sources.forEach((source, index) => {
     children.push(heading(`${index + 1}. ${source.name}`, HeadingLevel.HEADING_2));
     const linked = usedSources.has(source.id);
     const included = evidencePages.filter(page => page.sourceId === source.id).map(page => page.pageNumber).sort((a, b) => a - b);
+    const whole = evidencePages.some(page => page.sourceId === source.id && page.wholeSource);
     children.push(paragraph(source.pdf
       ? (included.length
-        ? `원문 총 ${source.pdf.pageCount}쪽 중 ${included.join(', ')}쪽 포함 · 원본 PDF와 나머지 쪽은 JSON에 보관.`
+        ? whole
+          ? `원문 전체 ${source.pdf.pageCount}쪽을 참고 부록에 한 번씩 포함했습니다. 업무별 쪽 연결을 새로 확정한 것은 아닙니다. 원본 PDF는 JSON에 보관합니다.`
+          : `원문 총 ${source.pdf.pageCount}쪽 중 ${included.join(', ')}쪽 포함 · 원본 PDF와 나머지 쪽은 JSON에 보관.`
         : `원문 총 ${source.pdf.pageCount}쪽인 보관 PDF입니다. 선택한 업무·진행 건과 연결되지 않아 이 DOCX에는 페이지를 넣지 않았습니다.`)
       : `출처 이름과 확인 경고만 표시합니다. 원문 발췌는 JSON에 보관.${linked ? '' : ' 업무·진행 건과 연결되지 않은 보관 자료입니다.'}`));
     children.push(paragraph(source.warnings.length ? source.warnings.join('\n') : '기록된 경고 없음 · 원본과의 일치가 보증된 것은 아닙니다.'));

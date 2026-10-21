@@ -106,6 +106,30 @@ export function storedOutputPages(doc, selection = {}) {
   return Object.fromEntries(choices);
 }
 
+/**
+ * Prepare an explicit "include the original as an appendix" output choice.
+ * Only sources with an unconfirmed item-to-page relation need the whole PDF;
+ * already confirmed relations keep their smaller range. This is not a saved
+ * relationship and must never be copied into sourcePages by the caller.
+ */
+export function fullSourceOutputPlan(doc, selection = {}) {
+  const plan = outputEvidencePlan(doc, selection);
+  const choices = [];
+  const wholeSourceIds = [];
+  let totalPages = 0;
+  for (const { source, records } of plan) {
+    const whole = records.some(record => record.state === 'unconfirmed');
+    const pages = whole
+      ? parseEvidencePages(`1-${source.pdf.pageCount}`, source.pdf.pageCount)
+      : [...new Set(records.flatMap(record => record.pages))].sort((a, b) => a - b);
+    totalPages += pages.length;
+    check(totalPages <= OUTPUT_EVIDENCE_LIMITS.pages, '원문과 근거 쪽은 한 번에 총 20쪽까지 넣을 수 있습니다. 원문은 JSON으로 전달하거나 필요한 쪽을 직접 연결해 주세요.');
+    choices.push([source.id, pages.join(', ')]);
+    if (whole) wholeSourceIds.push(source.id);
+  }
+  return { pageChoices: Object.fromEntries(choices), wholeSourceIds, totalPages };
+}
+
 export function parseEvidencePages(text, pageCount) {
   check(Number.isInteger(pageCount) && pageCount >= 1 && pageCount <= 200, 'PDF의 쪽수를 확인할 수 없습니다.');
   check(typeof text === 'string' && text.trim() && text.length <= 2000, '함께 넣을 근거 쪽을 선택해 주세요. 예: 1, 3-4');
